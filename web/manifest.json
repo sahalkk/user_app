@@ -1,6 +1,6 @@
 {
-    "name": "rider_app",
-    "short_name": "rider_app",
+    "name": "123_app",
+    "short_name": "123_app",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
