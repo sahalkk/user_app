@@ -1,9 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import '../../../components/my_text_field.dart';
-import '../blocs/sing_in_bloc/sign_in_bloc.dart';
+import '../blocs/bloc/sign_in_bloc.dart';
+
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -105,8 +105,8 @@ class _SignInScreenState extends State<SignInScreen> {
                     onPressed: () {
                       if (_formKey.currentState!.validate()) {
                         context.read<SignInBloc>().add(SignInRequired(
-                          emailController.text,
-                          passwordController.text)
+                          email: emailController.text,
+                          password: passwordController.text)
                         );
                       }
                     },

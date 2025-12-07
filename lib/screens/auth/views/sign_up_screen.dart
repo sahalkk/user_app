@@ -3,7 +3,7 @@ import 'package:user_repository/user_repository.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../../components/my_text_field.dart';
-import '../blocs/sign_up_bloc/sign_up_bloc.dart';
+import '../blocs/bloc/sign_up_bloc.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -238,7 +238,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             context.read<SignUpBloc>().add(
                               SignUpRequired(
                                 myUser,
-                                passwordController.text
+                                myUser
                               )
                             );
                           });																			
