@@ -6,9 +6,19 @@ version: 0.1.0
 environment:
   sdk: ">=3.2.3 <4.0.0"
 
+fonts:
+  - family: Poppins
+    fonts:
+      - asset: assets/fonts/Poppins-Regular.ttf
+      - asset: assets/fonts/Poppins-Medium.ttf
+      - asset: assets/fonts/Poppins-SemiBold.ttf
+      - asset: assets/fonts/Poppins-Bold.ttf
+      
 dependencies:
   flutter:
     sdk: flutter
+  cupertino_icons: ^1.0.6
+  flutter_svg: ^1.1.6
   firebase_core: ^2.16.0
 
   bloc: ^8.1.2
