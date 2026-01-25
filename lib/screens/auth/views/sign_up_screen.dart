@@ -20,7 +20,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 	IconData iconPassword = CupertinoIcons.eye_fill;
 	bool obscurePassword = true;
 	bool signUpRequired = false;
-
 	bool containsUpperCase = false;
 	bool containsLowerCase = false;
 	bool containsNumber = false;
