@@ -1,3 +1,4 @@
+import 'package:app123/screens/cart/views/cart_screen.dart';
 import 'package:flutter/material.dart';
 
 class HomeHeader extends StatelessWidget {
@@ -19,8 +20,13 @@ class HomeHeader extends StatelessWidget {
           ],
         ),
         IconButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const CartScreen()),
+            );
+          },
           icon: const Icon(Icons.shopping_bag_outlined),
-          onPressed: () {},
         )
       ],
     );

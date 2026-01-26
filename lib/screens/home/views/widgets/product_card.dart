@@ -1,45 +1,109 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart'; // 1. Import Bloc
+// Adjust these imports to match your folder structure if needed
+import '../../../../blocs/cart_bloc/cart_bloc.dart';
+import '../../../../shared/models/product_model.dart';
 
-class PopularProducts extends StatelessWidget {
-  const PopularProducts({super.key});
+class ProductCard extends StatelessWidget {
+  final ProductModel product;
+
+  const ProductCard({
+    super.key,
+    required this.product,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionHeader("Popular Products"),
-        const SizedBox(height: 12),
-        Container(
-          height: 160,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade300),
+    return Container(
+      width: 160,
+      decoration: BoxDecoration(
+        color: const Color(
+            0xFFF8F8F8), 
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Image Area
+          Expanded(
+            flex: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Center(
+                child: Image.network(
+                  product.imageUrl, // Access from model
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.image_not_supported,
+                      size: 40,
+                      color: Colors.grey),
+                ),
+              ),
+            ),
           ),
-          child: const Text("Product cards coming next"),
-        ),
-      ],
+
+          // 2. Details Area
+          Expanded(
+            flex: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    product.title, // Access from model
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 15),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        product.price, // Access from model
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w900, fontSize: 14),
+                      ),
+
+                      // 3. THE INTERACTION LOGIC
+                      GestureDetector(
+                        onTap: () {
+                          // A. Add to Cart Logic
+                          context
+                              .read<CartBloc>()
+                              .add(AddProductToCart(product));
+
+                          // B. Visual Feedback (Snackbar)
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text("${product.title} added to cart!"),
+                              duration: const Duration(seconds: 1),
+                              backgroundColor: Colors.green,
+                              behavior: SnackBarBehavior
+                                  .floating, // floats above bottom nav
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.add,
+                              color: Colors.white, size: 18),
+                        ),
+                      )
+                    ],
+                  )
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
-
-  Widget _sectionHeader(String title) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const Text(
-          "See All",
-          style: TextStyle(color: Colors.green),
-        ),
-      ],
-    );
-  }
-
 }
