@@ -1,34 +1,61 @@
-import 'dart:async';
-
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:user_repository/user_repository.dart';
 
 part 'authentication_event.dart';
 part 'authentication_state.dart';
 
 class AuthenticationBloc
     extends Bloc<AuthenticationEvent, AuthenticationState> {
-  final UserRepository userRepository;
-  late final StreamSubscription<MyUser?> _userSubscription;
-
-  AuthenticationBloc({required this.userRepository})
-      : super(AuthenticationState.unknown()) {
-    _userSubscription = userRepository.user.listen((user) {
-      add(AuthenticationUserChanged(user));
-    });
-    on<AuthenticationUserChanged>((event, emit) {
-      if (event.user != MyUser.empty) {
-        emit(AuthenticationState.authenticated(event.user!));
-      } else {
-        emit(const AuthenticationState.unauthenticated());
-      }
-    });
+  // We can inject a UserRepository here later
+  AuthenticationBloc() : super(const AuthenticationState.unknown()) {
+    on<SignInRequired>(_onSignInRequired);
+    on<SignUpRequired>(_onSignUpRequired);
+    on<SignOutRequired>(_onSignOutRequired);
   }
 
-  @override
-  Future<void> close() {
-    _userSubscription.cancel();
-    return super.close();
+  Future<void> _onSignInRequired(
+    SignInRequired event,
+    Emitter<AuthenticationState> emit,
+  ) async {
+    emit(const AuthenticationState.loading());
+    try {
+      // TODO: Replace with Real API Call
+      await Future.delayed(
+          const Duration(seconds: 2)); // Simulate network delay
+
+      // Mock Success Logic
+      if (event.email.isNotEmpty && event.password.length >= 6) {
+        // Create a mock user object
+        final mockUser = {'email': event.email, 'id': '123'};
+        emit(AuthenticationState.authenticated(mockUser));
+      } else {
+        emit(const AuthenticationState.failure("Invalid email or password"));
+      }
+    } catch (e) {
+      emit(AuthenticationState.failure(e.toString()));
+    }
+  }
+
+  Future<void> _onSignUpRequired(
+    SignUpRequired event,
+    Emitter<AuthenticationState> emit,
+  ) async {
+    emit(const AuthenticationState.loading());
+    try {
+      // TODO: Replace with Real API Call
+      await Future.delayed(const Duration(seconds: 2));
+
+      final mockUser = {'email': event.email, 'id': 'new_user_123'};
+      emit(AuthenticationState.authenticated(mockUser));
+    } catch (e) {
+      emit(AuthenticationState.failure(e.toString()));
+    }
+  }
+
+  void _onSignOutRequired(
+    SignOutRequired event,
+    Emitter<AuthenticationState> emit,
+  ) {
+    emit(const AuthenticationState.unauthenticated());
   }
 }

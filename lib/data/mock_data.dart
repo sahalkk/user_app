@@ -1,36 +1,44 @@
 import '../shared/models/product_model.dart';
 
-final List<ProductModel> mockProducts = [
+List<ProductModel> mockProducts = [
   const ProductModel(
-    id: '1',
-    title: 'Coconut Clarity',
-    price: '\$13.50',
-    priceValue: 13.50,
-    imageUrl:
-        'https://via.placeholder.com/150/FFF9C4/000000?text=Coconut', 
+    id: 'mock-1',
+    title: "Organic Bananas",
+    description: "Fresh organic bananas from local farms.",
+    price: "4.99", // NOW A STRING (matches API)
+    imageUrl: "https://via.placeholder.com/150?text=Bananas",
+    unit: "kg",
   ),
   const ProductModel(
-    id: '2',
-    title: 'Avocado Fresh',
-    price: '\$18.00',
-    priceValue: 18.00,
-    imageUrl:
-        'https://via.placeholder.com/150/E8F5E9/000000?text=Avocado', 
+    id: 'mock-2',
+    title: "Red Apples",
+    description: "Crisp and sweet red apples.",
+    price: "3.50",
+    imageUrl: "https://via.placeholder.com/150?text=Apples",
+    unit: "kg",
   ),
   const ProductModel(
-    id: '3',
-    title: 'Berry Blast',
-    price: '\$12.00',
-    priceValue: 12.00,
-    imageUrl:
-        'https://via.placeholder.com/150/FCE4EC/000000?text=Berry', 
+    id: 'mock-3',
+    title: "Fresh Broccoli",
+    description: "Nutritious green broccoli.",
+    price: "2.20",
+    imageUrl: "https://via.placeholder.com/150?text=Broccoli",
+    unit: "pcs",
   ),
   const ProductModel(
-    id: '4',
-    title: 'Sunny Banana',
-    price: '\$10.00',
-    priceValue: 10.00,
-    imageUrl:
-        'https://via.placeholder.com/150/FFF3E0/000000?text=Banana', 
+    id: 'mock-4',
+    title: "Carrots",
+    description: "Crunchy orange carrots.",
+    price: "1.99",
+    imageUrl: "https://via.placeholder.com/150?text=Carrots",
+    unit: "kg",
+  ),
+  const ProductModel(
+    id: 'mock-5',
+    title: "Strawberries",
+    description: "Sweet and juicy strawberries.",
+    price: "5.49",
+    imageUrl: "https://via.placeholder.com/150?text=Strawberries",
+    unit: "box",
   ),
 ];

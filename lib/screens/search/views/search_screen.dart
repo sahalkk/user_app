@@ -1,3 +1,4 @@
+import 'package:app123/data/repositories/product_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../data/mock_data.dart'; // For "Popular Products" fallback
@@ -12,7 +13,7 @@ class SearchScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // 1. Provide the Bloc to this screen
     return BlocProvider(
-      create: (context) => SearchBloc(),
+      create: (context) => SearchBloc(context.read<ProductRepository>()),
       child: const _SearchView(),
     );
   }
