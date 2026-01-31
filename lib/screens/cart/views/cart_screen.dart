@@ -84,7 +84,7 @@ class CartScreen extends StatelessWidget {
 
                           // Total Price for this item
                           Text(
-                            "\$${cartItem.totalPrice.toStringAsFixed(2)}",
+                            "\₹${cartItem.totalPrice.toStringAsFixed(2)}",
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
 
@@ -125,7 +125,7 @@ class CartScreen extends StatelessWidget {
                         children: [
                           const Text("Total:", style: TextStyle(fontSize: 18)),
                           Text(
-                            "\$${state.totalCartValue.toStringAsFixed(2)}",
+                            "\₹${state.totalCartValue.toStringAsFixed(2)}",
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
