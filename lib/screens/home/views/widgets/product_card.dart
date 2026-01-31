@@ -1,3 +1,4 @@
+import 'package:app123/shared/models/cart_item_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart'; // 1. Import Bloc
 // Adjust these imports to match your folder structure if needed
@@ -47,115 +48,157 @@ class ProductCard extends StatelessWidget {
 
           // 2. Details Area
           Expanded(
-            flex: 2,
+            flex: 3,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
+                  // --- TITLE ---
                   Text(
-                    product.title, // Access from model
+                    product.title,
                     style: const TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 15),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
+
+                  // --- PRICE & DISCOUNT ROW ---
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        product.price, // Access from model
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w900, fontSize: 14),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "₹${(product.priceValue * 1.2).toStringAsFixed(0)}", // Dummy original
+                            style: const TextStyle(
+                              fontSize: 12,
+                              decoration: TextDecoration.lineThrough,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            "₹${product.price}",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
                       ),
-
-                      // 3. THE INTERACTION LOGIC
-                      BlocBuilder<CartBloc, CartState>(
-                        builder: (context, state) {
-                          final isProductInCart = state.items
-                              .any((item) => item.product.id == product.id);
-
-                          if (!isProductInCart) {
-                            return GestureDetector(
-                              onTap: () {
-                                context
-                                    .read<CartBloc>()
-                                    .add(AddProductToCart(product));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content:
-                                        Text("${product.title} added to cart!"),
-                                    duration: const Duration(seconds: 1),
-                                    backgroundColor: Colors.green,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.green,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.add,
-                                    color: Colors.white, size: 18),
-                              ),
-                            );
-                          } else {
-                            final cartItem = state.items.firstWhere(
-                                (item) => item.product.id == product.id);
-                            return Row(
-                              children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    context.read<CartBloc>().add(
-                                        UpdateCartQuantity(product.id, -1));
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      border: Border.all(color: Colors.green),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(Icons.remove,
-                                        color: Colors.green, size: 18),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8.0),
-                                  child: Text(
-                                    "${cartItem.quantity}",
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    context
-                                        .read<CartBloc>()
-                                        .add(AddProductToCart(product));
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(Icons.add,
-                                        color: Colors.white, size: 18),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                        },
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          "20% OFF", // Dummy discount
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
                       ),
                     ],
-                  )
+                  ),
+                  const Spacer(), // Pushes buttons to the bottom
+
+                  // --- ACTION BUTTONS LAYER ---
+                  Center(
+                    child: BlocBuilder<CartBloc, CartState>(
+                      builder: (context, state) {
+                        final cartItem = state.items.firstWhere(
+                          (item) => item.product.id == product.id,
+                          orElse: () =>
+                              CartItemModel(id: '', product: product, quantity: 0),
+                        );
+
+                        if (cartItem.quantity == 0) {
+                          return GestureDetector(
+                            onTap: () {
+                              context
+                                  .read<CartBloc>()
+                                  .add(AddProductToCart(product));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content:
+                                      Text("${product.title} added to cart!"),
+                                  duration: const Duration(seconds: 1),
+                                  backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                "ADD",
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          );
+                        } else {
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              GestureDetector(
+                                onTap: () => context
+                                    .read<CartBloc>()
+                                    .add(UpdateCartQuantity(product.id, -1)),
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    border: Border.all(color: Colors.green),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(Icons.remove,
+                                      color: Colors.green, size: 18),
+                                ),
+                              ),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 15.0),
+                                child: Text(
+                                  "${cartItem.quantity}",
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () => context
+                                    .read<CartBloc>()
+                                    .add(AddProductToCart(product)),
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(Icons.add,
+                                      color: Colors.white, size: 18),
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
