@@ -9,12 +9,17 @@ class HomeHeader extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const CircleAvatar(radius: 20),
+        const CircleAvatar(
+          radius: 20,
+          backgroundImage: NetworkImage(  
+            "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&h=200",
+          ),
+        ),
         Row(
           children: const [
             Icon(Icons.location_on, size: 16, color: Colors.green),
             SizedBox(width: 4),
-            Text("California, USA",
+            Text("B C Road, Kasaragod",
                 style: TextStyle(fontWeight: FontWeight.w600)),
             Icon(Icons.keyboard_arrow_down),
           ],
