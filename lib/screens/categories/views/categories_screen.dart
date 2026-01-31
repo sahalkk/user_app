@@ -1,3 +1,4 @@
+import 'package:app123/screens/cart/views/cart_screen.dart';
 import 'package:flutter/material.dart';
 import '../../../theme/app_icons.dart';
 
@@ -45,6 +46,8 @@ class CategoriesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -57,8 +60,13 @@ class CategoriesScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(AppIcons.cart, color: Colors.black),
-            onPressed: () {},
+            icon: Icon(AppIcons.cart, color: colorScheme.onSurface),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CartScreen()),
+              );
+            },
           ),
         ],
       ),
