@@ -10,37 +10,37 @@ class CategoriesScreen extends StatelessWidget {
       "name": "Vegetables",
       "items": 40,
       "color": Color(0xFFE8F5E9),
-      "img": "https://via.placeholder.com/100"
+      // "img": "https://via.placeholder.com/100"
     }, // Light Green
     {
       "name": "Fruits",
       "items": 20,
       "color": Color(0xFFFFF3E0),
-      "img": "https://via.placeholder.com/100"
+      // "img": "https://via.placeholder.com/100"
     }, // Light Orange
     {
       "name": "Dairy",
       "items": 12,
       "color": Color(0xFFE3F2FD),
-      "img": "https://via.placeholder.com/100"
+      // "img": "https://via.placeholder.com/100"
     }, // Light Blue
     {
       "name": "Snacks",
       "items": 15,
       "color": Color(0xFFFCE4EC),
-      "img": "https://via.placeholder.com/100"
+      // "img": "https://via.placeholder.com/100"
     }, // Light Pink
     {
       "name": "Beverages",
       "items": 8,
       "color": Color(0xFFFFFDE7),
-      "img": "https://via.placeholder.com/100"
+      // "img": "https://via.placeholder.com/100"
     }, // Light Yellow
     {
       "name": "Bakery",
       "items": 10,
       "color": Color(0xFFEFEBE9),
-      "img": "https://via.placeholder.com/100"
+      // "img": "https://via.placeholder.com/100"
     }, // Light Brown
   ];
 

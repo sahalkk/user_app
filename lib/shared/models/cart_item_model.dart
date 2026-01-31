@@ -12,4 +12,16 @@ class CartItemModel {
   });
 
   double get totalPrice => product.priceValue * quantity;
+
+  CartItemModel copyWith({
+    String? id,
+    ProductModel? product,
+    int? quantity,
+  }) {
+    return CartItemModel(
+      id: id ?? this.id,
+      product: product ?? this.product,
+      quantity: quantity ?? this.quantity,
+    );
+  }
 }

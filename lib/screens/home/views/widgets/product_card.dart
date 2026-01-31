@@ -72,34 +72,88 @@ class ProductCard extends StatelessWidget {
                       ),
 
                       // 3. THE INTERACTION LOGIC
-                      GestureDetector(
-                        onTap: () {
-                          // A. Add to Cart Logic
-                          context
-                              .read<CartBloc>()
-                              .add(AddProductToCart(product));
+                      BlocBuilder<CartBloc, CartState>(
+                        builder: (context, state) {
+                          final isProductInCart = state.items
+                              .any((item) => item.product.id == product.id);
 
-                          // B. Visual Feedback (Snackbar)
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("${product.title} added to cart!"),
-                              duration: const Duration(seconds: 1),
-                              backgroundColor: Colors.green,
-                              behavior: SnackBarBehavior
-                                  .floating, // floats above bottom nav
-                            ),
-                          );
+                          if (!isProductInCart) {
+                            return GestureDetector(
+                              onTap: () {
+                                context
+                                    .read<CartBloc>()
+                                    .add(AddProductToCart(product));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content:
+                                        Text("${product.title} added to cart!"),
+                                    duration: const Duration(seconds: 1),
+                                    backgroundColor: Colors.green,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.green,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.add,
+                                    color: Colors.white, size: 18),
+                              ),
+                            );
+                          } else {
+                            final cartItem = state.items.firstWhere(
+                                (item) => item.product.id == product.id);
+                            return Row(
+                              children: [
+                                GestureDetector(
+                                  onTap: () {
+                                    context.read<CartBloc>().add(
+                                        UpdateCartQuantity(product.id, -1));
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      border: Border.all(color: Colors.green),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.remove,
+                                        color: Colors.green, size: 18),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8.0),
+                                  child: Text(
+                                    "${cartItem.quantity}",
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    context
+                                        .read<CartBloc>()
+                                        .add(AddProductToCart(product));
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.add,
+                                        color: Colors.white, size: 18),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
                         },
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.add,
-                              color: Colors.white, size: 18),
-                        ),
-                      )
+                      ),
                     ],
                   )
                 ],
