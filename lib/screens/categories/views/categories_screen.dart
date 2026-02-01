@@ -10,38 +10,44 @@ class CategoriesScreen extends StatelessWidget {
       "name": "Vegetables",
       "items": 40,
       "color": Color(0xFFE8F5E9),
-      "img": "https://via.placeholder.com/100"
-    }, // Light Green
+      "img":
+          "https://images.unsplash.com/photo-1597362925123-77861d3fbac7?auto=format&fit=crop&w=500&q=60"
+    },
     {
       "name": "Fruits",
       "items": 20,
       "color": Color(0xFFFFF3E0),
-      "img": "https://via.placeholder.com/100"
-    }, // Light Orange
+      "img":
+          "https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=500&q=60"
+    },
     {
       "name": "Dairy",
       "items": 12,
       "color": Color(0xFFE3F2FD),
-      "img": "https://via.placeholder.com/100"
-    }, // Light Blue
+      "img":
+          "https://images.unsplash.com/photo-1628088062854-d1870b4553da?auto=format&fit=crop&w=500&q=60"
+    },
     {
       "name": "Snacks",
       "items": 15,
       "color": Color(0xFFFCE4EC),
-      "img": "https://via.placeholder.com/100"
-    }, // Light Pink
+      "img":
+          "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?auto=format&fit=crop&w=500&q=60"
+    },
     {
       "name": "Beverages",
       "items": 8,
       "color": Color(0xFFFFFDE7),
-      "img": "https://via.placeholder.com/100"
-    }, // Light Yellow
+      "img":
+          "https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=500&q=60"
+    },
     {
       "name": "Bakery",
       "items": 10,
       "color": Color(0xFFEFEBE9),
-      "img": "https://via.placeholder.com/100"
-    }, // Light Brown
+      "img":
+          "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=500&q=60"
+    },
   ];
 
   @override
@@ -73,10 +79,10 @@ class CategoriesScreen extends StatelessWidget {
       body: GridView.builder(
         padding: const EdgeInsets.all(16),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2, // 2 columns
+          crossAxisCount: 2,
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
-          childAspectRatio: 0.85, // Taller cards
+          childAspectRatio: 0.85,
         ),
         itemCount: categories.length,
         itemBuilder: (context, index) {
@@ -89,7 +95,18 @@ class CategoriesScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Image.network(cat['img'], height: 80),
+                // --- WRAP IMAGE WITH ClipRRect FOR BORDER RADIUS ---
+                ClipRRect(
+                  borderRadius:
+                      BorderRadius.circular(12), // Adjust radius as liked
+                  child: Image.network(
+                    cat['img'],
+                    height: 80,
+                    width: 120, // Using the width from your snippet
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                // --------------------------------------------------
                 const SizedBox(height: 12),
                 Text(
                   cat['name'],
