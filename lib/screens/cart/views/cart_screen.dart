@@ -16,10 +16,8 @@ class CartScreen extends StatelessWidget {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
       ),
-      // Listen to CartBloc
       body: BlocBuilder<CartBloc, CartState>(
         builder: (context, state) {
-          // 1. Empty State
           if (state is! CartLoaded || state.items.isEmpty) {
             return const Center(
               child: Column(
@@ -37,7 +35,7 @@ class CartScreen extends StatelessWidget {
 
           return Column(
             children: [
-              // 2. List of Items
+              // 1. List of Items
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.all(16),
@@ -47,6 +45,9 @@ class CartScreen extends StatelessWidget {
                     final cartItem = state.items[index];
                     final itemTotal =
                         cartItem.product.priceValue * cartItem.quantity;
+
+                    // Logic to fake an "Original Price" for the strike-through effect (e.g. 25% higher)
+                    final originalPrice = itemTotal * 1.25;
 
                     return Container(
                       padding: const EdgeInsets.all(12),
@@ -77,32 +78,27 @@ class CartScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Title and Delete Row
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        cartItem.product.title,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    // Delete Icon
-                                    InkWell(
-                                      onTap: () {
-                                        context.read<CartBloc>().add(
-                                            RemoveFromCart(
-                                                cartItem.product.id));
-                                      },
-                                      child: const Icon(Icons.close,
-                                          color: Colors.red, size: 20),
-                                    ),
-                                  ],
+                                // Title Row (X Button Removed)
+                                Text(
+                                  cartItem.product.title,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
+                                const SizedBox(height: 4),
+
+                                // Unit / Description (Optional)
+                                Text(
+                                  cartItem.product.unit.isNotEmpty
+                                      ? cartItem.product.unit
+                                      : "1 Unit",
+                                  style: TextStyle(
+                                      color: Colors.grey.shade500,
+                                      fontSize: 12),
+                                ),
+
                                 const SizedBox(height: 12),
 
                                 // Price and Quantity Controls Row
@@ -110,16 +106,33 @@ class CartScreen extends StatelessWidget {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    // Price (Using your Rupee Icon)
-                                    Text(
-                                      "₹${itemTotal.toStringAsFixed(2)}",
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                          color: Colors.black),
+                                    // --- PRICES SECTION ---
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // Striked Through Price (Original)
+                                        Text(
+                                          "₹${originalPrice.toStringAsFixed(2)}",
+                                          style: TextStyle(
+                                            decoration:
+                                                TextDecoration.lineThrough,
+                                            color: Colors.grey.shade400,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        // Selling Price (Bold)
+                                        Text(
+                                          "₹${itemTotal.toStringAsFixed(2)}",
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                              color: Colors.black),
+                                        ),
+                                      ],
                                     ),
 
-                                    // Quantity Buttons
+                                    // --- QUANTITY CONTROLS ---
                                     Container(
                                       decoration: BoxDecoration(
                                         color: Colors.white,
@@ -129,14 +142,20 @@ class CartScreen extends StatelessWidget {
                                       ),
                                       child: Row(
                                         children: [
-                                          // Minus Button
+                                          // Minus Button (Handles Delete Logic)
                                           InkWell(
                                             onTap: () {
                                               if (cartItem.quantity > 1) {
+                                                // Decrease Quantity
                                                 context.read<CartBloc>().add(
                                                     UpdateCartItemQuantity(
                                                         cartItem.product.id,
                                                         cartItem.quantity - 1));
+                                              } else {
+                                                // Remove Item if quantity is 1
+                                                context.read<CartBloc>().add(
+                                                    RemoveFromCart(
+                                                        cartItem.product.id));
                                               }
                                             },
                                             child: const Padding(
@@ -185,7 +204,7 @@ class CartScreen extends StatelessWidget {
                 ),
               ),
 
-              // 3. Checkout Section
+              // 2. Checkout Section
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -209,7 +228,6 @@ class CartScreen extends StatelessWidget {
                           const Text("Total:",
                               style:
                                   TextStyle(fontSize: 18, color: Colors.grey)),
-                          // Total Price (Using your Rupee Icon)
                           Text(
                             "₹${state.totalAmount.toStringAsFixed(2)}",
                             style: TextStyle(
