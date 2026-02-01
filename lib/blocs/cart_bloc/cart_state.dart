@@ -1,12 +1,20 @@
 part of 'cart_bloc.dart';
 
-class CartState {
+abstract class CartState extends Equatable {
+  const CartState();
+
+  @override
+  List<Object> get props => [];
+}
+
+class CartInitial extends CartState {}
+
+class CartLoaded extends CartState {
   final List<CartItemModel> items;
+  final double totalAmount;
 
-  // Computed property: handy for showing "Total: $50" on the UI
-  double get totalCartValue =>
-      items.fold(0, (sum, item) => sum + item.totalPrice);
-  int get totalItemCount => items.fold(0, (sum, item) => sum + item.quantity);
+  const CartLoaded({required this.items, required this.totalAmount});
 
-  const CartState({this.items = const []});
+  @override
+  List<Object> get props => [items, totalAmount];
 }

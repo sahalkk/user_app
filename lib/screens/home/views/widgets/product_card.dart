@@ -113,18 +113,99 @@ class ProductCard extends StatelessWidget {
                   Center(
                     child: BlocBuilder<CartBloc, CartState>(
                       builder: (context, state) {
-                        final cartItem = state.items.firstWhere(
-                          (item) => item.product.id == product.id,
-                          orElse: () =>
-                              CartItemModel(id: '', product: product, quantity: 0),
-                        );
+                        if (state is CartLoaded) {
+                          final cartItem = state.items.firstWhere(
+                            (item) => item.product.id == product.id,
+                            orElse: () =>
+                                CartItemModel(id: '', product: product, quantity: 0),
+                          );
 
-                        if (cartItem.quantity == 0) {
+                          if (cartItem.quantity == 0) {
+                            return GestureDetector(
+                              onTap: () {
+                                context
+                                    .read<CartBloc>()
+                                    .add(AddToCart(product));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content:
+                                        Text("${product.title} added to cart!"),
+                                    duration: const Duration(seconds: 1),
+                                    backgroundColor: Colors.green,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.green,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Text(
+                                  "ADD",
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            );
+                          } else {
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                GestureDetector(
+                                  onTap: () {
+                                    if (cartItem.quantity > 1) {
+                                      context.read<CartBloc>().add(UpdateCartItemQuantity(product.id, cartItem.quantity - 1));
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      border: Border.all(color: Colors.green),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.remove,
+                                        color: Colors.green, size: 18),
+                                  ),
+                                ),
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 15.0),
+                                  child: Text(
+                                    "${cartItem.quantity}",
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () => context
+                                      .read<CartBloc>()
+                                      .add(AddToCart(product)),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.add,
+                                        color: Colors.white, size: 18),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                        } else {
+                          // Initial state, show ADD
                           return GestureDetector(
                             onTap: () {
                               context
                                   .read<CartBloc>()
-                                  .add(AddProductToCart(product));
+                                  .add(AddToCart(product));
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content:
@@ -149,51 +230,6 @@ class ProductCard extends StatelessWidget {
                                     fontWeight: FontWeight.bold),
                               ),
                             ),
-                          );
-                        } else {
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              GestureDetector(
-                                onTap: () => context
-                                    .read<CartBloc>()
-                                    .add(UpdateCartQuantity(product.id, -1)),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    border: Border.all(color: Colors.green),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const Icon(Icons.remove,
-                                      color: Colors.green, size: 18),
-                                ),
-                              ),
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 15.0),
-                                child: Text(
-                                  "${cartItem.quantity}",
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () => context
-                                    .read<CartBloc>()
-                                    .add(AddProductToCart(product)),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const Icon(Icons.add,
-                                      color: Colors.white, size: 18),
-                                ),
-                              ),
-                            ],
                           );
                         }
                       },

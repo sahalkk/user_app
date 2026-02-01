@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../shared/models/product_model.dart'; 
-import 'product_card.dart';
+import '../../../../shared/models/product_model.dart';
 
 class PopularProducts extends StatelessWidget {
   final List<ProductModel> products;

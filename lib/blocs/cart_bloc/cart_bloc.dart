@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:equatable/equatable.dart';
 import '../../shared/models/cart_item_model.dart';
 import '../../shared/models/product_model.dart';
 
@@ -6,56 +7,65 @@ part 'cart_event.dart';
 part 'cart_state.dart';
 
 class CartBloc extends Bloc<CartEvent, CartState> {
-  CartBloc() : super(const CartState()) {
-    on<AddProductToCart>(_onAddProduct);
-    on<RemoveProductFromCart>(_onRemoveProduct);
-    on<UpdateCartQuantity>(_onUpdateQuantity);
+  // Internal list to keep track of items
+  List<CartItemModel> _items = [];
+
+  CartBloc() : super(CartInitial()) {
+    on<LoadCart>(_onLoadCart);
+    on<AddToCart>(_onAddToCart);
+    on<RemoveFromCart>(_onRemoveFromCart);
+    on<UpdateCartItemQuantity>(_onUpdateQuantity); // Register new handler
   }
 
-  void _onAddProduct(AddProductToCart event, Emitter<CartState> emit) {
-    // 1. Check if item already exists
-    final existingIndex =
-        state.items.indexWhere((i) => i.product.id == event.product.id);
+  void _onLoadCart(LoadCart event, Emitter<CartState> emit) {
+    emit(CartLoaded(items: _items, totalAmount: _calculateTotal()));
+  }
 
-    List<CartItemModel> updatedList = List.from(state.items);
+  void _onAddToCart(AddToCart event, Emitter<CartState> emit) {
+    // Check if item already exists
+    final existingIndex =
+        _items.indexWhere((item) => item.product.id == event.product.id);
 
     if (existingIndex >= 0) {
-      // 2. If yes, just increase quantity
-      updatedList[existingIndex].quantity++;
+      // Increment quantity if exists
+      _items[existingIndex].quantity += 1;
     } else {
-      // 3. If no, add new item
-      updatedList.add(CartItemModel(
-        id: DateTime.now().toString(), // simplistic ID generation
+      // Add new item
+      _items.add(CartItemModel(
+        id: DateTime.now().toString(),
         product: event.product,
+        quantity: 1,
       ));
     }
-
-    emit(CartState(items: updatedList));
+    emit(CartLoaded(items: List.from(_items), totalAmount: _calculateTotal()));
   }
 
-  void _onRemoveProduct(RemoveProductFromCart event, Emitter<CartState> emit) {
-    List<CartItemModel> updatedList = List.from(state.items);
-    updatedList.removeWhere((item) => item.product.id == event.productId);
-    emit(CartState(items: updatedList));
+  void _onRemoveFromCart(RemoveFromCart event, Emitter<CartState> emit) {
+    _items.removeWhere((item) => item.product.id == event.productId);
+    emit(CartLoaded(items: List.from(_items), totalAmount: _calculateTotal()));
   }
 
-  void _onUpdateQuantity(UpdateCartQuantity event, Emitter<CartState> emit) {
-    final existingIndex =
-        state.items.indexWhere((i) => i.product.id == event.productId);
+  // --- NEW HANDLER ---
+  void _onUpdateQuantity(
+      UpdateCartItemQuantity event, Emitter<CartState> emit) {
+    final index =
+        _items.indexWhere((item) => item.product.id == event.productId);
 
-    if (existingIndex >= 0) {
-      List<CartItemModel> updatedList = List.from(state.items);
-      final currentItem = updatedList[existingIndex];
-
-      final newQuantity = currentItem.quantity + event.change;
-
-      if (newQuantity > 0) {
-        updatedList[existingIndex] =
-            currentItem.copyWith(quantity: newQuantity);
+    if (index >= 0) {
+      if (event.newQuantity > 0) {
+        _items[index].quantity = event.newQuantity;
       } else {
-        updatedList.removeAt(existingIndex);
+        // If quantity is 0, optional: remove item or keep at 1.
+        // Usually, we keep at 1 and let the user use the "Delete" button to remove.
+        _items[index].quantity = 1;
       }
-      emit(CartState(items: updatedList));
+      emit(
+          CartLoaded(items: List.from(_items), totalAmount: _calculateTotal()));
     }
+  }
+
+  double _calculateTotal() {
+    return _items.fold(
+        0, (total, item) => total + (item.product.priceValue * item.quantity));
   }
 }

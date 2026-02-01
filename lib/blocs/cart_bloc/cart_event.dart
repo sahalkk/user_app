@@ -1,20 +1,34 @@
 part of 'cart_bloc.dart';
 
-abstract class CartEvent {}
+abstract class CartEvent extends Equatable {
+  const CartEvent();
+  @override
+  List<Object> get props => [];
+}
 
-class AddProductToCart extends CartEvent {
+class LoadCart extends CartEvent {}
+
+class AddToCart extends CartEvent {
   final ProductModel product;
-  AddProductToCart(this.product);
+  const AddToCart(this.product);
+  @override
+  List<Object> get props => [product];
 }
 
-class RemoveProductFromCart extends CartEvent {
+class RemoveFromCart extends CartEvent {
   final String productId;
-  RemoveProductFromCart(this.productId);
+  const RemoveFromCart(this.productId);
+  @override
+  List<Object> get props => [productId];
 }
 
-// Optional: for incrementing/decrementing in Cart Page
-class UpdateCartQuantity extends CartEvent {
+// --- ADD THIS NEW EVENT ---
+class UpdateCartItemQuantity extends CartEvent {
   final String productId;
-  final int change; // +1 or -1
-  UpdateCartQuantity(this.productId, this.change);
+  final int newQuantity;
+
+  const UpdateCartItemQuantity(this.productId, this.newQuantity);
+
+  @override
+  List<Object> get props => [productId, newQuantity];
 }
