@@ -1,21 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'blocs/cart_bloc/cart_bloc.dart';
-import 'data/repositories/product_repository.dart'; // Import this
-import 'screens/main_wrapper.dart';
+import 'screens/home/blocs/home_bloc.dart';
+import 'data/repositories/product_repository.dart';
+import 'screens/splash/splash_screen.dart';
 
 class MyAppView extends StatelessWidget {
   const MyAppView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // 1. PROVIDE REPOSITORY AT THE TOP LEVEL
     return RepositoryProvider(
       create: (context) => ProductRepository(),
-      child: BlocProvider(
-        create: (context) => CartBloc(),
+
+      // USE MULTI-BLOC PROVIDER HERE
+      child: MultiBlocProvider(
+        providers: [
+          // 1. Provide CartBloc
+          BlocProvider(
+            create: (context) => CartBloc(),
+          ),
+          // 2. Provide HomeBloc (Global now!)
+          BlocProvider(
+            create: (context) => HomeBloc(
+              context.read<ProductRepository>(),
+            ),
+          ),
+        ],
         child: MaterialApp(
-          title: '123 Delivery App',
+          title: 'Beeyo App',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             colorScheme: ColorScheme.light(
@@ -25,7 +38,7 @@ class MyAppView extends StatelessWidget {
               onPrimary: Colors.white,
             ),
           ),
-          home: const MainWrapper(),
+          home: const SplashScreen(),
         ),
       ),
     );
