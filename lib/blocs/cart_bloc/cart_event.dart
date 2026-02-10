@@ -22,13 +22,20 @@ class RemoveFromCart extends CartEvent {
   List<Object> get props => [productId];
 }
 
-// --- ADD THIS NEW EVENT ---
 class UpdateCartItemQuantity extends CartEvent {
   final String productId;
   final int newQuantity;
-
   const UpdateCartItemQuantity(this.productId, this.newQuantity);
-
   @override
   List<Object> get props => [productId, newQuantity];
 }
+
+// 2. New Event: User saves an address
+class UpdateDeliveryAddress extends CartEvent {
+  final Map<String, String> address;
+  const UpdateDeliveryAddress(this.address);
+  @override
+  List<Object> get props => [address];
+}
+
+class ClearCart extends CartEvent {}

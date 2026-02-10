@@ -1,7 +1,7 @@
 name: app123
 description: A new Flutter project.
 publish_to: "none"
-version: 0.1.0+5
+version: 0.1.0+6
 
 environment:
   sdk: ">=3.2.3 <4.0.0"
@@ -29,6 +29,8 @@ dependencies:
     path: packages/user_repository
   rxdart: ^0.27.7
   flutter_spinkit: ^5.2.2
+  shared_preferences: ^2.5.3
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:

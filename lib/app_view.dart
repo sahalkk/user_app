@@ -1,3 +1,7 @@
+import 'package:app123/blocs/auth_bloc/auth_bloc.dart';
+import 'package:app123/blocs/auth_bloc/auth_event.dart';
+import 'package:app123/blocs/order_bloc/order_bloc.dart';
+import 'package:app123/data/repositories/auth_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'blocs/cart_bloc/cart_bloc.dart';
@@ -10,21 +14,27 @@ class MyAppView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RepositoryProvider(
-      create: (context) => ProductRepository(),
 
+    final authRepository = AuthRepository();
+
+    return MultiRepositoryProvider(
+      providers: [
+        RepositoryProvider<AuthRepository>.value(value: authRepository),
+        RepositoryProvider<ProductRepository>(
+          create: (context) => ProductRepository(),
+        ),
+      ],
       // USE MULTI-BLOC PROVIDER HERE
       child: MultiBlocProvider(
         providers: [
-          // 1. Provide CartBloc
           BlocProvider(
-            create: (context) => CartBloc(),
+            create: (context) => AuthBloc(authRepository: authRepository)..add(AppStarted()),
           ),
-          // 2. Provide HomeBloc (Global now!)
+          BlocProvider(create: (context) => CartBloc()),
           BlocProvider(
-            create: (context) => HomeBloc(
-              context.read<ProductRepository>(),
-            ),
+              create: (context) => HomeBloc(context.read<ProductRepository>())),
+          BlocProvider(
+            create: (context) => OrderBloc(),
           ),
         ],
         child: MaterialApp(

@@ -1,3 +1,8 @@
+import 'package:app123/blocs/auth_bloc/auth_bloc.dart';
+import 'package:app123/blocs/auth_bloc/auth_state.dart';
+import 'package:app123/screens/auth/views/login_screen.dart';
+import 'package:app123/screens/checkout/views/add_address_screen.dart';
+import 'package:app123/screens/checkout/views/checkout_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../blocs/cart_bloc/cart_bloc.dart';
@@ -243,8 +248,59 @@ class CartScreen extends StatelessWidget {
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: () {
-                            // TODO: Navigate to Address/Checkout Screen
+                          onPressed: () async {
+                            // --- STEP 1: LOGIN CHECK ---
+                            final authState = context.read<AuthBloc>().state;
+                            bool isLoggedIn = authState is AuthAuthenticated;
+
+                            if (!isLoggedIn) {
+                              // Redirect to Login Page and WAIT for result
+                              final loginResult = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => const LoginScreen()),
+                              );
+
+                              // If user pressed "Back" instead of logging in, stop here.
+                              if (loginResult != true) return;
+                            }
+
+                            // --- STEP 2: ADDRESS CHECK ---
+                            // (We check the CartBloc state to see if we already have an address)
+                            if (!context.mounted) return; // Safety check
+                            final cartState = context.read<CartBloc>().state;
+
+                            if (cartState.deliveryAddress == null) {
+                              // CASE A: No Address -> Go to "Add Address" Screen
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => AddAddressScreen(
+                                    onSave: (newAddress) {
+                                      // 1. Save address to Bloc
+                                      context.read<CartBloc>().add(
+                                          UpdateDeliveryAddress(newAddress));
+
+                                      // 2. Redirect immediately to Checkout Screen (replacing the add screen)
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                const CheckoutScreen()),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              );
+                            } else {
+                              // CASE B: Address Exists -> Go straight to Checkout
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        const CheckoutScreen()),
+                              );
+                            }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(context).primaryColor,
