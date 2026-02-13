@@ -1,3 +1,4 @@
+import 'package:app123/screens/profile/views/profile_screen.dart';
 import 'package:flutter/material.dart';
 
 // Screens
@@ -17,21 +18,24 @@ class MainWrapper extends StatefulWidget {
 class _MainWrapperState extends State<MainWrapper> {
   int _currentIndex = 0;
 
-  // 2. Update the Pages List
-  final List<Widget> _pages = [
-    const HomeScreen(), // Index 0
-    const CategoriesScreen(), // Index 1
-    const OrdersScreen(), // Index 2 (Replaced Text placeholder)
-    const Center(child: Text("Profile")), // Index 3
-  ];
-
   @override
   Widget build(BuildContext context) {
-    // 3. Removed BlocProvider (It's already in app_view.dart)
+    final List<Widget> pages = [
+      const HomeScreen(), // Index 0
+      const CategoriesScreen(), // Index 1
+      const OrdersScreen(), // Index 2
+      ProfileScreen(
+        onNavigateToOrders: () {
+          setState(() {
+            _currentIndex = 2;
+          });
+        },
+      ), // Index 3
+    ];
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _pages,
+        children: pages,
       ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: _currentIndex,
