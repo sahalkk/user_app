@@ -1,27 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-// Import Auth files to handle the Logout button
 import '../../../../blocs/auth_bloc/auth_bloc.dart';
 import '../../../../blocs/auth_bloc/auth_event.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ProfileScreen extends StatelessWidget {
   final VoidCallback onNavigateToOrders;
+
   const ProfileScreen({super.key, required this.onNavigateToOrders});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          Colors.grey.shade50, // Matches the soft background in the design
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         backgroundColor: Colors.grey.shade50,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
-          "Profile",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
+        title: const Text("Profile",
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.more_horiz, color: Colors.black),
@@ -34,21 +31,19 @@ class ProfileScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. User Header Card
             _buildUserCard(),
 
             const SizedBox(height: 32),
 
-            // 2. Account Section
-            const Text(
-              "Account",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            // 1. Account Section
+            const Text("Account",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             _buildMenuContainer([
               _buildMenuItem(
                   Icons.person_outline, "Account Information", () {}),
-              _buildMenuItem(Icons.receipt_long_outlined, "My Orders", onNavigateToOrders),
+              _buildMenuItem(
+                  Icons.receipt_long_outlined, "My Orders", onNavigateToOrders),
               _buildMenuItem(
                   Icons.location_on_outlined, "Address Management", () {}),
               _buildMenuItem(Icons.settings_outlined, "Setting", () {}),
@@ -57,16 +52,33 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 32),
 
+            // 2. NEW: About Section
+            const Text("About",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            _buildMenuContainer([
+              _buildMenuItem(Icons.share_outlined, "Share the App", () {
+                SharePlus.instance.share(
+                  ShareParams(
+                    text:
+                        'Check out Beeyo, Essentials at your Doorstep! Download it here: https://play.google.com/store/apps/details?id=com.beeyo.customer',
+                    subject: 'Download Beeyo App!',
+                  ),
+                );
+              }),
+              _buildMenuItem(Icons.info_outline, "About Us", () {}),
+              _buildMenuItem(Icons.shield_outlined, "Privacy Policy", () {}),
+            ]),
+
+            const SizedBox(height: 32),
+
             // 3. Support Section
-            const Text(
-              "Support",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            const Text("Support",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             _buildMenuContainer([
               _buildMenuItem(Icons.help_outline, "Help Center", () {}),
               _buildMenuItem(Icons.logout, "Logout", () {
-                // Trigger the Logout event we built earlier!
                 context.read<AuthBloc>().add(LogoutRequested());
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text("Logged out successfully")),
@@ -74,14 +86,12 @@ class ProfileScreen extends StatelessWidget {
               }, isDestructive: true),
             ]),
 
-            const SizedBox(height: 40), // Padding for bottom nav bar
+            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
-
-  // --- HELPER WIDGETS TO KEEP CODE CLEAN ---
 
   Widget _buildUserCard() {
     return Container(
@@ -91,41 +101,32 @@ class ProfileScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4)),
         ],
       ),
       child: Row(
         children: [
-          // Circular Avatar Placeholder
           CircleAvatar(
             radius: 30,
             backgroundColor: Colors.grey.shade200,
             child: const Icon(Icons.person, size: 30, color: Colors.grey),
           ),
           const SizedBox(width: 16),
-
-          // Name and Email
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "Jon Alishon",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+                Text("Jon Alishon",
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 SizedBox(height: 4),
-                Text(
-                  "alishon35@gmail.com",
-                  style: TextStyle(color: Colors.grey, fontSize: 13),
-                ),
+                Text("alishon35@gmail.com",
+                    style: TextStyle(color: Colors.grey, fontSize: 13)),
               ],
             ),
           ),
-
-          // Edit Button
           OutlinedButton.icon(
             onPressed: () {},
             icon: const Icon(Icons.edit, size: 16, color: Colors.black),
@@ -149,15 +150,12 @@ class ProfileScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4)),
         ],
       ),
-      child: Column(
-        children: children,
-      ),
+      child: Column(children: children),
     );
   }
 
@@ -166,13 +164,10 @@ class ProfileScreen extends StatelessWidget {
     return ListTile(
       leading:
           Icon(icon, color: isDestructive ? Colors.red : Colors.grey.shade700),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.w500,
-          color: isDestructive ? Colors.red : Colors.black,
-        ),
-      ),
+      title: Text(title,
+          style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: isDestructive ? Colors.red : Colors.black)),
       trailing:
           const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
       onTap: onTap,
