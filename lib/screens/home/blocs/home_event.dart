@@ -7,3 +7,14 @@ abstract class HomeEvent extends Equatable {
 }
 
 class LoadHomeData extends HomeEvent {}
+
+// --- NEW EVENT ---
+// Triggered when the user taps a category pill/button
+class SelectCategory extends HomeEvent {
+  final String category;
+
+  const SelectCategory(this.category);
+
+  @override
+  List<Object> get props => [category];
+}

@@ -7,6 +7,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'blocs/cart_bloc/cart_bloc.dart';
 import 'screens/home/blocs/home_bloc.dart';
 import 'data/repositories/product_repository.dart';
+import 'data/repositories/category_repository.dart';
+import 'screens/categories/blocs/categories_bloc.dart';
 import 'screens/splash/splash_screen.dart';
 
 class MyAppView extends StatelessWidget {
@@ -23,6 +25,9 @@ class MyAppView extends StatelessWidget {
         RepositoryProvider<ProductRepository>(
           create: (context) => ProductRepository(),
         ),
+        RepositoryProvider<CategoryRepository>(
+          create: (context) => CategoryRepository(),
+        ),
       ],
       // USE MULTI-BLOC PROVIDER HERE
       child: MultiBlocProvider(
@@ -33,6 +38,9 @@ class MyAppView extends StatelessWidget {
           BlocProvider(create: (context) => CartBloc()),
           BlocProvider(
               create: (context) => HomeBloc(context.read<ProductRepository>())),
+          BlocProvider(
+            create: (context) => CategoriesBloc(context.read<CategoryRepository>())..add(LoadCategories()),
+          ),
           BlocProvider(
             create: (context) => OrderBloc(),
           ),

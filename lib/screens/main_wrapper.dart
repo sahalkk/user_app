@@ -1,12 +1,17 @@
-import 'package:app123/screens/profile/views/profile_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 // Screens
 import 'home/views/home_screen.dart';
 import 'categories/views/categories_screen.dart';
-import 'orders/views/orders_screen.dart'; // 1. Import Orders Screen
-
+import 'orders/views/orders_screen.dart';
+import 'profile/views/profile_screen.dart';
 import '../shared/widgets/app_bottom_nav.dart';
+
+// Auth Imports (Crucial for the check)
+import '../../blocs/auth_bloc/auth_bloc.dart';
+import '../../blocs/auth_bloc/auth_state.dart';
+import 'auth/views/login_screen.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});
@@ -18,6 +23,38 @@ class MainWrapper extends StatefulWidget {
 class _MainWrapperState extends State<MainWrapper> {
   int _currentIndex = 0;
 
+  // --- THE PROTECTION LOGIC ---
+  void _onTabTapped(int index) async {
+    // 1. Check if the user is trying to access Orders (2) or Profile (3)
+    if (index == 2 || index == 3) {
+      final authState = context.read<AuthBloc>().state;
+
+      // 2. If the user is NOT logged in
+      if (authState is! AuthAuthenticated) {
+        // Show Login Screen and wait for them to finish
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+
+        if (!mounted) return;
+
+        // 3. Check their state again after they return from the Login screen
+        final newState = context.read<AuthBloc>().state;
+
+        // If they just hit the "Back" arrow and didn't log in, stop here.
+        if (newState is! AuthAuthenticated) {
+          return;
+        }
+      }
+    }
+
+    // 4. If they are logged in (or tapping Home/Categories), change tab normally
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
@@ -25,13 +62,11 @@ class _MainWrapperState extends State<MainWrapper> {
       const CategoriesScreen(), // Index 1
       const OrdersScreen(), // Index 2
       ProfileScreen(
-        onNavigateToOrders: () {
-          setState(() {
-            _currentIndex = 2;
-          });
-        },
+        // Use the protected logic here too!
+        onNavigateToOrders: () => _onTabTapped(2),
       ), // Index 3
     ];
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -39,7 +74,7 @@ class _MainWrapperState extends State<MainWrapper> {
       ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: _onTabTapped, // Make sure your custom nav uses this function!
       ),
     );
   }

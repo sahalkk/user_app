@@ -251,18 +251,24 @@ class CartScreen extends StatelessWidget {
                           onPressed: () async {
                             // --- STEP 1: LOGIN CHECK ---
                             final authState = context.read<AuthBloc>().state;
-                            bool isLoggedIn = authState is AuthAuthenticated;
 
-                            if (!isLoggedIn) {
-                              // Redirect to Login Page and WAIT for result
-                              final loginResult = await Navigator.push(
+                            if (authState is! AuthAuthenticated) {
+                              // Redirect to Login Page and WAIT for them to close it
+                              await Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                     builder: (context) => const LoginScreen()),
                               );
 
-                              // If user pressed "Back" instead of logging in, stop here.
-                              if (loginResult != true) return;
+                              // Safety check: Ensure the screen still exists after waiting
+                              if (!context.mounted) return;
+
+                              // 🔥 THE FIX: Ask the Bloc if they actually logged in!
+                              final newState = context.read<AuthBloc>().state;
+                              if (newState is! AuthAuthenticated) {
+                                // They pressed "Back" and are still a guest. Stop the checkout!
+                                return;
+                              }
                             }
 
                             // --- STEP 2: ADDRESS CHECK ---
@@ -281,7 +287,7 @@ class CartScreen extends StatelessWidget {
                                       context.read<CartBloc>().add(
                                           UpdateDeliveryAddress(newAddress));
 
-                                      // 2. Redirect immediately to Checkout Screen (replacing the add screen)
+                                      // 2. Redirect immediately to Checkout Screen
                                       Navigator.pushReplacement(
                                         context,
                                         MaterialPageRoute(

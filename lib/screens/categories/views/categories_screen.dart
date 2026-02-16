@@ -1,130 +1,117 @@
-import 'package:app123/screens/cart/views/cart_screen.dart';
 import 'package:flutter/material.dart';
-import '../../../theme/app_icons.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../blocs/categories_bloc.dart';
 
 class CategoriesScreen extends StatelessWidget {
   const CategoriesScreen({super.key});
 
-  final List<Map<String, dynamic>> categories = const [
-    {
-      "name": "Vegetables",
-      "items": 40,
-      "color": Color(0xFFE8F5E9),
-      "img":
-          "https://images.unsplash.com/photo-1597362925123-77861d3fbac7?auto=format&fit=crop&w=500&q=60"
-    },
-    {
-      "name": "Fruits",
-      "items": 20,
-      "color": Color(0xFFFFF3E0),
-      "img":
-          "https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=500&q=60"
-    },
-    {
-      "name": "Dairy",
-      "items": 12,
-      "color": Color(0xFFE3F2FD),
-      "img":
-          "https://images.unsplash.com/photo-1628088062854-d1870b4553da?auto=format&fit=crop&w=500&q=60"
-    },
-    {
-      "name": "Snacks",
-      "items": 15,
-      "color": Color(0xFFFCE4EC),
-      "img":
-          "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?auto=format&fit=crop&w=500&q=60"
-    },
-    {
-      "name": "Beverages",
-      "items": 8,
-      "color": Color(0xFFFFFDE7),
-      "img":
-          "https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=500&q=60"
-    },
-    {
-      "name": "Bakery",
-      "items": 10,
-      "color": Color(0xFFEFEBE9),
-      "img":
-          "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=500&q=60"
-    },
+  // A list of soft colors to cycle through for the background cards
+  static final List<Color> _cardColors = [
+    Colors.green.shade50,
+    Colors.orange.shade50,
+    Colors.blue.shade50,
+    Colors.pink.shade50,
+    Colors.yellow.shade50,
+    Colors.brown.shade50,
   ];
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
-          "Categories",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
+        title: const Text("Categories",
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            icon: Icon(AppIcons.cart, color: colorScheme.onSurface),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const CartScreen()),
-              );
-            },
+            icon: const Icon(Icons.shopping_bag_outlined, color: Colors.black),
+            onPressed: () {}, // Link to Cart if needed
           ),
         ],
       ),
-      body: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 0.85,
-        ),
-        itemCount: categories.length,
-        itemBuilder: (context, index) {
-          final cat = categories[index];
-          return Container(
-            decoration: BoxDecoration(
-              color: cat['color'],
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // --- WRAP IMAGE WITH ClipRRect FOR BORDER RADIUS ---
-                ClipRRect(
-                  borderRadius:
-                      BorderRadius.circular(12), // Adjust radius as liked
-                  child: Image.network(
-                    cat['img'],
-                    height: 80,
-                    width: 120, // Using the width from your snippet
-                    fit: BoxFit.cover,
+      body: BlocBuilder<CategoriesBloc, CategoriesState>(
+        builder: (context, state) {
+          if (state is CategoriesLoading) {
+            return const Center(
+                child: CircularProgressIndicator(color: Colors.green));
+          } else if (state is CategoriesError) {
+            return Center(
+                child: Text("Error: ${state.message}",
+                    style: const TextStyle(color: Colors.red)));
+          } else if (state is CategoriesLoaded) {
+            if (state.categories.isEmpty) {
+              return const Center(
+                  child: Text("No categories found",
+                      style: TextStyle(color: Colors.grey)));
+            }
+
+            return GridView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: state.categories.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.85,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+              ),
+              itemBuilder: (context, index) {
+                final category = state.categories[index];
+                // Cycle through the colors array so it repeats dynamically
+                final cardColor = _cardColors[index % _cardColors.length];
+
+                return GestureDetector(
+                  onTap: () {
+                    // TODO: Navigate to a filtered product list based on this category
+                    print("Tapped on ${category.name}");
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Category Image
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            category.imageUrl,
+                            height: 80,
+                            width: 100,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.image_not_supported,
+                                    size: 50, color: Colors.grey),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Category Title
+                        Text(
+                          category.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        // Subtitle
+                        const Text(
+                          "Explore", // You can replace this with category.description if you prefer!
+                          style: TextStyle(color: Colors.grey, fontSize: 13),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                // --------------------------------------------------
-                const SizedBox(height: 12),
-                Text(
-                  cat['name'],
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  "${cat['items']} Items",
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          );
+                );
+              },
+            );
+          }
+          return const SizedBox();
         },
       ),
     );

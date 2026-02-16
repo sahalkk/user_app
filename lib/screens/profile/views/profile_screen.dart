@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:share_plus/share_plus.dart';
+
+// Auth & Cart Imports
 import '../../../../blocs/auth_bloc/auth_bloc.dart';
 import '../../../../blocs/auth_bloc/auth_event.dart';
-import 'package:share_plus/share_plus.dart';
+import '../../../../blocs/cart_bloc/cart_bloc.dart'; // To clear the cart
+
+// Navigation Import
+import '../../main_wrapper.dart'; // To navigate home
+import '../../auth/views/login_screen.dart'; // To navigate to login after logout
 
 class ProfileScreen extends StatelessWidget {
   final VoidCallback onNavigateToOrders;
@@ -52,7 +59,7 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 32),
 
-            // 2. NEW: About Section
+            // 2. About Section
             const Text("About",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
@@ -78,12 +85,26 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 16),
             _buildMenuContainer([
               _buildMenuItem(Icons.help_outline, "Help Center", () {}),
+
+              // --- UPDATED LOGOUT BUTTON ---
               _buildMenuItem(Icons.logout, "Logout", () {
+                // 1. Clear the Cart
+                context.read<CartBloc>().add(ClearCart());
+
+                // 2. Clear Auth Session
                 context.read<AuthBloc>().add(LogoutRequested());
+
+                // 3. Navigate to Login Screen and remove all previous routes
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (route) => false,
+                );
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text("Logged out successfully")),
                 );
               }, isDestructive: true),
+              // ------------------------------
             ]),
 
             const SizedBox(height: 40),
@@ -118,7 +139,7 @@ class ProfileScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Jon Alishon",
+                Text("Jon Alishon", // Still Hardcoded
                     style:
                         TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 SizedBox(height: 4),

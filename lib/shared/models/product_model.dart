@@ -6,6 +6,9 @@ class ProductModel {
   final String imageUrl;
   final String unit;
 
+  // 1. ADDED CATEGORY ID HERE
+  final String categoryId;
+
   const ProductModel({
     required this.id,
     required this.title,
@@ -13,6 +16,9 @@ class ProductModel {
     required this.price,
     required this.imageUrl,
     required this.unit,
+
+    // 2. ADDED TO CONSTRUCTOR
+    required this.categoryId,
   });
 
   // --- 1. TEST IMAGES ARRAY ---
@@ -26,8 +32,6 @@ class ProductModel {
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     // --- 2. SELECT IMAGE DETERMINISTICALLY ---
-    // This uses the product name to pick an index.
-    // So "Chicken" will always pick index 2, "Apple" always index 0, etc.
     String name = json['name'] ?? '';
     int index = name.hashCode.abs() % _testImages.length;
 
@@ -41,6 +45,9 @@ class ProductModel {
       imageUrl: _testImages[index],
 
       unit: json['unit'] ?? '',
+
+      // 3. READ CATEGORY ID FROM YOUR API JSON
+      categoryId: json['categoryId'] ?? 'Uncategorized',
     );
   }
 
