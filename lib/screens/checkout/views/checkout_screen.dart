@@ -161,10 +161,9 @@ class CheckoutScreen extends StatelessWidget {
 
                       // E. Navigate Home after 2 seconds
                       Future.delayed(const Duration(seconds: 2), () {
-                        Navigator.of(context).pushAndRemoveUntil(
+                        Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
                               builder: (context) => const MainWrapper()),
-                          (route) => false,
                         );
                       });
                     },

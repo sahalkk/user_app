@@ -94,10 +94,10 @@ class ProfileScreen extends StatelessWidget {
                 // 2. Clear Auth Session
                 context.read<AuthBloc>().add(LogoutRequested());
 
-                // 3. Navigate to Login Screen and remove all previous routes
-                Navigator.of(context).pushAndRemoveUntil(
+                // 3. Navigate to Login Screen but keep the app route below so
+                // closing the login screen returns user to Home as a guest.
+                Navigator.of(context).push(
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
                 );
 
                 ScaffoldMessenger.of(context).showSnackBar(
