@@ -250,7 +250,21 @@ class CartScreen extends StatelessWidget {
                         child: ElevatedButton(
                           onPressed: () async {
                             // --- STEP 1: LOGIN CHECK ---
-                            final authState = context.read<AuthBloc>().state;
+                            final authBloc = context.read<AuthBloc>();
+
+                            // If the AuthBloc is still in the initial state (e.g. after a
+                            // hot restart) wait briefly for it to initialize so we do not
+                            // incorrectly force the user to the login screen on first tap.
+                            final currentAuth = authBloc.state;
+                            if (currentAuth is AuthInitial) {
+                              try {
+                                await authBloc.stream.firstWhere((s) => s is! AuthInitial).timeout(const Duration(seconds: 2));
+                              } catch (_) {
+                                // ignore timeout and re-check below
+                              }
+                            }
+
+                            final authState = authBloc.state;
 
                             if (authState is! AuthAuthenticated) {
                               // Redirect to Login Page and WAIT for them to close it

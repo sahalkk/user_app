@@ -27,7 +27,21 @@ class _MainWrapperState extends State<MainWrapper> {
   void _onTabTapped(int index) async {
     // 1. Check if the user is trying to access Orders (2) or Profile (3)
     if (index == 2 || index == 3) {
-      final authState = context.read<AuthBloc>().state;
+      final authBloc = context.read<AuthBloc>();
+
+      // If the bloc is still in the initial state (e.g. during hot restart)
+      // wait briefly for initialization so we don't incorrectly treat the
+      // user as unauthenticated on the very first tap.
+      final currentState = authBloc.state;
+      if (currentState is AuthInitial) {
+        try {
+          await authBloc.stream.firstWhere((s) => s is! AuthInitial).timeout(const Duration(seconds: 2));
+        } catch (_) {
+          // Timeout or error: fall through and re-check state below
+        }
+      }
+
+      final authState = authBloc.state;
 
       // 2. If the user is NOT logged in
       if (authState is! AuthAuthenticated) {
