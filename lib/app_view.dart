@@ -37,7 +37,10 @@ class MyAppView extends StatelessWidget {
           ),
           BlocProvider(create: (context) => CartBloc()),
           BlocProvider(
-              create: (context) => HomeBloc(context.read<ProductRepository>())),
+              create: (context) => HomeBloc(
+                    context.read<ProductRepository>(),
+                    context.read<CategoryRepository>(),
+                  )),
           BlocProvider(
             create: (context) => CategoriesBloc(context.read<CategoryRepository>())..add(LoadCategories()),
           ),

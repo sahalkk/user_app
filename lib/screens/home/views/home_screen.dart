@@ -89,15 +89,15 @@ class HomeScreen extends StatelessWidget {
                     separatorBuilder: (context, index) =>
                         const SizedBox(width: 12),
                     itemBuilder: (context, index) {
-                      final categoryName = state.categories[index];
-                      final isSelected = state.selectedCategory == categoryName;
+                      final category = state.categories[index];
+                      final categoryId = category['id'] ?? 'All';
+                      final categoryName = category['name'] ?? categoryId;
+                      final isSelected = state.selectedCategory == categoryId;
 
                       return GestureDetector(
                         onTap: () {
-                          // Dispatch event to filter products!
-                          context
-                              .read<HomeBloc>()
-                              .add(SelectCategory(categoryName));
+                          // Dispatch event to filter products by category id
+                          context.read<HomeBloc>().add(SelectCategory(categoryId));
                         },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),

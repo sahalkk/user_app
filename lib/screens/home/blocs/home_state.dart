@@ -18,10 +18,10 @@ class HomeLoaded extends HomeState {
   // 2. The list that actually gets displayed on the screen
   final List<ProductModel> filteredProducts;
 
-  // 3. The dynamic list of category names (e.g., "All", "Fruits", "Snacks")
-  final List<String> categories;
+  // 3. The dynamic list of category id/name pairs (e.g., {id: '1', name: 'Fruits'})
+  final List<Map<String, String>> categories;
 
-  // 4. The currently selected category button
+  // 4. The currently selected category id
   final String selectedCategory;
 
   const HomeLoaded({
@@ -35,7 +35,7 @@ class HomeLoaded extends HomeState {
   HomeLoaded copyWith({
     List<ProductModel>? allProducts,
     List<ProductModel>? filteredProducts,
-    List<String>? categories,
+    List<Map<String, String>>? categories,
     String? selectedCategory,
   }) {
     return HomeLoaded(
