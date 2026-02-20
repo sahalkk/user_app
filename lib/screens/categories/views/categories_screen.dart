@@ -1,3 +1,5 @@
+import 'package:app123/screens/cart/views/cart_screen.dart';
+import 'package:app123/screens/categories/views/category_products_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/categories_bloc.dart';
@@ -25,12 +27,6 @@ class CategoriesScreen extends StatelessWidget {
         centerTitle: true,
         title: const Text("Categories",
             style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.shopping_bag_outlined, color: Colors.black),
-            onPressed: () {}, // Link to Cart if needed
-          ),
-        ],
       ),
       body: BlocBuilder<CategoriesBloc, CategoriesState>(
         builder: (context, state) {
@@ -64,8 +60,12 @@ class CategoriesScreen extends StatelessWidget {
 
                 return GestureDetector(
                   onTap: () {
-                    // TODO: Navigate to a filtered product list based on this category
-                    print("Tapped on ${category.name}");
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CategoryProductsScreen(category: category),
+                      ),
+                    );
                   },
                   child: Container(
                     decoration: BoxDecoration(

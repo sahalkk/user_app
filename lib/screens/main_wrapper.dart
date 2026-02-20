@@ -1,3 +1,4 @@
+import 'package:app123/screens/auth/views/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -6,12 +7,13 @@ import 'home/views/home_screen.dart';
 import 'categories/views/categories_screen.dart';
 import 'orders/views/orders_screen.dart';
 import 'profile/views/profile_screen.dart';
+import 'cart/views/cart_screen.dart'; // Import Cart Screen
 import '../shared/widgets/app_bottom_nav.dart';
 
-// Auth Imports (Crucial for the check)
+// Blocs
 import '../../blocs/auth_bloc/auth_bloc.dart';
 import '../../blocs/auth_bloc/auth_state.dart';
-import 'auth/views/login_screen.dart';
+import '../../blocs/cart_bloc/cart_bloc.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});
@@ -23,47 +25,19 @@ class MainWrapper extends StatefulWidget {
 class _MainWrapperState extends State<MainWrapper> {
   int _currentIndex = 0;
 
-  // --- THE PROTECTION LOGIC ---
   void _onTabTapped(int index) async {
-    // 1. Check if the user is trying to access Orders (2) or Profile (3)
     if (index == 2 || index == 3) {
-      final authBloc = context.read<AuthBloc>();
-
-      // If the bloc is still in the initial state (e.g. during hot restart)
-      // wait briefly for initialization so we don't incorrectly treat the
-      // user as unauthenticated on the very first tap.
-      final currentState = authBloc.state;
-      if (currentState is AuthInitial) {
-        try {
-          await authBloc.stream.firstWhere((s) => s is! AuthInitial).timeout(const Duration(seconds: 2));
-        } catch (_) {
-          // Timeout or error: fall through and re-check state below
-        }
-      }
-
-      final authState = authBloc.state;
-
-      // 2. If the user is NOT logged in
+      final authState = context.read<AuthBloc>().state;
       if (authState is! AuthAuthenticated) {
-        // Show Login Screen and wait for them to finish
         await Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const LoginScreen()),
         );
-
         if (!mounted) return;
-
-        // 3. Check their state again after they return from the Login screen
         final newState = context.read<AuthBloc>().state;
-
-        // If they just hit the "Back" arrow and didn't log in, stop here.
-        if (newState is! AuthAuthenticated) {
-          return;
-        }
+        if (newState is! AuthAuthenticated) return;
       }
     }
-
-    // 4. If they are logged in (or tapping Home/Categories), change tab normally
     setState(() {
       _currentIndex = index;
     });
@@ -72,23 +46,111 @@ class _MainWrapperState extends State<MainWrapper> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
-      const HomeScreen(), // Index 0
-      const CategoriesScreen(), // Index 1
-      const OrdersScreen(), // Index 2
-      ProfileScreen(
-        // Use the protected logic here too!
-        onNavigateToOrders: () => _onTabTapped(2),
-      ), // Index 3
+      const HomeScreen(),
+      const CategoriesScreen(),
+      const OrdersScreen(),
+      ProfileScreen(onNavigateToOrders: () => _onTabTapped(2)),
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
+      body: Stack(
+        children: [
+          // 1. The main screens
+          IndexedStack(
+            index: _currentIndex,
+            children: pages,
+          ),
+
+          // 2. The Blinkit-style Floating Cart Banner
+          Positioned(
+            bottom: 16, // Hover just above the bottom nav bar
+            left: 16,
+            right: 16,
+            child: BlocBuilder<CartBloc, CartState>(
+              builder: (context, state) {
+                if (state is CartLoaded && state.items.isNotEmpty) {
+                  // Calculate total items and price
+                  final totalItems =
+                      state.items.fold(0, (sum, item) => sum + item.quantity);
+                  final totalPrice = state.items.fold(
+                      0.0,
+                      (sum, item) =>
+                          sum + (item.product.priceValue * item.quantity));
+
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const CartScreen()));
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade700, // Blinkit green
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          )
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Left Side: Item count & Price
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "$totalItems ITEM${totalItems > 1 ? 'S' : ''}",
+                                style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                "₹${totalPrice.toStringAsFixed(0)}",
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          // Right Side: View Cart
+                          const Row(
+                            children: [
+                              Text(
+                                "View cart",
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              SizedBox(width: 8),
+                              Icon(Icons.arrow_right,
+                                  color: Colors.white, size: 24),
+                            ],
+                          )
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink(); // Hide if cart is empty
+              },
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: _currentIndex,
-        onTap: _onTabTapped, // Make sure your custom nav uses this function!
+        onTap: _onTabTapped,
       ),
     );
   }
