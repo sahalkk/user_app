@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../blocs/cart_bloc/cart_bloc.dart';
 import '../../../../shared/models/product_model.dart';
-import '../../../../shared/widgets/product_quantity_selector.dart';
 
 class ProductCard extends StatelessWidget {
   final ProductModel product;
@@ -17,10 +16,16 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 2. WRAP WITH GESTURE DETECTOR
+    // --- DUMMY DATA FOR DEMO ---
+    // Simulating a discount for every alternate product to show off the UI
+    final bool hasDiscount = product.hashCode % 2 == 0;
+    final double originalPrice =
+        product.priceValue * 1.25; // 25% markup for MRP
+    final int discountPercent =
+        ((originalPrice - product.priceValue) / originalPrice * 100).round();
+
     return GestureDetector(
       onTap: () {
-        // 3. NAVIGATE TO DETAILS SCREEN ON TAP
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -29,105 +34,193 @@ class ProductCard extends StatelessWidget {
         );
       },
       child: Container(
-        width: 160,
+        // Allow this card to expand to the height provided by its parent
+        height: double.infinity,
         decoration: BoxDecoration(
-          color: const Color(0xFFF8F8F8),
-          borderRadius: BorderRadius.circular(8),
+          // Faint greenish/yellow tint background matching the screenshot
+          color: const Color(0xFFF8FAEE),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. Image Area
-            Expanded(
-              flex: 3,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Center(
+            // --- 1. IMAGE & OVERLAPS STACK ---
+            Stack(
+              clipBehavior:
+                  Clip.none, // Allows the ADD button to hang over the edge
+              children: [
+                // Product Image
+                Container(
+                  height: 120, // Taller image area
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(16)),
+                  ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(16)),
                     child: Image.network(
-                      product.imageUrl, // Access from model
-                      fit: BoxFit.contain,
+                      product.imageUrl,
+                      fit: BoxFit
+                          .cover, // Fills the space nicely like the onions image
                       errorBuilder: (context, error, stackTrace) => const Icon(
                           Icons.image_not_supported,
-                          size: 40,
                           color: Colors.grey),
                     ),
                   ),
                 ),
-              ),
+
+                // Top-Left: Red Discount Badge (Conditionally shown)
+                if (hasDiscount)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade600,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16), // Matches card corner
+                          bottomRight: Radius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        "$discountPercent% OFF",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Top-Right: Heart Icon
+                const Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Icon(Icons.favorite_border,
+                      color: Colors.white,
+                      size: 22,
+                      shadows: [
+                        Shadow(
+                            color: Colors.black26,
+                            blurRadius:
+                                4) // Makes white icon pop on light images
+                      ]),
+                ),
+
+                // Bottom-Right: Overlapping ADD Button
+                Positioned(
+                  bottom: -16, // Hangs halfway off the image
+                  right: 8,
+                  child: _buildAddButton(context),
+                ),
+              ],
             ),
 
-            // 2. Details Area
+            // Small spacer to account for the overlapping button
+            const SizedBox(height: 8),
+
+            // --- 2. PRODUCT DETAILS ---
+            // Make the details area flexible so the card fits constrained heights
             Expanded(
-              flex: 3,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- TITLE ---
-                    Text(
-                      product.title,
+                  // Unit / Weight Tag (Light indigo background)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F2FB),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      product.unit.isNotEmpty ? product.unit : "1 kg",
                       style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 15),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-
-                    // --- PRICE & DISCOUNT ROW ---
-                    Row(
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "₹${(product.priceValue * 1.2).toStringAsFixed(0)}", // Dummy original
-                              style: const TextStyle(
-                                fontSize: 12,
-                                decoration: TextDecoration.lineThrough,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              "₹${product.price}",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            "20% OFF", // Dummy discount
-                            style: TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(), // Pushes buttons to the bottom
-
-                    // --- ACTION BUTTONS LAYER ---
-                    Center(
-                      child: ProductQuantitySelector(
-                        product: product,
-                        compact: true, // Use compact counter for product card
+                        color: Color(0xFF333366), // Dark indigo text
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Title
+                  Text(
+                    product.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      color: Colors.black87,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Delivery Time
+                  Row(
+                    children: [
+                      Icon(Icons.access_time_filled,
+                          color: Colors.green.shade600, size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        "12 MINS", // Dummy time
+                        style: TextStyle(
+                          color: Colors.blueGrey.shade600,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Discount Text (Blue) - Optional
+                  if (hasDiscount) ...[
+                    Text(
+                      "$discountPercent% OFF",
+                      style: const TextStyle(
+                          color: Colors.blueAccent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 2),
+                  ],
+
+                  // Price Row
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        "₹${product.price}",
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        "MRP ₹${originalPrice.toStringAsFixed(0)}",
+                        style: TextStyle(
+                          decoration: TextDecoration.lineThrough,
+                          color: Colors.grey.shade600,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                   ],
                 ),
               ),
@@ -135,6 +228,119 @@ class ProductCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // --- OVERHAULED ADD BUTTON ---
+  Widget _buildAddButton(BuildContext context) {
+    return BlocBuilder<CartBloc, CartState>(
+      builder: (context, state) {
+        int quantity = 0;
+        if (state is CartLoaded) {
+          final cartItem = state.items.firstWhere(
+            (item) => item.product.id == product.id,
+            orElse: () => CartItemModel(id: '', product: product, quantity: 0),
+          );
+          quantity = cartItem.quantity;
+        }
+
+        // State 1: Item NOT in cart
+        if (quantity == 0) {
+          return GestureDetector(
+            onTap: () {
+              context.read<CartBloc>().add(AddToCart(product));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("${product.title} added to cart!"),
+                  duration: const Duration(seconds: 1),
+                  backgroundColor: Colors.green.shade700,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            child: Container(
+              height: 36,
+              width: 76, // Slightly wider for the bold text
+              decoration: BoxDecoration(
+                color: Colors.white,
+                // The distinct green border from the screenshots
+                border: Border.all(color: Colors.green.shade700, width: 1.5),
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ],
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                "ADD",
+                style: TextStyle(
+                  color: Colors.green.shade700,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          );
+        }
+
+        // State 2: Item IS in cart (- 1 +)
+        else {
+          return Container(
+            height: 36,
+            width: 76,
+            decoration: BoxDecoration(
+              color: Colors.green.shade700, // Solid green background
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.green.withOpacity(0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                )
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    if (quantity > 1) {
+                      context.read<CartBloc>().add(
+                          UpdateCartItemQuantity(product.id, quantity - 1));
+                    } else {
+                      context.read<CartBloc>().add(RemoveFromCart(product.id));
+                    }
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: Icon(Icons.remove, color: Colors.white, size: 18),
+                  ),
+                ),
+                Text(
+                  "$quantity",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => context.read<CartBloc>().add(AddToCart(product)),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: Icon(Icons.add, color: Colors.white, size: 18),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+      },
     );
   }
 }

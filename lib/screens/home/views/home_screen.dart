@@ -151,12 +151,14 @@ class HomeScreen extends StatelessWidget {
                                   // For now, using the first letter of the category name.
                                   child: Center(
                                     child: Text(
-                                        categoryName.isNotEmpty
-                                            ? categoryName[0]
-                                            : '',
-                                        style: const TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold)),
+                                      categoryName.isNotEmpty
+                                          ? categoryName[0]
+                                          : '',
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 6),
@@ -202,18 +204,22 @@ class HomeScreen extends StatelessWidget {
 
                     // Horizontal Product Scroll
                     SizedBox(
-                      height: 260, // Fixed height for horizontal cards
+                      height: 200, // Slightly reduced height to avoid pushing content offscreen
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: state.filteredProducts
-                            .take(5)
-                            .length, // Show up to 5 items in specials
+                        itemCount: state.filteredProducts.length >= 5
+                            ? 5
+                            : state.filteredProducts.length, // Show up to 5 items in specials
                         separatorBuilder: (context, index) =>
                             const SizedBox(width: 16),
                         itemBuilder: (context, index) {
-                          return ProductCard(
-                              product: state.filteredProducts[index]);
+                          // Constrain width so horizontal cards render predictably
+                          return SizedBox(
+                            width: 170,
+                            child: ProductCard(
+                                product: state.filteredProducts[index]),
+                          );
                         },
                       ),
                     ),
