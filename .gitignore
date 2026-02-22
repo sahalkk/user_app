@@ -50,3 +50,6 @@ nul
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Environment file for local secrets
+.env
