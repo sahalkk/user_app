@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../shared/models/category_model.dart';
+import '../../search/views/search_screen.dart';
 import 'category_products_screen.dart'; // Keep this for when you wire it back up
 
 class CategoriesScreen extends StatelessWidget {
@@ -154,7 +155,12 @@ class CategoriesScreen extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.search, color: Colors.black87),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SearchScreen()),
+              );
+            },
           ),
         ],
       ),

@@ -52,7 +52,7 @@ class ProductCard extends StatelessWidget {
               children: [
                 // Product Image
                 Container(
-                  height: 120, // Taller image area
+                  height: 90, // Reduced image height for 3-column layout
                   width: double.infinity,
                   decoration: const BoxDecoration(
                     borderRadius:
@@ -123,16 +123,15 @@ class ProductCard extends StatelessWidget {
             ),
 
             // Small spacer to account for the overlapping button
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
 
             // --- 2. PRODUCT DETAILS ---
-            // Make the details area flexible so the card fits constrained heights
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   // Unit / Weight Tag (Light indigo background)
                   Container(
                     padding:
@@ -159,30 +158,12 @@ class ProductCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
-                      fontSize: 14,
+                      fontSize: 13,
                       color: Colors.black87,
                       height: 1.2,
                     ),
                   ),
-                  const SizedBox(height: 6),
-
-                  // Delivery Time
-                  Row(
-                    children: [
-                      Icon(Icons.access_time_filled,
-                          color: Colors.green.shade600, size: 12),
-                      const SizedBox(width: 4),
-                      Text(
-                        "12 MINS", // Dummy time
-                        style: TextStyle(
-                          color: Colors.blueGrey.shade600,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
 
                   // Discount Text (Blue) - Optional
                   if (hasDiscount) ...[
@@ -190,7 +171,7 @@ class ProductCard extends StatelessWidget {
                       "$discountPercent% OFF",
                       style: const TextStyle(
                           color: Colors.blueAccent,
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 2),
@@ -201,28 +182,33 @@ class ProductCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
-                      Text(
-                        "₹${product.price}",
-                        style: const TextStyle(
-                          color: Colors.black87,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
+                      Expanded(
+                        child: Text(
+                          "₹${product.price}",
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        "MRP ₹${originalPrice.toStringAsFixed(0)}",
-                        style: TextStyle(
-                          decoration: TextDecoration.lineThrough,
-                          color: Colors.grey.shade600,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
+                      const SizedBox(width: 2),
+                      Flexible(
+                        child: Text(
+                          "MRP ₹${originalPrice.toStringAsFixed(0)}",
+                          style: TextStyle(
+                            decoration: TextDecoration.lineThrough,
+                            color: Colors.grey.shade600,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                  ],
-                ),
+                ],
               ),
             ),
           ],

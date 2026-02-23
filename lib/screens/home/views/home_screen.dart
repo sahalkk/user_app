@@ -204,7 +204,7 @@ class HomeScreen extends StatelessWidget {
 
                     // Horizontal Product Scroll
                     SizedBox(
-                      height: 200, // Slightly reduced height to avoid pushing content offscreen
+                      height: 280, // Adjusted height for better card display
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -212,11 +212,11 @@ class HomeScreen extends StatelessWidget {
                             ? 5
                             : state.filteredProducts.length, // Show up to 5 items in specials
                         separatorBuilder: (context, index) =>
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 12),
                         itemBuilder: (context, index) {
                           // Constrain width so horizontal cards render predictably
                           return SizedBox(
-                            width: 170,
+                            width: 150,
                             child: ProductCard(
                                 product: state.filteredProducts[index]),
                           );
@@ -254,10 +254,10 @@ class HomeScreen extends StatelessWidget {
                             itemCount: state.filteredProducts.length,
                             gridDelegate:
                                 const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
+                              crossAxisCount: 3,
                               childAspectRatio:
-                                  0.65, // Adjust this if cards overflow vertically
-                              crossAxisSpacing: 16,
+                                  0.55, // Adjusted for 3 columns
+                              crossAxisSpacing: 12,
                               mainAxisSpacing: 16,
                             ),
                             itemBuilder: (context, index) {
