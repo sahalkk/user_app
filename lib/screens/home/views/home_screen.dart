@@ -2,7 +2,7 @@ import 'package:app123/screens/home/views/widgets/product_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/home_bloc.dart';
-import '../../search/views/search_screen.dart';
+import '../../../shared/widgets/global_header.dart'; // Import the new header
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -23,93 +23,12 @@ class HomeScreen extends StatelessWidget {
                       style: const TextStyle(color: Colors.red)));
             } else if (state is HomeLoaded) {
               return SingleChildScrollView(
-                // Add bottom padding so the floating cart doesn't cover the last items
                 padding: const EdgeInsets.only(bottom: 80),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- 1. TOP HEADER (Location & Profile) ---
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Location Column
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "HOME", // You can make this dynamic later
-                                  style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  "Sahalkk, Opposite MS PALACE...", // Dynamic address later
-                                  style: TextStyle(
-                                      fontSize: 13, color: Colors.grey),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Profile Icon
-                          CircleAvatar(
-                            backgroundColor: Colors.grey.shade200,
-                            radius: 20,
-                            child:
-                                const Icon(Icons.person, color: Colors.black54),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // --- 2. SEARCH BAR ---
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16.0, vertical: 8.0),
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => const SearchScreen()));
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade300),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: Colors.grey.shade100,
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2)),
-                            ],
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.search, color: Colors.grey),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text("Search for products...",
-                                    style: TextStyle(
-                                        color: Colors.grey, fontSize: 15)),
-                              ),
-                              Icon(Icons.mic,
-                                  color: Colors
-                                      .grey), // Added mic icon like Blinkit
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                    // 🔥 Dropped the new Global Header here!
+                    const GlobalHeader(title: "HOME"),
                     const SizedBox(height: 16),
 
                     // --- 3. DYNAMIC CATEGORY CIRCLES ---
@@ -125,7 +44,8 @@ class HomeScreen extends StatelessWidget {
                           final category = state.categories[index];
                           final categoryId = category['id'] ?? '';
                           final categoryName = category['name'] ?? '';
-                          final isSelected = state.selectedCategory == categoryId;
+                          final isSelected =
+                              state.selectedCategory == categoryId;
 
                           return GestureDetector(
                             onTap: () => context
@@ -147,8 +67,6 @@ class HomeScreen extends StatelessWidget {
                                             : Colors.transparent,
                                         width: 2),
                                   ),
-                                  // Placeholder for category image/icon.
-                                  // For now, using the first letter of the category name.
                                   child: Center(
                                     child: Text(
                                       categoryName.isNotEmpty
@@ -182,8 +100,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
 
-                    // --- 4. FESTIVE SPECIALS (Horizontal List) ---
-                    // This creates the styled divider with text in the middle
+                    // --- 4. FESTIVE SPECIALS ---
                     Row(
                       children: [
                         const Expanded(
@@ -202,19 +119,17 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
-                    // Horizontal Product Scroll
                     SizedBox(
-                      height: 280, // Adjusted height for better card display
+                      height: 280,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         itemCount: state.filteredProducts.length >= 5
                             ? 5
-                            : state.filteredProducts.length, // Show up to 5 items in specials
+                            : state.filteredProducts.length,
                         separatorBuilder: (context, index) =>
                             const SizedBox(width: 12),
                         itemBuilder: (context, index) {
-                          // Constrain width so horizontal cards render predictably
                           return SizedBox(
                             width: 150,
                             child: ProductCard(
@@ -247,16 +162,13 @@ class HomeScreen extends StatelessWidget {
                           ))
                         : GridView.builder(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
-                            physics:
-                                const NeverScrollableScrollPhysics(), // Let SingleChildScrollView handle scrolling
-                            shrinkWrap:
-                                true, // Required inside SingleChildScrollView
+                            physics: const NeverScrollableScrollPhysics(),
+                            shrinkWrap: true,
                             itemCount: state.filteredProducts.length,
                             gridDelegate:
                                 const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 3,
-                              childAspectRatio:
-                                  0.55, // Adjusted for 3 columns
+                              childAspectRatio: 0.55,
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 16,
                             ),

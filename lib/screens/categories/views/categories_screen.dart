@@ -1,3 +1,4 @@
+import 'package:app123/shared/widgets/global_header.dart';
 import 'package:flutter/material.dart';
 import '../../../shared/models/category_model.dart';
 import '../../search/views/search_screen.dart';
@@ -139,47 +140,26 @@ class CategoriesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          "All Categories",
-          style: TextStyle(
-              color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.favorite_border, color: Colors.black87),
-            onPressed: () {},
+      // Removed AppBar and wrapped body in SafeArea
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 🔥 Dropped the new Global Header here!
+              const GlobalHeader(title: "ALL CATEGORIES"),
+
+              _buildCategorySection(
+                  context, "Grocery & Kitchen", _groceryAndKitchen),
+              const Divider(thickness: 4, color: Color(0xFFF4F6F8)),
+              _buildCategorySection(
+                  context, "Snacks & Drinks", _snacksAndDrinks),
+              const Divider(thickness: 4, color: Color(0xFFF4F6F8)),
+              _buildCategorySection(
+                  context, "Beauty & Personal Care", _beautyAndCare),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.black87),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SearchScreen()),
-              );
-            },
-          ),
-        ],
-      ),
-      // For the demo, we use a standard SingleChildScrollView instead of the BlocBuilder
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 100), // Space for floating cart
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCategorySection(
-                context, "Grocery & Kitchen", _groceryAndKitchen),
-            const Divider(
-                thickness: 4,
-                color: Color(0xFFF4F6F8)), // Thick separator like Blinkit
-            _buildCategorySection(context, "Snacks & Drinks", _snacksAndDrinks),
-            const Divider(thickness: 4, color: Color(0xFFF4F6F8)),
-            _buildCategorySection(
-                context, "Beauty & Personal Care", _beautyAndCare),
-          ],
         ),
       ),
     );

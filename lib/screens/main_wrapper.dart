@@ -6,8 +6,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'home/views/home_screen.dart';
 import 'categories/views/categories_screen.dart';
 import 'orders/views/orders_screen.dart';
-import 'profile/views/profile_screen.dart';
-import 'cart/views/cart_screen.dart'; // Import Cart Screen
+// Note: Changed the import from Profile to OrderAgain
+import 'order_again/views/order_again_screen.dart';
+import 'cart/views/cart_screen.dart';
 import '../shared/widgets/app_bottom_nav.dart';
 
 // Blocs
@@ -26,7 +27,8 @@ class _MainWrapperState extends State<MainWrapper> {
   int _currentIndex = 0;
 
   void _onTabTapped(int index) async {
-    if (index == 2 || index == 3) {
+    // Protect Orders (Index 3) - User must log in to see past orders!
+    if (index == 3) {
       final authState = context.read<AuthBloc>().state;
       if (authState is! AuthAuthenticated) {
         await Navigator.push(
@@ -45,31 +47,30 @@ class _MainWrapperState extends State<MainWrapper> {
 
   @override
   Widget build(BuildContext context) {
+    // NEW TAB ORDER: 0=Home, 1=Order Again, 2=Categories, 3=Orders
     final List<Widget> pages = [
       const HomeScreen(),
+      const OrderAgainScreen(), // Now at index 1
       const CategoriesScreen(),
       const OrdersScreen(),
-      ProfileScreen(onNavigateToOrders: () => _onTabTapped(2)),
     ];
 
     return Scaffold(
       body: Stack(
         children: [
-          // 1. The main screens
           IndexedStack(
             index: _currentIndex,
             children: pages,
           ),
 
-          // 2. The Blinkit-style Floating Cart Banner
+          // Global Floating Cart Banner (Remains unchanged!)
           Positioned(
-            bottom: 16, // Hover just above the bottom nav bar
+            bottom: 16,
             left: 16,
             right: 16,
             child: BlocBuilder<CartBloc, CartState>(
               builder: (context, state) {
                 if (state is CartLoaded && state.items.isNotEmpty) {
-                  // Calculate total items and price
                   final totalItems =
                       state.items.fold(0, (sum, item) => sum + item.quantity);
                   final totalPrice = state.items.fold(
@@ -88,7 +89,7 @@ class _MainWrapperState extends State<MainWrapper> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade700, // Blinkit green
+                        color: Colors.green.shade700,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
@@ -101,7 +102,6 @@ class _MainWrapperState extends State<MainWrapper> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Left Side: Item count & Price
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
@@ -122,7 +122,6 @@ class _MainWrapperState extends State<MainWrapper> {
                               ),
                             ],
                           ),
-                          // Right Side: View Cart
                           const Row(
                             children: [
                               Text(
@@ -142,7 +141,7 @@ class _MainWrapperState extends State<MainWrapper> {
                     ),
                   );
                 }
-                return const SizedBox.shrink(); // Hide if cart is empty
+                return const SizedBox.shrink();
               },
             ),
           ),
