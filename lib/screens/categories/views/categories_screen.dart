@@ -1,7 +1,6 @@
 import 'package:app123/shared/widgets/global_header.dart';
 import 'package:flutter/material.dart';
 import '../../../shared/models/category_model.dart';
-import '../../search/views/search_screen.dart';
 import 'category_products_screen.dart'; // Keep this for when you wire it back up
 
 class CategoriesScreen extends StatelessWidget {
@@ -140,26 +139,43 @@ class CategoriesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      // Removed AppBar and wrapped body in SafeArea
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 100),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 🔥 Dropped the new Global Header here!
-              const GlobalHeader(title: "ALL CATEGORIES"),
+        child: CustomScrollView(
+          slivers: [
+            // --- 1. SCROLLS AWAY: Location & Profile ---
+            const SliverToBoxAdapter(
+              child: LocationHeader(title: "ALL CATEGORIES"),
+            ),
 
-              _buildCategorySection(
-                  context, "Grocery & Kitchen", _groceryAndKitchen),
-              const Divider(thickness: 4, color: Color(0xFFF4F6F8)),
-              _buildCategorySection(
-                  context, "Snacks & Drinks", _snacksAndDrinks),
-              const Divider(thickness: 4, color: Color(0xFFF4F6F8)),
-              _buildCategorySection(
-                  context, "Beauty & Personal Care", _beautyAndCare),
-            ],
-          ),
+            // --- 2. STICKS TO TOP: Search Bar ---
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: StickyHeaderDelegate(
+                height: 65, // The exact height of your StickySearchBar
+                child: const StickySearchBar(),
+              ),
+            ),
+
+            // --- 3. SCROLLABLE BODY: Category Grids ---
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildCategorySection(
+                      context, "Grocery & Kitchen", _groceryAndKitchen),
+                  const Divider(thickness: 4, color: Color(0xFFF4F6F8)),
+                  _buildCategorySection(
+                      context, "Snacks & Drinks", _snacksAndDrinks),
+                  const Divider(thickness: 4, color: Color(0xFFF4F6F8)),
+                  _buildCategorySection(
+                      context, "Beauty & Personal Care", _beautyAndCare),
+                ],
+              ),
+            ),
+
+            // --- 4. BOTTOM PADDING (For floating cart) ---
+            const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
+          ],
         ),
       ),
     );
