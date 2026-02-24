@@ -1,4 +1,4 @@
-import 'package:app123/screens/auth/views/login_screen.dart';
+import 'package:beeyo_customer/screens/auth/views/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 

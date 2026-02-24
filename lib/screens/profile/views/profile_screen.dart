@@ -1,7 +1,7 @@
-import 'package:app123/blocs/auth_bloc/auth_bloc.dart';
-import 'package:app123/blocs/auth_bloc/auth_event.dart';
-import 'package:app123/blocs/auth_bloc/auth_state.dart';
-import 'package:app123/screens/profile/views/wishlist_screen.dart';
+import 'package:beeyo_customer/blocs/auth_bloc/auth_bloc.dart';
+import 'package:beeyo_customer/blocs/auth_bloc/auth_event.dart';
+import 'package:beeyo_customer/blocs/auth_bloc/auth_state.dart';
+import 'package:beeyo_customer/screens/profile/views/wishlist_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 

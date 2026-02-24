@@ -1,8 +1,8 @@
-import 'package:app123/blocs/auth_bloc/auth_bloc.dart';
-import 'package:app123/blocs/auth_bloc/auth_state.dart';
-import 'package:app123/screens/auth/views/login_screen.dart';
-import 'package:app123/screens/checkout/views/add_address_screen.dart';
-import 'package:app123/screens/checkout/views/checkout_screen.dart';
+import 'package:beeyo_customer/blocs/auth_bloc/auth_bloc.dart';
+import 'package:beeyo_customer/blocs/auth_bloc/auth_state.dart';
+import 'package:beeyo_customer/screens/auth/views/login_screen.dart';
+import 'package:beeyo_customer/screens/checkout/views/add_address_screen.dart';
+import 'package:beeyo_customer/screens/checkout/views/checkout_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../blocs/cart_bloc/cart_bloc.dart';

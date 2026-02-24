@@ -1,5 +1,5 @@
-import 'package:app123/screens/home/views/widgets/product_card.dart';
-import 'package:app123/shared/widgets/floating_cart_banner.dart';
+import 'package:beeyo_customer/screens/home/views/widgets/product_card.dart';
+import 'package:beeyo_customer/shared/widgets/floating_cart_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 // REMOVED HomeBloc import

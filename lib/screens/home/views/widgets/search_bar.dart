@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:app123/screens/search/views/search_screen.dart';
+import 'package:beeyo_customer/screens/search/views/search_screen.dart';
 
 class HomeSearchBar extends StatelessWidget {
   const HomeSearchBar({super.key});

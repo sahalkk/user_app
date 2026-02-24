@@ -1,5 +1,5 @@
-name: app123
-description: A new Flutter project.
+name: beeyo_customer  # Was app123
+description: Delivery app for Beeyo.
 publish_to: "none"
 version: 0.1.0+10
 

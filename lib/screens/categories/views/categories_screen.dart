@@ -1,4 +1,4 @@
-import 'package:app123/shared/widgets/global_header.dart';
+import 'package:beeyo_customer/shared/widgets/global_header.dart';
 import 'package:flutter/material.dart';
 import '../../../shared/models/category_model.dart';
 import 'category_products_screen.dart';

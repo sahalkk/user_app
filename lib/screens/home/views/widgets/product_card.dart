@@ -1,9 +1,9 @@
-import 'package:app123/blocs/wishlist_bloc/wishlist_bloc.dart';
-import 'package:app123/blocs/wishlist_bloc/wishlist_event.dart';
-import 'package:app123/blocs/wishlist_bloc/wishlist_state.dart';
-import 'package:app123/screens/product_details/views/product_details_screen.dart';
-import 'package:app123/screens/profile/views/wishlist_screen.dart';
-import 'package:app123/shared/models/cart_item_model.dart';
+import 'package:beeyo_customer/blocs/wishlist_bloc/wishlist_bloc.dart';
+import 'package:beeyo_customer/blocs/wishlist_bloc/wishlist_event.dart';
+import 'package:beeyo_customer/blocs/wishlist_bloc/wishlist_state.dart';
+import 'package:beeyo_customer/screens/product_details/views/product_details_screen.dart';
+import 'package:beeyo_customer/screens/profile/views/wishlist_screen.dart';
+import 'package:beeyo_customer/shared/models/cart_item_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
