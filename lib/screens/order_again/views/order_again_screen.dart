@@ -95,8 +95,8 @@ class OrderAgainScreen extends StatelessWidget {
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 3,
-                            childAspectRatio: 0.55,
-                            mainAxisSpacing: 16,
+                            mainAxisExtent: 260,
+                            mainAxisSpacing: 12,
                             crossAxisSpacing: 12,
                           ),
                           itemBuilder: (context, index) {

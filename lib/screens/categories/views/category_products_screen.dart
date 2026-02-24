@@ -196,7 +196,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                           const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         // Adjusting AspectRatio because the screen width is smaller now (minus sidebar)
-                        childAspectRatio: 0.62,
+                        mainAxisExtent: 260,
                         mainAxisSpacing: 12,
                         crossAxisSpacing: 12,
                       ),
