@@ -1,198 +1,418 @@
+import 'package:app123/blocs/auth_bloc/auth_bloc.dart';
+import 'package:app123/blocs/auth_bloc/auth_event.dart';
+import 'package:app123/blocs/auth_bloc/auth_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:share_plus/share_plus.dart';
 
-// Auth & Cart Imports
-import '../../../../blocs/auth_bloc/auth_bloc.dart';
-import '../../../../blocs/auth_bloc/auth_event.dart';
-import '../../../../blocs/cart_bloc/cart_bloc.dart'; // To clear the cart
-
-// Navigation Import
-import '../../main_wrapper.dart'; // To navigate home
-import '../../auth/views/login_screen.dart'; // To navigate to login after logout
+// Make sure these paths match your folder structure
+import '../../auth/views/login_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
-  final VoidCallback onNavigateToOrders;
+  final VoidCallback? onNavigateToOrders;
 
-  const ProfileScreen({super.key, required this.onNavigateToOrders});
+  const ProfileScreen({super.key, this.onNavigateToOrders});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: const Color(0xFFF4F6F8),
       appBar: AppBar(
-        backgroundColor: Colors.grey.shade50,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        centerTitle: true,
-        title: const Text("Profile",
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.more_horiz, color: Colors.black),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildUserCard(),
-
-            const SizedBox(height: 32),
-
-            // 1. Account Section
-            const Text("Account",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            _buildMenuContainer([
-              _buildMenuItem(
-                  Icons.person_outline, "Account Information", () {}),
-              _buildMenuItem(
-                  Icons.receipt_long_outlined, "My Orders", onNavigateToOrders),
-              _buildMenuItem(
-                  Icons.location_on_outlined, "Address Management", () {}),
-              _buildMenuItem(Icons.settings_outlined, "Setting", () {}),
-              _buildMenuItem(Icons.lock_outline, "Password Manager", () {}),
-            ]),
-
-            const SizedBox(height: 32),
-
-            // 2. About Section
-            const Text("About",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            _buildMenuContainer([
-              _buildMenuItem(Icons.share_outlined, "Share the App", () {
-                SharePlus.instance.share(
-                  ShareParams(
-                    text:
-                        'Check out Beeyo, Essentials at your Doorstep! Download it here: https://play.google.com/store/apps/details?id=com.beeyo.customer',
-                    subject: 'Download Beeyo App!',
-                  ),
-                );
-              }),
-              _buildMenuItem(Icons.info_outline, "About Us", () {}),
-              _buildMenuItem(Icons.shield_outlined, "Privacy Policy", () {}),
-            ]),
-
-            const SizedBox(height: 32),
-
-            // 3. Support Section
-            const Text("Support",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            _buildMenuContainer([
-              _buildMenuItem(Icons.help_outline, "Help Center", () {}),
-
-              // --- UPDATED LOGOUT BUTTON ---
-              _buildMenuItem(Icons.logout, "Logout", () {
-                // 1. Clear the Cart
-                context.read<CartBloc>().add(ClearCart());
-
-                // 2. Clear Auth Session
-                context.read<AuthBloc>().add(LogoutRequested());
-
-                // 3. Navigate to Login Screen but keep the app route below so
-                // closing the login screen returns user to Home as a guest.
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                );
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Logged out successfully")),
-                );
-              }, isDestructive: true),
-              // ------------------------------
-            ]),
-
-            const SizedBox(height: 40),
-          ],
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
         ),
+      ),
+      body: BlocBuilder<AuthBloc, AuthState>(
+        builder: (context, state) {
+          if (state is AuthAuthenticated) {
+            // USER IS LOGGED IN
+            return _buildLoggedInProfile(context, state);
+          } else {
+            // USER IS A GUEST
+            return _buildGuestProfile(context);
+          }
+        },
       ),
     );
   }
 
-  Widget _buildUserCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.grey.shade200,
-            child: const Icon(Icons.person, size: 30, color: Colors.grey),
-          ),
-          const SizedBox(width: 16),
-          const Expanded(
+  // ==========================================
+  // 1. GUEST PROFILE VIEW
+  // ==========================================
+  Widget _buildGuestProfile(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Jon Alishon", // Still Hardcoded
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                SizedBox(height: 4),
-                Text("alishon35@gmail.com",
-                    style: TextStyle(color: Colors.grey, fontSize: 13)),
+                const SizedBox(height: 10),
+                Container(
+                  height: 80,
+                  width: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    shape: BoxShape.circle,
+                  ),
+                  child:
+                      Icon(Icons.person, size: 50, color: Colors.grey.shade700),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Your account",
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "Log in to view your complete profile",
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const LoginScreen()),
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: Colors.green.shade600, width: 1.5),
+                      ),
+                      child: Center(
+                        child: Text(
+                          "Continue",
+                          style: TextStyle(
+                              color: Colors.green.shade700,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      "Other Information",
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade800),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.02),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading:
+                            const Icon(Icons.ios_share, color: Colors.black54),
+                        title: const Text("Share the app",
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
+                        trailing:
+                            const Icon(Icons.chevron_right, color: Colors.grey),
+                        onTap: () {},
+                      ),
+                      Divider(
+                          height: 1,
+                          thickness: 1,
+                          indent: 16,
+                          endIndent: 16,
+                          color: Colors.grey.shade100),
+                      ListTile(
+                        leading: const Icon(Icons.info_outline,
+                            color: Colors.black54),
+                        title: const Text("About us",
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
+                        trailing:
+                            const Icon(Icons.chevron_right, color: Colors.grey),
+                        onTap: () {},
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-          OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.edit, size: 16, color: Colors.black),
-            label: const Text("Edit", style: TextStyle(color: Colors.black)),
-            style: OutlinedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              side: BorderSide(color: Colors.grey.shade300),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        _buildFooter(),
+      ],
+    );
+  }
+
+  // ==========================================
+  // 2. LOGGED-IN PROFILE VIEW (UPDATED)
+  // ==========================================
+  Widget _buildLoggedInProfile(BuildContext context, AuthAuthenticated state) {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                // Avatar Header
+                Container(
+                  height: 80,
+                  width: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade100,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      "U",
+                      style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade800),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "My Account",
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "+91 XXXXX XXXXX",
+                  style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 32),
+
+                // --- FIRST SECTION (Main Items) ---
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.02),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.book_outlined,
+                            color: Colors.black54),
+                        title: const Text("Address Book",
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
+                        trailing:
+                            const Icon(Icons.chevron_right, color: Colors.grey),
+                        onTap: () {},
+                      ),
+                      Divider(
+                          height: 1,
+                          thickness: 1,
+                          indent: 16,
+                          endIndent: 16,
+                          color: Colors.grey.shade100),
+                      ListTile(
+                        leading: const Icon(Icons.favorite_border,
+                            color: Colors.black54),
+                        title: const Text("Your Wishlist",
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
+                        trailing:
+                            const Icon(Icons.chevron_right, color: Colors.grey),
+                        onTap: () {},
+                      ),
+                      Divider(
+                          height: 1,
+                          thickness: 1,
+                          indent: 16,
+                          endIndent: 16,
+                          color: Colors.grey.shade100),
+                      ListTile(
+                        leading: const Icon(Icons.payment_outlined,
+                            color: Colors.black54),
+                        title: const Text("Payment Settings",
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
+                        trailing:
+                            const Icon(Icons.chevron_right, color: Colors.grey),
+                        onTap: () {},
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // --- OTHER INFORMATION SECTION ---
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      "Other Information",
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade800),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.02),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading:
+                            const Icon(Icons.ios_share, color: Colors.black54),
+                        title: const Text("Share the app",
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
+                        trailing:
+                            const Icon(Icons.chevron_right, color: Colors.grey),
+                        onTap: () {},
+                      ),
+                      Divider(
+                          height: 1,
+                          thickness: 1,
+                          indent: 16,
+                          endIndent: 16,
+                          color: Colors.grey.shade100),
+                      ListTile(
+                        leading: const Icon(Icons.info_outline,
+                            color: Colors.black54),
+                        title: const Text("About us",
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
+                        trailing:
+                            const Icon(Icons.chevron_right, color: Colors.grey),
+                        onTap: () {},
+                      ),
+                      Divider(
+                          height: 1,
+                          thickness: 1,
+                          indent: 16,
+                          endIndent: 16,
+                          color: Colors.grey.shade100),
+                      ListTile(
+                        leading: const Icon(Icons.lock_outline,
+                            color: Colors.black54),
+                        title: const Text("Account Privacy",
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
+                        trailing:
+                            const Icon(Icons.chevron_right, color: Colors.grey),
+                        onTap: () {},
+                      ),
+                      Divider(
+                          height: 1,
+                          thickness: 1,
+                          indent: 16,
+                          endIndent: 16,
+                          color: Colors.grey.shade100),
+                      ListTile(
+                        leading:
+                            const Icon(Icons.logout, color: Colors.black54),
+                        title: const Text("Log out",
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
+                        trailing:
+                            const Icon(Icons.chevron_right, color: Colors.grey),
+                        onTap: () {
+                          // Dispatches the logout event to AuthBloc
+                          context.read<AuthBloc>().add(LogoutRequested());
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+              ],
             ),
+          ),
+        ),
+        _buildFooter(),
+      ],
+    );
+  }
+
+  // ==========================================
+  // 3. REUSABLE FOOTER (Beeyo Logo)
+  // ==========================================
+  Widget _buildFooter() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 32.0, top: 16.0),
+      child: Column(
+        children: [
+          Text(
+            "Beeyo",
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              color: Colors.grey.shade400,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "v1.0.0",
+            style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade400,
+                fontWeight: FontWeight.w500),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildMenuContainer(List<Widget> children) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(children: children),
-    );
-  }
-
-  Widget _buildMenuItem(IconData icon, String title, VoidCallback onTap,
-      {bool isDestructive = false}) {
-    return ListTile(
-      leading:
-          Icon(icon, color: isDestructive ? Colors.red : Colors.grey.shade700),
-      title: Text(title,
-          style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: isDestructive ? Colors.red : Colors.black)),
-      trailing:
-          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-      onTap: onTap,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
     );
   }
 }
