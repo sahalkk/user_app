@@ -1,7 +1,9 @@
 import 'package:app123/shared/widgets/global_header.dart';
 import 'package:flutter/material.dart';
 import '../../../shared/models/category_model.dart';
-import 'category_products_screen.dart'; // Keep this for when you wire it back up
+import 'category_products_screen.dart';
+// 🔥 1. Import the floating cart banner
+import '../../../shared/widgets/floating_cart_banner.dart';
 
 class CategoriesScreen extends StatelessWidget {
   const CategoriesScreen({super.key});
@@ -139,24 +141,22 @@ class CategoriesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      // 🔥 2. Add the dynamic cart banner here
+      bottomNavigationBar: const FloatingCartBanner(),
+
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            // --- 1. SCROLLS AWAY: Location & Profile ---
             const SliverToBoxAdapter(
               child: LocationHeader(title: "ALL CATEGORIES"),
             ),
-
-            // --- 2. STICKS TO TOP: Search Bar ---
             SliverPersistentHeader(
               pinned: true,
               delegate: StickyHeaderDelegate(
-                height: 65, // The exact height of your StickySearchBar
+                height: 65,
                 child: const StickySearchBar(),
               ),
             ),
-
-            // --- 3. SCROLLABLE BODY: Category Grids ---
             SliverToBoxAdapter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,108 +172,85 @@ class CategoriesScreen extends StatelessWidget {
                 ],
               ),
             ),
-
-            // --- 4. BOTTOM PADDING (For floating cart) ---
-            const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
+            // 🔥 3. Reduced to normal padding because Scaffold handles the space now
+            const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
           ],
         ),
       ),
     );
   }
 
-  /// Helper widget to build the 4-column Zepto/Blinkit section layout
   Widget _buildCategorySection(
       BuildContext context, String title, List<CategoryModel> items) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section Header
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
           child: Text(
             title,
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800, // Very bold heading
-              color: Colors.black87,
-            ),
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Colors.black87),
           ),
         ),
-
-        // 4-Column Grid
         GridView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           physics: const NeverScrollableScrollPhysics(),
           shrinkWrap: true,
           itemCount: items.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4, // 4 items per row
-            childAspectRatio: 0.68, // Adjusts the vertical height of the card
+            crossAxisCount: 4,
+            childAspectRatio: 0.68,
             crossAxisSpacing: 12,
             mainAxisSpacing: 16,
           ),
           itemBuilder: (context, index) {
             final category = items[index];
-
             return GestureDetector(
               onTap: () {
-                // Keep the navigation intact so the client can still click through!
                 Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        CategoryProductsScreen(category: category),
-                  ),
-                );
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) =>
+                            CategoryProductsScreen(category: category)));
               },
               child: Column(
                 children: [
-                  // 1. Light Grey Image Container
                   Expanded(
                     child: Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: const Color(
-                            0xFFF4F6F8), // Soft off-white/grey background
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+                          color: const Color(0xFFF4F6F8),
+                          borderRadius: BorderRadius.circular(16)),
                       padding: const EdgeInsets.all(8.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          category.imageUrl,
-                          fit: BoxFit.cover, // Fills the box cleanly
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(
-                            Icons.image_not_supported,
-                            color: Colors.grey,
-                            size: 24,
-                          ),
-                        ),
+                        child: Image.network(category.imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.image_not_supported,
+                                    color: Colors.grey, size: 24)),
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
-
-                  // 2. Multiline Small Text
-                  Text(
-                    category.name,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                      height: 1.2,
-                    ),
-                  ),
+                  Text(category.name,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                          height: 1.2)),
                 ],
               ),
             );
           },
         ),
-        const SizedBox(height: 16), // Bottom padding for the section
+        const SizedBox(height: 16),
       ],
     );
   }

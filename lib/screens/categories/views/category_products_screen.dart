@@ -4,6 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../home/blocs/home_bloc.dart';
 import '../../../shared/models/category_model.dart';
 
+// 🔥 1. Import the new floating cart banner!
+import '../../../shared/widgets/floating_cart_banner.dart';
+
 class CategoryProductsScreen extends StatefulWidget {
   final CategoryModel category;
 
@@ -79,6 +82,10 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
           IconButton(icon: const Icon(Icons.search), onPressed: () {}),
         ],
       ),
+
+      // 🔥 2. Add the banner here! It automatically floats above the body.
+      bottomNavigationBar: const FloatingCartBanner(),
+
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

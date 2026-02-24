@@ -1,4 +1,5 @@
 import 'package:app123/screens/home/views/widgets/product_card.dart';
+import 'package:app123/shared/widgets/floating_cart_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 // REMOVED HomeBloc import
@@ -27,6 +28,7 @@ class WishlistScreen extends StatelessWidget {
               color: Colors.black87, fontWeight: FontWeight.w900, fontSize: 18),
         ),
       ),
+      bottomNavigationBar: const FloatingCartBanner(),
       // 🔥 Listen to the real WishlistBloc now!
       body: BlocBuilder<WishlistBloc, WishlistState>(
         builder: (context, state) {

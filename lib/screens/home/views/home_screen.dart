@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/home_bloc.dart';
 import '../../../shared/widgets/global_header.dart';
-
-// 🔥 Import the Wishlist Bloc so we can listen to it on the Home Screen!
 import '../../../blocs/wishlist_bloc/wishlist_bloc.dart';
 import '../../../blocs/wishlist_bloc/wishlist_state.dart';
+
+// 🔥 1. Import the floating cart banner
+import '../../../shared/widgets/floating_cart_banner.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -15,6 +16,9 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      // 🔥 2. Add the dynamic cart banner here
+      bottomNavigationBar: const FloatingCartBanner(),
+
       body: SafeArea(
         child: BlocBuilder<HomeBloc, HomeState>(
           builder: (context, state) {
@@ -28,12 +32,9 @@ class HomeScreen extends StatelessWidget {
             } else if (state is HomeLoaded) {
               return CustomScrollView(
                 slivers: [
-                  // 1. SCROLLS AWAY: Location & Profile
                   const SliverToBoxAdapter(
                     child: LocationHeader(title: "HOME"),
                   ),
-
-                  // 2. STICKS TO TOP: Search Bar + Category Chips
                   SliverPersistentHeader(
                     pinned: true,
                     delegate: StickyHeaderDelegate(
@@ -81,28 +82,25 @@ class HomeScreen extends StatelessWidget {
                                           ),
                                           child: Center(
                                             child: Text(
-                                              categoryName.isNotEmpty
-                                                  ? categoryName[0]
-                                                  : '',
-                                              style: const TextStyle(
-                                                  fontSize: 20,
-                                                  fontWeight: FontWeight.bold),
-                                            ),
+                                                categoryName.isNotEmpty
+                                                    ? categoryName[0]
+                                                    : '',
+                                                style: const TextStyle(
+                                                    fontSize: 20,
+                                                    fontWeight:
+                                                        FontWeight.bold)),
                                           ),
                                         ),
                                         const SizedBox(height: 6),
-                                        Text(
-                                          categoryName,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: isSelected
-                                                ? Colors.green
-                                                : Colors.black87,
-                                            fontWeight: isSelected
-                                                ? FontWeight.bold
-                                                : FontWeight.w500,
-                                          ),
-                                        ),
+                                        Text(categoryName,
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color: isSelected
+                                                    ? Colors.green
+                                                    : Colors.black87,
+                                                fontWeight: isSelected
+                                                    ? FontWeight.bold
+                                                    : FontWeight.w500)),
                                       ],
                                     ),
                                   );
@@ -114,35 +112,28 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-
-                  // 3. SCROLLABLE BODY
                   SliverToBoxAdapter(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
-
-                        // --- FESTIVE SPECIALS ---
                         Row(
                           children: [
                             const Expanded(
                                 child: Divider(indent: 16, endIndent: 8)),
-                            Text(
-                              "✦ FESTIVE SPECIALS ✦",
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.orange.shade800,
-                                  letterSpacing: 1.2),
-                            ),
+                            Text("✦ FESTIVE SPECIALS ✦",
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.orange.shade800,
+                                    letterSpacing: 1.2)),
                             const Expanded(
                                 child: Divider(indent: 8, endIndent: 16)),
                           ],
                         ),
                         const SizedBox(height: 16),
-
                         SizedBox(
-                          height: 280, // Height to fit the taller product cards
+                          height: 280,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -151,20 +142,13 @@ class HomeScreen extends StatelessWidget {
                                 : state.filteredProducts.length,
                             separatorBuilder: (context, index) =>
                                 const SizedBox(width: 12),
-                            itemBuilder: (context, index) {
-                              return SizedBox(
-                                width:
-                                    145, // Constrain width so it looks like a clean horizontal carousel
+                            itemBuilder: (context, index) => SizedBox(
+                                width: 145,
                                 child: ProductCard(
-                                    product: state.filteredProducts[index]),
-                              );
-                            },
+                                    product: state.filteredProducts[index])),
                           ),
                         ),
                         const SizedBox(height: 24),
-
-                        // --- 🔥 DYNAMIC WISHLIST SECTION 🔥 ---
-                        // This will ONLY appear if the user has items in their wishlist!
                         BlocBuilder<WishlistBloc, WishlistState>(
                           builder: (context, wishlistState) {
                             if (wishlistState is WishlistLoaded &&
@@ -173,16 +157,13 @@ class HomeScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Padding(
-                                    padding:
-                                        EdgeInsets.symmetric(horizontal: 16.0),
-                                    child: Text(
-                                      "Your wishlist",
-                                      style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.black87),
-                                    ),
-                                  ),
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 16.0),
+                                      child: Text("Your wishlist",
+                                          style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w900,
+                                              color: Colors.black87))),
                                   const SizedBox(height: 16),
                                   SizedBox(
                                     height: 280,
@@ -194,37 +175,28 @@ class HomeScreen extends StatelessWidget {
                                           wishlistState.wishlistItems.length,
                                       separatorBuilder: (context, index) =>
                                           const SizedBox(width: 12),
-                                      itemBuilder: (context, index) {
-                                        return SizedBox(
-                                          width:
-                                              145, // Match Festive Specials width
+                                      itemBuilder: (context, index) => SizedBox(
+                                          width: 145,
                                           child: ProductCard(
                                               product: wishlistState
-                                                  .wishlistItems[index]),
-                                        );
-                                      },
+                                                  .wishlistItems[index])),
                                     ),
                                   ),
                                   const SizedBox(height: 24),
                                 ],
                               );
                             }
-                            return const SizedBox
-                                .shrink(); // Returns an empty, invisible widget if wishlist is empty
+                            return const SizedBox.shrink();
                           },
                         ),
-
-                        // --- ALL PRODUCTS ---
                         const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16.0),
-                          child: Text("All Products",
-                              style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.black87)),
-                        ),
+                            padding: EdgeInsets.symmetric(horizontal: 16.0),
+                            child: Text("All Products",
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.black87))),
                         const SizedBox(height: 16),
-
                         state.filteredProducts.isEmpty
                             ? const Center(
                                 child: Padding(
@@ -240,8 +212,7 @@ class HomeScreen extends StatelessWidget {
                                 gridDelegate:
                                     const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 3,
-                                  mainAxisExtent:
-                                      260, // Fixed height from previous step
+                                  mainAxisExtent: 260,
                                   crossAxisSpacing: 12,
                                   mainAxisSpacing: 16,
                                 ),
@@ -251,9 +222,8 @@ class HomeScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-
-                  // BOTTOM PADDING (Room for Cart)
-                  const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
+                  // 🔥 3. Reduced to normal padding because Scaffold handles the space now
+                  const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
                 ],
               );
             }
