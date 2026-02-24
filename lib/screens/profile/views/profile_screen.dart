@@ -1,6 +1,7 @@
 import 'package:app123/blocs/auth_bloc/auth_bloc.dart';
 import 'package:app123/blocs/auth_bloc/auth_event.dart';
 import 'package:app123/blocs/auth_bloc/auth_state.dart';
+import 'package:app123/screens/profile/views/wishlist_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -253,14 +254,16 @@ class ProfileScreen extends StatelessWidget {
                           endIndent: 16,
                           color: Colors.grey.shade100),
                       ListTile(
-                        leading: const Icon(Icons.favorite_border,
-                            color: Colors.black54),
-                        title: const Text("Your Wishlist",
-                            style: TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w600)),
-                        trailing:
-                            const Icon(Icons.chevron_right, color: Colors.grey),
-                        onTap: () {},
+                        leading: const Icon(Icons.favorite_border, color: Colors.black54),
+                        title: const Text("Your Wishlist", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                        onTap: () {
+                          // 🔥 Navigate to the new Wishlist screen!
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const WishlistScreen()),
+                          );
+                        },
                       ),
                       Divider(
                           height: 1,

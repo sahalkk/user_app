@@ -4,6 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/home_bloc.dart';
 import '../../../shared/widgets/global_header.dart';
 
+// 🔥 Import the Wishlist Bloc so we can listen to it on the Home Screen!
+import '../../../blocs/wishlist_bloc/wishlist_bloc.dart';
+import '../../../blocs/wishlist_bloc/wishlist_state.dart';
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -22,7 +26,6 @@ class HomeScreen extends StatelessWidget {
                   child: Text("Error: ${state.message}",
                       style: const TextStyle(color: Colors.red)));
             } else if (state is HomeLoaded) {
-              // --- THE NEW CUSTOM SCROLL VIEW ---
               return CustomScrollView(
                 slivers: [
                   // 1. SCROLLS AWAY: Location & Profile
@@ -32,16 +35,14 @@ class HomeScreen extends StatelessWidget {
 
                   // 2. STICKS TO TOP: Search Bar + Category Chips
                   SliverPersistentHeader(
-                    pinned: true, // THIS IS THE MAGIC PROPERTY!
+                    pinned: true,
                     delegate: StickyHeaderDelegate(
-                      height: 165, // Fixed height for Search (65) + Chips (100)
+                      height: 165,
                       child: Container(
-                        color: Colors
-                            .white, // Solid background blocks scrolling items from showing through
+                        color: Colors.white,
                         child: Column(
                           children: [
                             const StickySearchBar(),
-                            // Category Chips
                             SizedBox(
                               height: 90,
                               child: ListView.separated(
@@ -114,13 +115,14 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // 3. SCROLLABLE BODY: Festive Specials & Products
+                  // 3. SCROLLABLE BODY
                   SliverToBoxAdapter(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
-                        // FESTIVE SPECIALS
+
+                        // --- FESTIVE SPECIALS ---
                         Row(
                           children: [
                             const Expanded(
@@ -140,7 +142,7 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(height: 16),
 
                         SizedBox(
-                          height: 280,
+                          height: 280, // Height to fit the taller product cards
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -151,7 +153,8 @@ class HomeScreen extends StatelessWidget {
                                 const SizedBox(width: 12),
                             itemBuilder: (context, index) {
                               return SizedBox(
-                                width: 150,
+                                width:
+                                    145, // Constrain width so it looks like a clean horizontal carousel
                                 child: ProductCard(
                                     product: state.filteredProducts[index]),
                               );
@@ -160,13 +163,64 @@ class HomeScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
 
-                        // ALL PRODUCTS
+                        // --- 🔥 DYNAMIC WISHLIST SECTION 🔥 ---
+                        // This will ONLY appear if the user has items in their wishlist!
+                        BlocBuilder<WishlistBloc, WishlistState>(
+                          builder: (context, wishlistState) {
+                            if (wishlistState is WishlistLoaded &&
+                                wishlistState.wishlistItems.isNotEmpty) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 16.0),
+                                    child: Text(
+                                      "Your wishlist",
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.black87),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  SizedBox(
+                                    height: 280,
+                                    child: ListView.separated(
+                                      scrollDirection: Axis.horizontal,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16),
+                                      itemCount:
+                                          wishlistState.wishlistItems.length,
+                                      separatorBuilder: (context, index) =>
+                                          const SizedBox(width: 12),
+                                      itemBuilder: (context, index) {
+                                        return SizedBox(
+                                          width:
+                                              145, // Match Festive Specials width
+                                          child: ProductCard(
+                                              product: wishlistState
+                                                  .wishlistItems[index]),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                ],
+                              );
+                            }
+                            return const SizedBox
+                                .shrink(); // Returns an empty, invisible widget if wishlist is empty
+                          },
+                        ),
+
+                        // --- ALL PRODUCTS ---
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 16.0),
                           child: Text("All Products",
                               style: TextStyle(
                                   fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w900,
                                   color: Colors.black87)),
                         ),
                         const SizedBox(height: 16),
@@ -186,9 +240,10 @@ class HomeScreen extends StatelessWidget {
                                 gridDelegate:
                                     const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 3,
-                                  mainAxisExtent: 260,
-                                  mainAxisSpacing: 12,
+                                  mainAxisExtent:
+                                      260, // Fixed height from previous step
                                   crossAxisSpacing: 12,
+                                  mainAxisSpacing: 16,
                                 ),
                                 itemBuilder: (context, index) => ProductCard(
                                     product: state.filteredProducts[index]),
@@ -197,7 +252,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // 4. BOTTOM PADDING (For the Floating Cart Banner)
+                  // BOTTOM PADDING (Room for Cart)
                   const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
                 ],
               );
