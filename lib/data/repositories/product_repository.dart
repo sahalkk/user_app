@@ -1,14 +1,15 @@
 import 'dart:convert';
+import 'package:beeyo_customer/shared/constants/api_constants.dart';
 import 'package:http/http.dart' as http;
 import '../../shared/models/product_model.dart';
 
 class ProductRepository {
   // The Base URL for your API
-  final String baseUrl = "https://nestjs-backend-egj0.onrender.com/api/v1";
+  final String baseUrl = ApiConstants.baseUrl;
 
   Future<List<ProductModel>> getProducts() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/products'));
+      final response = await http.get(Uri.parse('$baseUrl/api/v1/products'));
 
       if (response.statusCode == 200) {
         // 1. Decode the JSON

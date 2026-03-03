@@ -1,11 +1,11 @@
 import 'dart:convert';
+import 'package:beeyo_customer/shared/constants/api_constants.dart';
 import 'package:http/http.dart' as http;
 import '../../shared/models/category_model.dart';
 
 class CategoryRepository {
   // Your backend endpoint for categories
-  final String baseUrl =
-      'https://nestjs-backend-egj0.onrender.com/api/v1/categories';
+  final String baseUrl = '${ApiConstants.baseUrl}/api/v1/categories';
 
   Future<List<CategoryModel>> getCategories() async {
     try {

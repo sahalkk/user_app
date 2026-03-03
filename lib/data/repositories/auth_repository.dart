@@ -1,11 +1,11 @@
 import 'dart:convert';
+import 'package:beeyo_customer/shared/constants/api_constants.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthRepository {
   // Added 'https://' so the app knows how to connect to it securely
-  final String loginUrl =
-      'https://nestjs-backend-egj0.onrender.com/api/v1/auth/signin';
+  final String loginUrl = '${ApiConstants.baseUrl}/api/v1/auth/signin';
 
   static const String _tokenKey = 'auth_token';
   static const String _userKey = 'user_phone';
