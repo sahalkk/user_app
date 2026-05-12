@@ -1,6 +1,6 @@
 class ApiConstants {
   // 🔥 Your new backend IP address
-  static const String baseUrl = 'https://144.24.146.130';
+  static const String baseUrl = 'http://10.0.2.2:4000';
 
   // Example endpoint paths:
   static const String productsEndpoint = '/api/products';
