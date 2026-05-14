@@ -140,7 +140,7 @@ class CategoriesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFF0D0D0D),
       // 🔥 2. Add the dynamic cart banner here
       bottomNavigationBar: const FloatingCartBanner(),
 
@@ -163,10 +163,10 @@ class CategoriesScreen extends StatelessWidget {
                 children: [
                   _buildCategorySection(
                       context, "Grocery & Kitchen", _groceryAndKitchen),
-                  const Divider(thickness: 4, color: Color(0xFFF4F6F8)),
+                  const Divider(thickness: 1, color: Color(0xFF2A2A2A)),
                   _buildCategorySection(
                       context, "Snacks & Drinks", _snacksAndDrinks),
-                  const Divider(thickness: 4, color: Color(0xFFF4F6F8)),
+                  const Divider(thickness: 1, color: Color(0xFF2A2A2A)),
                   _buildCategorySection(
                       context, "Beauty & Personal Care", _beautyAndCare),
                 ],
@@ -187,12 +187,26 @@ class CategoriesScreen extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-          child: Text(
-            title,
-            style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Colors.black87),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3DAA5C),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white),
+              ),
+            ],
           ),
         ),
         GridView.builder(
@@ -222,16 +236,18 @@ class CategoriesScreen extends StatelessWidget {
                     child: Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
-                          color: const Color(0xFFF4F6F8),
-                          borderRadius: BorderRadius.circular(16)),
+                          color: const Color(0xFF1A1A1A),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                              color: const Color(0xFF2A2A2A), width: 1)),
                       padding: const EdgeInsets.all(8.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(category.imageUrl,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
-                                const Icon(Icons.image_not_supported,
-                                    color: Colors.grey, size: 24)),
+                                const Icon(Icons.image_not_supported_outlined,
+                                    color: Color(0xFF3A3A3A), size: 24)),
                       ),
                     ),
                   ),
@@ -241,9 +257,10 @@ class CategoriesScreen extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 11,
+                          fontFamily: 'Poppins',
+                          fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: Color(0xFF9E9E9E),
                           height: 1.2)),
                 ],
               ),

@@ -12,8 +12,7 @@ class OrderAgainScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      // 🔥 2. Add the dynamic cart banner here
+      backgroundColor: const Color(0xFF0D0D0D),
       bottomNavigationBar: const FloatingCartBanner(),
 
       body: SafeArea(
@@ -21,7 +20,8 @@ class OrderAgainScreen extends StatelessWidget {
           builder: (context, state) {
             if (state is HomeLoading) {
               return const Center(
-                  child: CircularProgressIndicator(color: Colors.green));
+                  child: CircularProgressIndicator(
+                      color: Color(0xFF3DAA5C)));
             }
 
             if (state is HomeLoaded) {
@@ -47,34 +47,37 @@ class OrderAgainScreen extends StatelessWidget {
                           child: Center(
                             child: Column(
                               children: [
-                                Icon(Icons.shopping_basket_rounded,
-                                    size: 80, color: Colors.green.shade200),
+                                const Icon(Icons.shopping_bag_outlined,
+                                    size: 80, color: Color(0xFF3DAA5C)),
                                 const SizedBox(height: 16),
                                 const Text("Reordering will be easy",
                                     style: TextStyle(
+                                        fontFamily: 'Poppins',
                                         fontSize: 18,
-                                        fontWeight: FontWeight.w900,
-                                        color: Colors.black87)),
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white)),
                                 const SizedBox(height: 8),
-                                Text(
+                                const Text(
                                     "Items you order will show up here so you can buy them again easily.",
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                        color: Colors.grey.shade600,
+                                        fontFamily: 'Poppins',
+                                        color: Color(0xFF9E9E9E),
                                         fontSize: 13,
                                         height: 1.4)),
                               ],
                             ),
                           ),
                         ),
-                        const Divider(thickness: 6, color: Color(0xFFF4F6F8)),
+                        const Divider(thickness: 1, color: Color(0xFF2A2A2A)),
                         const Padding(
                           padding: EdgeInsets.fromLTRB(16, 24, 16, 16),
                           child: Text("Bestsellers",
                               style: TextStyle(
+                                  fontFamily: 'Poppins',
                                   fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.black87)),
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white)),
                         ),
                         GridView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 16),

@@ -87,14 +87,14 @@ class _MainWrapperState extends State<MainWrapper> {
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                          horizontal: 18, vertical: 13),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade700,
-                        borderRadius: BorderRadius.circular(12),
+                        color: const Color(0xFF3DAA5C),
+                        borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 10,
+                            color: const Color(0xFF3DAA5C).withOpacity(0.25),
+                            blurRadius: 16,
                             offset: const Offset(0, 4),
                           )
                         ],
@@ -109,31 +109,35 @@ class _MainWrapperState extends State<MainWrapper> {
                               Text(
                                 "$totalItems ITEM${totalItems > 1 ? 'S' : ''}",
                                 style: const TextStyle(
-                                    color: Colors.white70,
+                                    fontFamily: 'Poppins',
+                                    color: Color(0xCCFFFFFF),
                                     fontSize: 10,
-                                    fontWeight: FontWeight.bold),
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5),
                               ),
                               Text(
                                 "₹${totalPrice.toStringAsFixed(0)}",
                                 style: const TextStyle(
+                                    fontFamily: 'Poppins',
                                     color: Colors.white,
                                     fontSize: 16,
-                                    fontWeight: FontWeight.bold),
+                                    fontWeight: FontWeight.w900),
                               ),
                             ],
                           ),
                           const Row(
                             children: [
                               Text(
-                                "View cart",
+                                "View Cart",
                                 style: TextStyle(
+                                    fontFamily: 'Poppins',
                                     color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700),
                               ),
-                              SizedBox(width: 8),
-                              Icon(Icons.arrow_right,
-                                  color: Colors.white, size: 24),
+                              SizedBox(width: 6),
+                              Icon(Icons.arrow_forward_ios_rounded,
+                                  color: Colors.white, size: 13),
                             ],
                           )
                         ],

@@ -70,35 +70,45 @@ class _SearchScreenState extends State<SearchScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      backgroundColor: const Color(0xFF1A1A1A),
       builder: (context) {
         return Container(
           height: 250,
           padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Text(
                 "Listening...",
                 style: TextStyle(
+                    fontFamily: 'Poppins',
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87),
+                    color: Colors.white),
               ),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 "Speak what you want to search",
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 14,
+                    color: Color(0xFF9E9E9E)),
               ),
               const SizedBox(height: 32),
-              // Big pulsating mic button
               Container(
                 height: 80,
                 width: 80,
                 decoration: BoxDecoration(
-                  color: Colors.green.shade100,
+                  color: const Color(0xFF3DAA5C).withOpacity(0.15),
                   shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF3DAA5C), width: 2),
                 ),
-                child: Icon(Icons.mic, size: 40, color: Colors.green.shade700),
+                child: const Icon(Icons.mic_rounded,
+                    size: 40, color: Color(0xFF3DAA5C)),
               ),
             ],
           ),
@@ -133,7 +143,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFF0D0D0D),
       body: SafeArea(
         child: Column(
           children: [
@@ -143,45 +153,40 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                    icon: const Icon(Icons.arrow_back_rounded,
+                      color: Colors.white),
                     onPressed: () => Navigator.pop(context),
                   ),
                   Expanded(
                     child: Container(
                       height: 48,
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.grey.shade100,
-                              blurRadius: 4,
-                              offset: const Offset(0, 2)),
-                        ],
+                        color: const Color(0xFF1E1E1E),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF2A2A2A)),
                       ),
                       child: TextField(
                         controller: _searchController,
                         focusNode: _searchFocusNode,
                         style: const TextStyle(
+                            fontFamily: 'Poppins',
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Colors.black87),
+                            color: Colors.white),
                         decoration: InputDecoration(
                           hintText: "Search for products...",
                           hintStyle: const TextStyle(
-                              color: Colors.grey,
+                              fontFamily: 'Poppins',
+                              color: Color(0xFF5C5C5C),
                               fontSize: 15,
                               fontWeight: FontWeight.normal),
                           border: InputBorder.none,
-                          prefixIcon:
-                              const Icon(Icons.search, color: Colors.grey),
-
-                          // 🔥 5. Update the Suffix Icon to trigger Voice Search
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: Color(0xFF5C5C5C)),
                           suffixIcon: _searchController.text.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.close,
-                                      color: Colors.grey, size: 20),
+                                  icon: const Icon(Icons.close_rounded,
+                                      color: Color(0xFF9E9E9E), size: 20),
                                   onPressed: () {
                                     setState(() {
                                       _searchController.clear();
@@ -189,12 +194,11 @@ class _SearchScreenState extends State<SearchScreen> {
                                   },
                                 )
                               : IconButton(
-                                  icon: Icon(Icons.mic,
+                                  icon: Icon(Icons.mic_rounded,
                                       color: _isSpeechAvailable
-                                          ? Colors.green.shade700
-                                          : Colors.grey),
-                                  onPressed:
-                                      _startVoiceSearch, // Trigger the bottom sheet!
+                                          ? const Color(0xFF3DAA5C)
+                                          : const Color(0xFF5C5C5C)),
+                                  onPressed: _startVoiceSearch,
                                 ),
                         ),
                         onChanged: (value) {
@@ -207,7 +211,7 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
 
-            Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
+            const Divider(height: 1, thickness: 1, color: Color(0xFF2A2A2A)),
 
             // --- 2. SUGGESTIONS BODY ---
             Expanded(
@@ -215,7 +219,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 builder: (context, state) {
                   if (state is HomeLoading) {
                     return const Center(
-                        child: CircularProgressIndicator(color: Colors.green));
+                        child: CircularProgressIndicator(
+                            color: Color(0xFF3DAA5C)));
                   }
 
                   if (state is HomeLoaded) {
@@ -263,10 +268,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                         height: 60,
                                         width: 60,
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFF4F8F4),
+                                          color: const Color(0xFF1E1E1E),
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                              color: Colors.grey.shade200),
+                                              color: const Color(0xFF2A2A2A)),
                                         ),
                                         child: Center(
                                           child: Text(
@@ -276,7 +281,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                             style: TextStyle(
                                                 fontSize: 20,
                                                 fontWeight: FontWeight.w900,
-                                                color: Colors.green.shade800),
+                                                color: Color(0xFF3DAA5C)),
                                           ),
                                         ),
                                       ),
@@ -321,14 +326,15 @@ class _SearchScreenState extends State<SearchScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.search,
-                                size: 64, color: Colors.grey.shade300),
+                            const Icon(Icons.search_rounded,
+                                size: 64, color: Color(0xFF2A2A2A)),
                             const SizedBox(height: 16),
                             Text(
                               "Searching for '${_searchController.text}'...",
-                              style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 16,
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  color: Color(0xFF9E9E9E),
+                                  fontSize: 15,
                                   fontWeight: FontWeight.w500),
                             ),
                           ],
@@ -354,15 +360,17 @@ class _SearchScreenState extends State<SearchScreen> {
         children: [
           Text(title,
               style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.black87)),
+                  fontFamily: 'Poppins',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white)),
           if (trailing != null)
             Text(trailing,
                 style: const TextStyle(
+                    fontFamily: 'Poppins',
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.green)),
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF3DAA5C))),
         ],
       ),
     );
@@ -372,19 +380,20 @@ class _SearchScreenState extends State<SearchScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(8)),
+          color: const Color(0xFF1E1E1E),
+          border: Border.all(color: const Color(0xFF2A2A2A)),
+          borderRadius: BorderRadius.circular(10)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Colors.grey.shade600),
+          Icon(icon, size: 15, color: const Color(0xFF9E9E9E)),
           const SizedBox(width: 8),
           Text(label,
               style: const TextStyle(
+                  fontFamily: 'Poppins',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87)),
+                  color: Color(0xFFCCCCCC))),
         ],
       ),
     );

@@ -17,16 +17,15 @@ class ProductDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double originalPrice = product.priceValue * 1.25;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFF0D0D0D),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF0D0D0D),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.keyboard_arrow_down,
-              color: Colors.black, size: 28),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              color: Colors.white, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -39,8 +38,12 @@ class ProductDetailsScreen extends StatelessWidget {
               }
               return IconButton(
                 icon: Icon(
-                  isWishlisted ? Icons.favorite : Icons.favorite_border,
-                  color: isWishlisted ? Colors.redAccent : Colors.black87,
+                  isWishlisted
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: isWishlisted
+                      ? const Color(0xFF3DAA5C)
+                      : const Color(0xFF9E9E9E),
                 ),
                 onPressed: () {
                   if (isWishlisted) {
@@ -55,10 +58,12 @@ class ProductDetailsScreen extends StatelessWidget {
             },
           ),
           IconButton(
-              icon: const Icon(Icons.search, color: Colors.black87),
+              icon: const Icon(Icons.search_rounded,
+                  color: Color(0xFF9E9E9E)),
               onPressed: () {}),
           IconButton(
-              icon: const Icon(Icons.ios_share, color: Colors.black87),
+              icon: const Icon(Icons.ios_share_rounded,
+                  color: Color(0xFF9E9E9E)),
               onPressed: () {}),
         ],
       ),
@@ -78,14 +83,9 @@ class ProductDetailsScreen extends StatelessWidget {
 
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    offset: const Offset(0, -4),
-                    blurRadius: 10),
-              ],
+            decoration: const BoxDecoration(
+              color: Color(0xFF1A1A1A),
+              border: Border(top: BorderSide(color: Color(0xFF2A2A2A), width: 1)),
             ),
             child: SafeArea(
               top: false,
@@ -100,31 +100,33 @@ class ProductDetailsScreen extends StatelessWidget {
                         Text(
                           product.unit.isNotEmpty ? product.unit : "1 Item",
                           style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87),
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF9E9E9E)),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           "₹${product.price}",
                           style: const TextStyle(
+                              fontFamily: 'Poppins',
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
-                              color: Colors.black87),
+                              color: Colors.white),
                         ),
                         const SizedBox(height: 2),
-                        Text(
+                        const Text(
                           "Inclusive of all taxes",
                           style: TextStyle(
+                              fontFamily: 'Poppins',
                               fontSize: 10,
-                              color: Colors.grey.shade500,
+                              color: Color(0xFF5C5C5C),
                               fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // The exact Add button code you verified is ok!
                   _buildDynamicAddButton(context, currentItemQuantity),
                 ],
               ),
@@ -153,9 +155,9 @@ class ProductDetailsScreen extends StatelessWidget {
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) => Container(
                           height: 250,
-                          color: Colors.grey.shade100,
-                          child: const Icon(Icons.image_not_supported,
-                              size: 50, color: Colors.grey)),
+                          color: const Color(0xFF141414),
+                          child: const Icon(Icons.image_not_supported_outlined,
+                              size: 50, color: Color(0xFF3A3A3A))),
                     ),
                   ),
                 ),
@@ -167,21 +169,21 @@ class ProductDetailsScreen extends StatelessWidget {
                         width: 20,
                         height: 6,
                         decoration: BoxDecoration(
-                            color: Colors.grey.shade400,
+                            color: const Color(0xFF3DAA5C),
                             borderRadius: BorderRadius.circular(10))),
                     Container(
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         width: 6,
                         height: 6,
-                        decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
+                        decoration: const BoxDecoration(
+                            color: Color(0xFF2A2A2A),
                             shape: BoxShape.circle)),
                     Container(
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         width: 6,
                         height: 6,
-                        decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
+                        decoration: const BoxDecoration(
+                            color: Color(0xFF2A2A2A),
                             shape: BoxShape.circle)),
                   ],
                 ),
@@ -191,48 +193,26 @@ class ProductDetailsScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Rating stars only (removed delivery time badge)
                       Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                                color: Colors.green.shade50,
-                                borderRadius: BorderRadius.circular(4)),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.timer,
-                                    size: 10, color: Colors.green),
-                                const SizedBox(width: 4),
-                                const Text("14 MINS",
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green)),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Row(
-                            children: [
-                              Icon(Icons.star,
-                                  size: 12, color: Colors.orange.shade400),
-                              Icon(Icons.star,
-                                  size: 12, color: Colors.orange.shade400),
-                              Icon(Icons.star,
-                                  size: 12, color: Colors.orange.shade400),
-                              Icon(Icons.star,
-                                  size: 12, color: Colors.orange.shade400),
-                              Icon(Icons.star_half,
-                                  size: 12, color: Colors.orange.shade400),
-                              const SizedBox(width: 4),
-                              Text("(52)",
-                                  style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey.shade600,
-                                      fontWeight: FontWeight.bold)),
-                            ],
-                          )
+                          Icon(Icons.star_rounded,
+                              size: 13, color: Colors.amber.shade400),
+                          Icon(Icons.star_rounded,
+                              size: 13, color: Colors.amber.shade400),
+                          Icon(Icons.star_rounded,
+                              size: 13, color: Colors.amber.shade400),
+                          Icon(Icons.star_rounded,
+                              size: 13, color: Colors.amber.shade400),
+                          Icon(Icons.star_half_rounded,
+                              size: 13, color: Colors.amber.shade400),
+                          const SizedBox(width: 4),
+                          const Text("(52)",
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 11,
+                                  color: Color(0xFF9E9E9E),
+                                  fontWeight: FontWeight.w600)),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -243,9 +223,10 @@ class ProductDetailsScreen extends StatelessWidget {
                             child: Text(
                               product.title,
                               style: const TextStyle(
+                                  fontFamily: 'Poppins',
                                   fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.black87,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
                                   height: 1.2),
                             ),
                           ),
@@ -254,55 +235,54 @@ class ProductDetailsScreen extends StatelessWidget {
                             width: 16,
                             height: 16,
                             decoration: BoxDecoration(
-                                border:
-                                    Border.all(color: Colors.green, width: 1.5),
+                                border: Border.all(
+                                    color: const Color(0xFF3DAA5C), width: 1.5),
                                 borderRadius: BorderRadius.circular(4)),
                             child: Center(
                                 child: Container(
                                     width: 8,
                                     height: 8,
                                     decoration: const BoxDecoration(
-                                        color: Colors.green,
+                                        color: Color(0xFF3DAA5C),
                                         shape: BoxShape.circle))),
                           )
                         ],
                       ),
                       const SizedBox(height: 8),
-                      const Text("Only 1 left",
+                      const Text("In Stock",
                           style: TextStyle(
+                              fontFamily: 'Poppins',
                               fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.deepOrange)),
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF3DAA5C))),
                       const SizedBox(height: 8),
-                      Text(product.unit.isNotEmpty ? product.unit : "1 Item",
+                      Text(
+                          product.unit.isNotEmpty ? product.unit : "1 Item",
                           style: const TextStyle(
+                              fontFamily: 'Poppins',
                               fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87)),
-                      const SizedBox(height: 4),
-                      Text("MRP ₹${originalPrice.toStringAsFixed(0)}",
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey.shade600,
-                              decoration: TextDecoration.lineThrough)),
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF9E9E9E))),
                       const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Text("View product details",
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.green.shade700)),
-                          Icon(Icons.arrow_drop_down,
-                              color: Colors.green.shade700),
-                        ],
+                      GestureDetector(
+                        child: Row(
+                          children: [
+                            const Text("View product details",
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF3DAA5C))),
+                            const Icon(Icons.arrow_drop_down_rounded,
+                                color: Color(0xFF3DAA5C)),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                     ],
                   ),
                 ),
-                Divider(thickness: 8, color: Colors.grey.shade100),
+                const Divider(thickness: 1, color: Color(0xFF2A2A2A)),
                 Padding(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16.0, vertical: 16.0),
@@ -312,9 +292,9 @@ class ProductDetailsScreen extends StatelessWidget {
                         height: 48,
                         width: 48,
                         decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: const Color(0xFF1E1E1E),
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.grey.shade200),
+                            border: Border.all(color: const Color(0xFF2A2A2A)),
                             image: const DecorationImage(
                               image: NetworkImage(
                                   "https://images.unsplash.com/photo-1559525839-b184a4d698c7?w=100&q=80"),
@@ -328,30 +308,34 @@ class ProductDetailsScreen extends StatelessWidget {
                           children: [
                             const Text("Premium Brand",
                                 style: TextStyle(
+                                    fontFamily: 'Poppins',
                                     fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.black87)),
-                            Text("Explore all products",
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white)),
+                            const Text("Explore all products",
                                 style: TextStyle(
+                                    fontFamily: 'Poppins',
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
-                                    color: Colors.grey.shade600)),
+                                    color: Color(0xFF9E9E9E))),
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right, color: Colors.grey.shade400),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: Color(0xFF5C5C5C)),
                     ],
                   ),
                 ),
-                Divider(thickness: 8, color: Colors.grey.shade100),
+                const Divider(thickness: 1, color: Color(0xFF2A2A2A)),
                 const Padding(
                   padding: EdgeInsets.fromLTRB(16, 20, 16, 16),
                   child: Text(
-                    "Similar products",
+                    "Similar Products",
                     style: TextStyle(
+                        fontFamily: 'Poppins',
                         fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black87),
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white),
                   ),
                 ),
                 BlocBuilder<HomeBloc, HomeState>(
@@ -416,12 +400,12 @@ class ProductDetailsScreen extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade800,
-                        borderRadius: BorderRadius.circular(12),
+                        color: const Color(0xFF3DAA5C),
+                        borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                              color: Colors.green.withOpacity(0.3),
-                              blurRadius: 10,
+                              color: const Color(0xFF3DAA5C).withOpacity(0.3),
+                              blurRadius: 16,
                               offset: const Offset(0, 4))
                         ],
                       ),
@@ -434,12 +418,14 @@ class ProductDetailsScreen extends StatelessWidget {
                               Text(
                                   "$totalItems ITEM${totalItems > 1 ? 'S' : ''}",
                                   style: const TextStyle(
-                                      color: Colors.white70,
+                                      fontFamily: 'Poppins',
+                                      color: Color(0xCCFFFFFF),
                                       fontSize: 10,
-                                      fontWeight: FontWeight.w800,
+                                      fontWeight: FontWeight.w700,
                                       letterSpacing: 0.5)),
                               Text("₹${totalPrice.toStringAsFixed(0)}",
                                   style: const TextStyle(
+                                      fontFamily: 'Poppins',
                                       color: Colors.white,
                                       fontSize: 15,
                                       fontWeight: FontWeight.w900)),
@@ -449,12 +435,13 @@ class ProductDetailsScreen extends StatelessWidget {
                             children: [
                               Text("View Cart",
                                   style: TextStyle(
+                                      fontFamily: 'Poppins',
                                       color: Colors.white,
                                       fontSize: 14,
-                                      fontWeight: FontWeight.bold)),
+                                      fontWeight: FontWeight.w700)),
                               SizedBox(width: 6),
-                              Icon(Icons.arrow_forward_ios,
-                                  color: Colors.white, size: 14),
+                              Icon(Icons.arrow_forward_ios_rounded,
+                                  color: Colors.white, size: 13),
                             ],
                           )
                         ],

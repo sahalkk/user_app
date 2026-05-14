@@ -66,20 +66,27 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFF0D0D0D),
       appBar: AppBar(
         title: Text(
-          widget.category.name
-              .replaceAll('\n', ' '), // Clean up newlines from the title
+          widget.category.name.replaceAll('\n', ' '),
           style: const TextStyle(
-              color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18),
+              fontFamily: 'Poppins',
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 18),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF0D0D0D),
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          IconButton(icon: const Icon(Icons.favorite_border), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
+          IconButton(
+              icon: const Icon(Icons.favorite_border_rounded,
+                  color: Color(0xFF9E9E9E)),
+              onPressed: () {}),
+          IconButton(
+              icon: const Icon(Icons.search_rounded, color: Color(0xFF9E9E9E)),
+              onPressed: () {}),
         ],
       ),
 
@@ -91,11 +98,10 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
         children: [
           // --- 1. LEFT SIDEBAR (Subcategories) ---
           Container(
-            width: 85, // Fixed width for the sidebar
-            color: Colors.white,
+            width: 85,
+            color: const Color(0xFF0D0D0D),
             child: ListView.builder(
-              padding:
-                  const EdgeInsets.only(bottom: 100), // Space for floating cart
+              padding: const EdgeInsets.only(bottom: 100),
               itemCount: _mockSubCategories.length,
               itemBuilder: (context, index) {
                 final isSelected = _selectedSubCategoryIndex == index;
@@ -106,18 +112,18 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                     setState(() {
                       _selectedSubCategoryIndex = index;
                     });
-                    // TODO (Future): Dispatch event to filter products by subcategory
                   },
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.purple.shade50 : Colors.white,
+                      color: isSelected
+                          ? const Color(0xFF1A1A1A)
+                          : const Color(0xFF0D0D0D),
                       border: Border(
-                        // The accent line on the left when selected
                         left: BorderSide(
                           color: isSelected
-                              ? Colors.purpleAccent
+                              ? const Color(0xFF3DAA5C)
                               : Colors.transparent,
-                          width: 4,
+                          width: 3,
                         ),
                       ),
                     ),
@@ -126,13 +132,12 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Circle Image
                         Container(
                           height: 48,
                           width: 48,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.grey.shade100,
+                            color: const Color(0xFF1E1E1E),
                             image: DecorationImage(
                               image: NetworkImage(subCategory['image']!),
                               fit: BoxFit.cover,
@@ -140,17 +145,18 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        // Title
                         Text(
                           subCategory['name']!,
                           textAlign: TextAlign.center,
                           style: TextStyle(
+                            fontFamily: 'Poppins',
                             fontSize: 10,
-                            fontWeight:
-                                isSelected ? FontWeight.bold : FontWeight.w500,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             color: isSelected
-                                ? Colors.purpleAccent.shade700
-                                : Colors.black87,
+                                ? const Color(0xFF3DAA5C)
+                                : const Color(0xFF9E9E9E),
                             height: 1.2,
                           ),
                         ),
@@ -165,13 +171,13 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
           // --- 2. RIGHT PANEL (Product Grid) ---
           Expanded(
             child: Container(
-              color: const Color(
-                  0xFFF4F6F8), // Light grey background separates it from sidebar
+              color: const Color(0xFF111111),
               child: BlocBuilder<HomeBloc, HomeState>(
                 builder: (context, state) {
                   if (state is HomeLoading) {
                     return const Center(
-                        child: CircularProgressIndicator(color: Colors.green));
+                        child: CircularProgressIndicator(
+                            color: Color(0xFF3DAA5C)));
                   }
 
                   if (state is HomeLoaded) {
@@ -191,7 +197,9 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                     if (categoryProducts.isEmpty) {
                       return Center(
                         child: Text("No items available",
-                            style: TextStyle(color: Colors.grey.shade600)),
+                            style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontFamily: 'Poppins')),
                       );
                     }
 

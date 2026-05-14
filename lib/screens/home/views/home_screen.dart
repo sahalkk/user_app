@@ -6,7 +6,6 @@ import '../../../shared/widgets/global_header.dart';
 import '../../../blocs/wishlist_bloc/wishlist_bloc.dart';
 import '../../../blocs/wishlist_bloc/wishlist_state.dart';
 
-// 🔥 1. Import the floating cart banner
 import '../../../shared/widgets/floating_cart_banner.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -15,44 +14,47 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      // 🔥 2. Add the dynamic cart banner here
+      backgroundColor: const Color(0xFF0D0D0D),
       bottomNavigationBar: const FloatingCartBanner(),
-
       body: SafeArea(
         child: BlocBuilder<HomeBloc, HomeState>(
           builder: (context, state) {
             if (state is HomeLoading) {
               return const Center(
-                  child: CircularProgressIndicator(color: Colors.green));
+                  child: CircularProgressIndicator(color: Color(0xFF3DAA5C)));
             } else if (state is HomeError) {
               return Center(
                   child: Text("Error: ${state.message}",
-                      style: const TextStyle(color: Colors.red)));
+                      style: const TextStyle(color: Color(0xFF9E9E9E))));
             } else if (state is HomeLoaded) {
               return CustomScrollView(
                 slivers: [
+                  // ── Brand Header (scrolls away) ──
                   const SliverToBoxAdapter(
                     child: LocationHeader(title: "HOME"),
                   ),
+
+                  // ── Sticky Search + Category Tabs ──
                   SliverPersistentHeader(
                     pinned: true,
                     delegate: StickyHeaderDelegate(
-                      height: 165,
+                      height: 130,
                       child: Container(
-                        color: Colors.white,
+                        color: const Color(0xFF0D0D0D),
                         child: Column(
                           children: [
+                            // Search bar
                             const StickySearchBar(),
+                            // Category pill tabs
                             SizedBox(
-                              height: 90,
+                              height: 44,
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 4),
                                 itemCount: state.categories.length,
                                 separatorBuilder: (context, index) =>
-                                    const SizedBox(width: 16),
+                                    const SizedBox(width: 8),
                                 itemBuilder: (context, index) {
                                   final category = state.categories[index];
                                   final categoryId = category['id'] ?? '';
@@ -64,44 +66,37 @@ class HomeScreen extends StatelessWidget {
                                     onTap: () => context
                                         .read<HomeBloc>()
                                         .add(SelectCategory(categoryId)),
-                                    child: Column(
-                                      children: [
-                                        Container(
-                                          height: 60,
-                                          width: 60,
-                                          decoration: BoxDecoration(
-                                            color: isSelected
-                                                ? Colors.green.shade100
-                                                : Colors.grey.shade100,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                                color: isSelected
-                                                    ? Colors.green
-                                                    : Colors.transparent,
-                                                width: 2),
-                                          ),
-                                          child: Center(
-                                            child: Text(
-                                                categoryName.isNotEmpty
-                                                    ? categoryName[0]
-                                                    : '',
-                                                style: const TextStyle(
-                                                    fontSize: 20,
-                                                    fontWeight:
-                                                        FontWeight.bold)),
-                                          ),
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 200),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 7),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? const Color(0xFF3DAA5C)
+                                            : const Color(0xFF1E1E1E),
+                                        borderRadius:
+                                            BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? const Color(0xFF3DAA5C)
+                                              : const Color(0xFF2A2A2A),
+                                          width: 1,
                                         ),
-                                        const SizedBox(height: 6),
-                                        Text(categoryName,
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                color: isSelected
-                                                    ? Colors.green
-                                                    : Colors.black87,
-                                                fontWeight: isSelected
-                                                    ? FontWeight.bold
-                                                    : FontWeight.w500)),
-                                      ],
+                                      ),
+                                      child: Text(
+                                        categoryName,
+                                        style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 12,
+                                          fontWeight: isSelected
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : const Color(0xFF9E9E9E),
+                                        ),
+                                      ),
                                     ),
                                   );
                                 },
@@ -112,43 +107,40 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+
+                  // ── Content ──
                   SliverToBoxAdapter(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            const Expanded(
-                                child: Divider(indent: 16, endIndent: 8)),
-                            Text("✦ FESTIVE SPECIALS ✦",
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.orange.shade800,
-                                    letterSpacing: 1.2)),
-                            const Expanded(
-                                child: Divider(indent: 8, endIndent: 16)),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 24),
+
+                        // ── FESTIVE SPECIALS section header ──
+                        _SectionHeader(title: "Festive Specials"),
+                        const SizedBox(height: 14),
+
+                        // Horizontal scroll of first 5 products
                         SizedBox(
-                          height: 280,
+                          height: 265,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16),
                             itemCount: state.filteredProducts.length >= 5
                                 ? 5
                                 : state.filteredProducts.length,
                             separatorBuilder: (context, index) =>
                                 const SizedBox(width: 12),
                             itemBuilder: (context, index) => SizedBox(
-                                width: 145,
+                                width: 140,
                                 child: ProductCard(
                                     product: state.filteredProducts[index])),
                           ),
                         ),
-                        const SizedBox(height: 24),
+
+                        const SizedBox(height: 28),
+
+                        // ── WISHLIST section (if not empty) ──
                         BlocBuilder<WishlistBloc, WishlistState>(
                           builder: (context, wishlistState) {
                             if (wishlistState is WishlistLoaded &&
@@ -156,17 +148,10 @@ class HomeScreen extends StatelessWidget {
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Padding(
-                                      padding: EdgeInsets.symmetric(
-                                          horizontal: 16.0),
-                                      child: Text("Your wishlist",
-                                          style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w900,
-                                              color: Colors.black87))),
-                                  const SizedBox(height: 16),
+                                  _SectionHeader(title: "Your Wishlist"),
+                                  const SizedBox(height: 14),
                                   SizedBox(
-                                    height: 280,
+                                    height: 265,
                                     child: ListView.separated(
                                       scrollDirection: Axis.horizontal,
                                       padding: const EdgeInsets.symmetric(
@@ -176,45 +161,49 @@ class HomeScreen extends StatelessWidget {
                                       separatorBuilder: (context, index) =>
                                           const SizedBox(width: 12),
                                       itemBuilder: (context, index) => SizedBox(
-                                          width: 145,
+                                          width: 140,
                                           child: ProductCard(
                                               product: wishlistState
                                                   .wishlistItems[index])),
                                     ),
                                   ),
-                                  const SizedBox(height: 24),
+                                  const SizedBox(height: 28),
                                 ],
                               );
                             }
                             return const SizedBox.shrink();
                           },
                         ),
-                        const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16.0),
-                            child: Text("All Products",
-                                style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.black87))),
-                        const SizedBox(height: 16),
+
+                        // ── ALL PRODUCTS section header ──
+                        _SectionHeader(title: "All Products"),
+                        const SizedBox(height: 14),
+
+                        // 3-column grid
                         state.filteredProducts.isEmpty
                             ? const Center(
                                 child: Padding(
-                                    padding: EdgeInsets.all(32.0),
-                                    child: Text("No products found",
-                                        style: TextStyle(color: Colors.grey))))
+                                  padding: EdgeInsets.all(40.0),
+                                  child: Text(
+                                    "No products found",
+                                    style: TextStyle(
+                                        color: Color(0xFF5C5C5C),
+                                        fontFamily: 'Poppins'),
+                                  ),
+                                ),
+                              )
                             : GridView.builder(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16),
                                 physics: const NeverScrollableScrollPhysics(),
                                 shrinkWrap: true,
                                 itemCount: state.filteredProducts.length,
                                 gridDelegate:
                                     const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 3,
-                                  mainAxisExtent: 260,
+                                  mainAxisExtent: 255,
                                   crossAxisSpacing: 12,
-                                  mainAxisSpacing: 16,
+                                  mainAxisSpacing: 12,
                                 ),
                                 itemBuilder: (context, index) => ProductCard(
                                     product: state.filteredProducts[index]),
@@ -222,14 +211,54 @@ class HomeScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // 🔥 3. Reduced to normal padding because Scaffold handles the space now
-                  const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
+
+                  const SliverPadding(padding: EdgeInsets.only(bottom: 32)),
                 ],
               );
             }
             return const SizedBox();
           },
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Reusable Section Header with green accent dot
+// ─────────────────────────────────────────────
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Green accent dot
+          Container(
+            width: 4,
+            height: 18,
+            decoration: BoxDecoration(
+              color: const Color(0xFF3DAA5C),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            title,
+            style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ],
       ),
     );
   }
