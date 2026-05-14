@@ -8,51 +8,25 @@ import '../../../shared/models/category_model.dart';
 import '../../../shared/widgets/floating_cart_banner.dart';
 
 class CategoryProductsScreen extends StatefulWidget {
-  final CategoryModel category;
+  final String categoryId;
+  final String categoryName;
+  final List<CategoryModel> subcategories;
 
-  const CategoryProductsScreen({super.key, required this.category});
+  const CategoryProductsScreen({
+    super.key,
+    required this.categoryId,
+    required this.categoryName,
+    required this.subcategories,
+  });
 
   @override
   State<CategoryProductsScreen> createState() => _CategoryProductsScreenState();
 }
 
 class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
-  // Track which subcategory is currently selected in the sidebar
+  // Track which subcategory is currently selected
+  // 0 corresponds to "All"
   int _selectedSubCategoryIndex = 0;
-
-  // --- MOCK DATA FOR THE SIDEBAR (Client Demo) ---
-  final List<Map<String, String>> _mockSubCategories = [
-    {
-      'name': 'All',
-      'image':
-          'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=100&q=80'
-    },
-    {
-      'name': 'Fresh\nVegetables',
-      'image':
-          'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?auto=format&fit=crop&w=100&q=80'
-    },
-    {
-      'name': 'New\nLaunches',
-      'image':
-          'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=100&q=80'
-    },
-    {
-      'name': 'Fresh\nFruits',
-      'image':
-          'https://images.unsplash.com/photo-1582293041079-7814c2f12063?auto=format&fit=crop&w=100&q=80'
-    },
-    {
-      'name': 'Exotics &\nPremium',
-      'image':
-          'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=100&q=80'
-    },
-    {
-      'name': 'Organics',
-      'image':
-          'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=100&q=80'
-    },
-  ];
 
   @override
   void initState() {
@@ -69,7 +43,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
       backgroundColor: const Color(0xFF0D0D0D),
       appBar: AppBar(
         title: Text(
-          widget.category.name.replaceAll('\n', ' '),
+          widget.categoryName,
           style: const TextStyle(
               fontFamily: 'Poppins',
               color: Colors.white,
@@ -93,19 +67,21 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
       // 🔥 2. Add the banner here! It automatically floats above the body.
       bottomNavigationBar: const FloatingCartBanner(),
 
-      body: Row(
+      body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- 1. LEFT SIDEBAR (Subcategories) ---
-          Container(
-            width: 85,
-            color: const Color(0xFF0D0D0D),
-            child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: 100),
-              itemCount: _mockSubCategories.length,
+          // --- 1. HORIZONTAL TABS (Subcategories) ---
+          SizedBox(
+            height: 50,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.subcategories.length + 1,
+              separatorBuilder: (context, index) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
                 final isSelected = _selectedSubCategoryIndex == index;
-                final subCategory = _mockSubCategories[index];
+                final name =
+                    index == 0 ? "All" : widget.subcategories[index - 1].name;
 
                 return GestureDetector(
                   onTap: () {
@@ -114,61 +90,36 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                     });
                   },
                   child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? const Color(0xFF1A1A1A)
-                          : const Color(0xFF0D0D0D),
-                      border: Border(
-                        left: BorderSide(
+                          ? const Color(0xFF3DAA5C)
+                          : const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Center(
+                      child: Text(
+                        name,
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w500,
                           color: isSelected
-                              ? const Color(0xFF3DAA5C)
-                              : Colors.transparent,
-                          width: 3,
+                              ? Colors.white
+                              : const Color(0xFF9E9E9E),
                         ),
                       ),
-                    ),
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          height: 48,
-                          width: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFF1E1E1E),
-                            image: DecorationImage(
-                              image: NetworkImage(subCategory['image']!),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          subCategory['name']!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 10,
-                            fontWeight: isSelected
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: isSelected
-                                ? const Color(0xFF3DAA5C)
-                                : const Color(0xFF9E9E9E),
-                            height: 1.2,
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 );
               },
             ),
           ),
+          const SizedBox(height: 8),
 
-          // --- 2. RIGHT PANEL (Product Grid) ---
+          // --- 2. PRODUCT GRID ---
           Expanded(
             child: Container(
               color: const Color(0xFF111111),
@@ -181,9 +132,15 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                   }
 
                   if (state is HomeLoaded) {
-                    // Filter logic: Attempt to get products for this category.
+                    // Filter logic: Attempt to get products for this category/subcategory.
+                    String filterCategoryId = widget.categoryId;
+                    if (_selectedSubCategoryIndex > 0) {
+                      filterCategoryId = widget
+                          .subcategories[_selectedSubCategoryIndex - 1].id;
+                    }
+
                     var categoryProducts = state.allProducts
-                        .where((p) => p.categoryId == widget.category.id)
+                        .where((p) => p.categoryId == filterCategoryId)
                         .toList();
 
                     // MOCK FALLBACK FOR CLIENT DEMO:
@@ -210,7 +167,6 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
-                        // Adjusting AspectRatio because the screen width is smaller now (minus sidebar)
                         mainAxisExtent: 260,
                         mainAxisSpacing: 12,
                         crossAxisSpacing: 12,

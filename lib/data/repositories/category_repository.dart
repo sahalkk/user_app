@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:beeyo_customer/shared/constants/api_constants.dart';
 import 'package:http/http.dart' as http;
 import '../../shared/models/category_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CategoryRepository {
   // Your backend endpoint for categories
@@ -9,7 +10,16 @@ class CategoryRepository {
 
   Future<List<CategoryModel>> getCategories() async {
     try {
-      final response = await http.get(Uri.parse(baseUrl));
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
+
+      final response = await http.get(
+        Uri.parse(baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);

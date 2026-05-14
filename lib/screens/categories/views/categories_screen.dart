@@ -1,141 +1,28 @@
 import 'package:beeyo_customer/shared/widgets/global_header.dart';
 import 'package:flutter/material.dart';
 import '../../../shared/models/category_model.dart';
-import 'category_products_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shimmer/shimmer.dart';
+import '../blocs/categories_bloc.dart';
 // 🔥 1. Import the floating cart banner
 import '../../../shared/widgets/floating_cart_banner.dart';
+import '../views/category_products_screen.dart';
 
-class CategoriesScreen extends StatelessWidget {
+class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
 
-  // --- MOCK DATA FOR CLIENT DEMO ---
-  static final List<CategoryModel> _groceryAndKitchen = [
-    CategoryModel(
-        id: '1',
-        name: 'Fruits &\nVegetables',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '2',
-        name: 'Dairy, Bread\n& Eggs',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '3',
-        name: 'Atta, Rice,\nOil & Dals',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '4',
-        name: 'Meat, Fish\n& Eggs',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '5',
-        name: 'Masala &\nDry Fruits',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '6',
-        name: 'Breakfast\n& Sauces',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1525059337994-6f2a1311b4d4?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '7',
-        name: 'Packaged\nFood',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?auto=format&fit=crop&w=200&q=80'),
-  ];
+  @override
+  State<CategoriesScreen> createState() => _CategoriesScreenState();
+}
 
-  static final List<CategoryModel> _snacksAndDrinks = [
-    CategoryModel(
-        id: '8',
-        name: 'Tea, Coffee\n& More',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1559525839-b184a4d698c7?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '9',
-        name: 'Ice Creams\n& More',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1557142046-c704a3adf8afe?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '10',
-        name: 'Sweet\nCravings',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1582293041079-7814c2f12063?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '11',
-        name: 'Cold Drinks\n& Juices',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '12',
-        name: 'Munchies',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '13',
-        name: 'Biscuits\n& Cookies',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&w=200&q=80'),
-  ];
-
-  static final List<CategoryModel> _beautyAndCare = [
-    CategoryModel(
-        id: '14',
-        name: 'Skincare',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '15',
-        name: 'Makeup\n& Beauty',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1596462502278-27bf85033e5a?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '16',
-        name: 'Bath & Body',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?auto=format&fit=crop&w=200&q=80'),
-    CategoryModel(
-        id: '17',
-        name: 'Haircare',
-        slug: '',
-        description: '',
-        imageUrl:
-            'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?auto=format&fit=crop&w=200&q=80'),
-  ];
+class _CategoriesScreenState extends State<CategoriesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Call GET /api/v1/categories on screen mount/initState
+    context.read<CategoriesBloc>().add(LoadCategories());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -158,18 +45,42 @@ class CategoriesScreen extends StatelessWidget {
               ),
             ),
             SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildCategorySection(
-                      context, "Grocery & Kitchen", _groceryAndKitchen),
-                  const Divider(thickness: 1, color: Color(0xFF2A2A2A)),
-                  _buildCategorySection(
-                      context, "Snacks & Drinks", _snacksAndDrinks),
-                  const Divider(thickness: 1, color: Color(0xFF2A2A2A)),
-                  _buildCategorySection(
-                      context, "Beauty & Personal Care", _beautyAndCare),
-                ],
+              child: BlocBuilder<CategoriesBloc, CategoriesState>(
+                builder: (context, state) {
+                  if (state is CategoriesLoading ||
+                      state is CategoriesInitial) {
+                    return _buildLoadingState();
+                  } else if (state is CategoriesError) {
+                    return _buildErrorState(context);
+                  } else if (state is CategoriesLoaded) {
+                    if (state.categories.isEmpty) {
+                      return _buildEmptyState();
+                    }
+
+                    // Filter to only root categories (no parentId)
+                    // If no grouping field exists on them, render them in "All Categories"
+                    final rootCategories = state.categories
+                        .where((c) => c.parentId == null)
+                        .toList();
+
+                    if (rootCategories.isEmpty) {
+                      return _buildEmptyState();
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildCategorySection(
+                          context,
+                          "All Categories",
+                          rootCategories,
+                          state.categories,
+                        ),
+                      ],
+                    );
+                  }
+                  return const SizedBox();
+                },
               ),
             ),
             // 🔥 3. Reduced to normal padding because Scaffold handles the space now
@@ -180,8 +91,8 @@ class CategoriesScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCategorySection(
-      BuildContext context, String title, List<CategoryModel> items) {
+  Widget _buildCategorySection(BuildContext context, String title,
+      List<CategoryModel> items, List<CategoryModel> allCategories) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -224,11 +135,18 @@ class CategoriesScreen extends StatelessWidget {
             final category = items[index];
             return GestureDetector(
               onTap: () {
+                final subcategories = allCategories
+                    .where((c) => c.parentId == category.id)
+                    .toList();
+
                 Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) =>
-                            CategoryProductsScreen(category: category)));
+                        builder: (context) => CategoryProductsScreen(
+                              categoryId: category.id,
+                              categoryName: category.name,
+                              subcategories: subcategories,
+                            )));
               },
               child: Column(
                 children: [
@@ -243,11 +161,19 @@ class CategoriesScreen extends StatelessWidget {
                       padding: const EdgeInsets.all(8.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(category.imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(Icons.image_not_supported_outlined,
-                                    color: Color(0xFF3A3A3A), size: 24)),
+                        child: CachedNetworkImage(
+                          imageUrl: category.imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Shimmer.fromColors(
+                            baseColor: const Color(0xFF2A2A2A),
+                            highlightColor: const Color(0xFF3A3A3A),
+                            child: Container(color: Colors.white),
+                          ),
+                          errorWidget: (context, url, error) => const Center(
+                            child: Icon(Icons.shopping_basket_rounded,
+                                color: Color(0xFF3DAA5C), size: 24),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -269,6 +195,114 @@ class CategoriesScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
       ],
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24.0),
+      child: GridView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        itemCount: 12,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          childAspectRatio: 0.68,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 16,
+        ),
+        itemBuilder: (context, index) {
+          return Column(
+            children: [
+              Expanded(
+                child: Shimmer.fromColors(
+                  baseColor: const Color(0xFF1A1A1A),
+                  highlightColor: const Color(0xFF2A2A2A),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Shimmer.fromColors(
+                baseColor: const Color(0xFF1A1A1A),
+                highlightColor: const Color(0xFF2A2A2A),
+                child: Container(
+                  height: 10,
+                  width: 40,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildErrorState(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 60.0),
+      child: Center(
+        child: Column(
+          children: [
+            const Icon(Icons.error_outline_rounded,
+                size: 48, color: Color(0xFF5C5C5C)),
+            const SizedBox(height: 16),
+            const Text(
+              "Couldn't load categories",
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 14,
+                color: Color(0xFF9E9E9E),
+              ),
+            ),
+            const SizedBox(height: 24),
+            TextButton(
+              onPressed: () {
+                context.read<CategoriesBloc>().add(LoadCategories());
+              },
+              style: TextButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                backgroundColor: const Color(0xFF1A1A1A),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFF3DAA5C), width: 1),
+                ),
+              ),
+              child: const Text(
+                "Retry",
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  color: Color(0xFF3DAA5C),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return const Padding(
+      padding: EdgeInsets.only(top: 80.0),
+      child: Center(
+        child: Text(
+          "No categories available",
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 14,
+            color: Color(0xFF9E9E9E),
+          ),
+        ),
+      ),
     );
   }
 }

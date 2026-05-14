@@ -4,6 +4,7 @@ class CategoryModel {
   final String slug;
   final String imageUrl;
   final String description;
+  final String? parentId;
 
   CategoryModel({
     required this.id,
@@ -11,6 +12,7 @@ class CategoryModel {
     required this.slug,
     required this.imageUrl,
     required this.description,
+    this.parentId,
   });
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class CategoryModel {
       imageUrl: json['imageUrl'] ??
           'https://images.unsplash.com/photo-1542838132-92c53300491e',
       description: json['description'] ?? '',
+      parentId: json['parentId'],
     );
   }
 }
