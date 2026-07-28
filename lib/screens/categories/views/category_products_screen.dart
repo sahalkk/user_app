@@ -40,26 +40,26 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: const Color(0xFFFFFFFF),
       appBar: AppBar(
         title: Text(
           widget.categoryName,
           style: const TextStyle(
               fontFamily: 'Poppins',
-              color: Colors.white,
+              color: Colors.black87,
               fontWeight: FontWeight.w700,
               fontSize: 18),
         ),
-        backgroundColor: const Color(0xFF0D0D0D),
+        backgroundColor: const Color(0xFFFFFFFF),
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.black87),
         actions: [
           IconButton(
               icon: const Icon(Icons.favorite_border_rounded,
-                  color: Color(0xFF9E9E9E)),
+                  color: Color(0xFF6B6B6B)),
               onPressed: () {}),
           IconButton(
-              icon: const Icon(Icons.search_rounded, color: Color(0xFF9E9E9E)),
+              icon: const Icon(Icons.search_rounded, color: Color(0xFF6B6B6B)),
               onPressed: () {}),
         ],
       ),
@@ -95,7 +95,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? const Color(0xFF3DAA5C)
-                          : const Color(0xFF1A1A1A),
+                          : const Color(0xFFF0F0F0),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Center(
@@ -108,7 +108,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                               isSelected ? FontWeight.w700 : FontWeight.w500,
                           color: isSelected
                               ? Colors.white
-                              : const Color(0xFF9E9E9E),
+                              : const Color(0xFF6B6B6B),
                         ),
                       ),
                     ),
@@ -122,7 +122,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
           // --- 2. PRODUCT GRID ---
           Expanded(
             child: Container(
-              color: const Color(0xFF111111),
+              color: const Color(0xFFFFFFFF),
               child: BlocBuilder<HomeBloc, HomeState>(
                 builder: (context, state) {
                   if (state is HomeLoading) {

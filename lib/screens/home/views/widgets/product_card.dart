@@ -32,12 +32,12 @@ class ProductCard extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF2A2A2A), width: 1),
+          border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.35),
+              color: Colors.black.withOpacity(0.08),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -57,7 +57,7 @@ class ProductCard extends StatelessWidget {
                     decoration: const BoxDecoration(
                       borderRadius:
                           BorderRadius.vertical(top: Radius.circular(16)),
-                      color: Color(0xFF141414),
+                      color: Color(0xFFF5F5F5),
                     ),
                     child: ClipRRect(
                       borderRadius:
@@ -69,7 +69,7 @@ class ProductCard extends StatelessWidget {
                           fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) =>
                               const Icon(Icons.image_not_supported_outlined,
-                                  color: Color(0xFF3A3A3A), size: 32),
+                                  color: Color(0xFFBDBDBD), size: 32),
                         ),
                       ),
                     ),
@@ -118,10 +118,10 @@ class ProductCard extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF222222),
+                            color: Colors.white,
                             shape: BoxShape.circle,
                             border: Border.all(
-                                color: const Color(0xFF2A2A2A), width: 1),
+                                color: const Color(0xFFE0E0E0), width: 1),
                           ),
                           child: Icon(
                             isWishlisted
@@ -129,7 +129,7 @@ class ProductCard extends StatelessWidget {
                                 : Icons.favorite_border_rounded,
                             color: isWishlisted
                                 ? const Color(0xFF3DAA5C)
-                                : const Color(0xFF5C5C5C),
+                                : const Color(0xFF6B6B6B),
                             size: 14,
                           ),
                         ),
@@ -154,7 +154,7 @@ class ProductCard extends StatelessWidget {
                           .toUpperCase(),
                       style: const TextStyle(
                         fontFamily: 'Poppins',
-                        color: Color(0xFF9E9E9E),
+                        color: Color(0xFF6B6B6B),
                         fontSize: 8,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.8,
@@ -171,7 +171,7 @@ class ProductCard extends StatelessWidget {
                         fontFamily: 'Poppins',
                         fontWeight: FontWeight.w700,
                         fontSize: 11,
-                        color: Colors.white,
+                        color: Colors.black87,
                         height: 1.25,
                       ),
                     ),
@@ -183,7 +183,7 @@ class ProductCard extends StatelessWidget {
                       "₹${product.price}",
                       style: const TextStyle(
                         fontFamily: 'Poppins',
-                        color: Colors.white,
+                        color: Colors.black87,
                         fontWeight: FontWeight.w900,
                         fontSize: 14,
                       ),

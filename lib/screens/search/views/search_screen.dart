@@ -70,13 +70,13 @@ class _SearchScreenState extends State<SearchScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: const Color(0xFFFFFFFF),
       builder: (context) {
         return Container(
           height: 250,
           padding: const EdgeInsets.all(24),
           decoration: const BoxDecoration(
-            color: Color(0xFF1A1A1A),
+            color: Color(0xFFFFFFFF),
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -88,7 +88,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     fontFamily: 'Poppins',
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white),
+                    color: Colors.black87),
               ),
               const SizedBox(height: 8),
               const Text(
@@ -96,7 +96,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 style: TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 14,
-                    color: Color(0xFF9E9E9E)),
+                    color: Color(0xFF6B6B6B)),
               ),
               const SizedBox(height: 32),
               Container(
@@ -143,7 +143,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: const Color(0xFFFFFFFF),
       body: SafeArea(
         child: Column(
           children: [
@@ -154,16 +154,16 @@ class _SearchScreenState extends State<SearchScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back_rounded,
-                      color: Colors.white),
+                      color: Colors.black87),
                     onPressed: () => Navigator.pop(context),
                   ),
                   Expanded(
                     child: Container(
                       height: 48,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E1E1E),
+                        color: const Color(0xFFF0F0F0),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF2A2A2A)),
+                        border: Border.all(color: const Color(0xFFE0E0E0)),
                       ),
                       child: TextField(
                         controller: _searchController,
@@ -172,21 +172,21 @@ class _SearchScreenState extends State<SearchScreen> {
                             fontFamily: 'Poppins',
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white),
+                            color: Colors.black87),
                         decoration: InputDecoration(
                           hintText: "Search for products...",
                           hintStyle: const TextStyle(
                               fontFamily: 'Poppins',
-                              color: Color(0xFF5C5C5C),
+                              color: Color(0xFF6B6B6B),
                               fontSize: 15,
                               fontWeight: FontWeight.normal),
                           border: InputBorder.none,
                           prefixIcon: const Icon(Icons.search_rounded,
-                              color: Color(0xFF5C5C5C)),
+                              color: Color(0xFF6B6B6B)),
                           suffixIcon: _searchController.text.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.close_rounded,
-                                      color: Color(0xFF9E9E9E), size: 20),
+                                      color: Color(0xFF6B6B6B), size: 20),
                                   onPressed: () {
                                     setState(() {
                                       _searchController.clear();
@@ -197,7 +197,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                   icon: Icon(Icons.mic_rounded,
                                       color: _isSpeechAvailable
                                           ? const Color(0xFF3DAA5C)
-                                          : const Color(0xFF5C5C5C)),
+                                          : const Color(0xFF6B6B6B)),
                                   onPressed: _startVoiceSearch,
                                 ),
                         ),
@@ -211,7 +211,7 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
 
-            const Divider(height: 1, thickness: 1, color: Color(0xFF2A2A2A)),
+            const Divider(height: 1, thickness: 1, color: Color(0xFFE0E0E0)),
 
             // --- 2. SUGGESTIONS BODY ---
             Expanded(
@@ -268,10 +268,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                         height: 60,
                                         width: 60,
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF1E1E1E),
+                                          color: const Color(0xFFF0F0F0),
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                              color: const Color(0xFF2A2A2A)),
+                                              color: const Color(0xFFE0E0E0)),
                                         ),
                                         child: Center(
                                           child: Text(
@@ -327,13 +327,13 @@ class _SearchScreenState extends State<SearchScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(Icons.search_rounded,
-                                size: 64, color: Color(0xFF2A2A2A)),
+                                size: 64, color: Color(0xFFE0E0E0)),
                             const SizedBox(height: 16),
                             Text(
                               "Searching for '${_searchController.text}'...",
                               style: const TextStyle(
                                   fontFamily: 'Poppins',
-                                  color: Color(0xFF9E9E9E),
+                                  color: Color(0xFF6B6B6B),
                                   fontSize: 15,
                                   fontWeight: FontWeight.w500),
                             ),
@@ -363,7 +363,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   fontFamily: 'Poppins',
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white)),
+                  color: Colors.black87)),
           if (trailing != null)
             Text(trailing,
                 style: const TextStyle(
@@ -380,20 +380,20 @@ class _SearchScreenState extends State<SearchScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
-          border: Border.all(color: const Color(0xFF2A2A2A)),
+          color: const Color(0xFFF0F0F0),
+          border: Border.all(color: const Color(0xFFE0E0E0)),
           borderRadius: BorderRadius.circular(10)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: const Color(0xFF9E9E9E)),
+          Icon(icon, size: 15, color: const Color(0xFF6B6B6B)),
           const SizedBox(width: 8),
           Text(label,
               style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFFCCCCCC))),
+                  color: Color(0xFF333333))),
         ],
       ),
     );

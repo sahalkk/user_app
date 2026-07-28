@@ -14,7 +14,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: const Color(0xFFFFFFFF),
       bottomNavigationBar: const FloatingCartBanner(),
       body: SafeArea(
         child: BlocBuilder<HomeBloc, HomeState>(
@@ -25,7 +25,7 @@ class HomeScreen extends StatelessWidget {
             } else if (state is HomeError) {
               return Center(
                   child: Text("Error: ${state.message}",
-                      style: const TextStyle(color: Color(0xFF9E9E9E))));
+                      style: const TextStyle(color: Color(0xFF6B6B6B))));
             } else if (state is HomeLoaded) {
               return CustomScrollView(
                 slivers: [
@@ -40,7 +40,7 @@ class HomeScreen extends StatelessWidget {
                     delegate: StickyHeaderDelegate(
                       height: 130,
                       child: Container(
-                        color: const Color(0xFF0D0D0D),
+                        color: const Color(0xFFFFFFFF),
                         child: Column(
                           children: [
                             // Search bar
@@ -74,13 +74,13 @@ class HomeScreen extends StatelessWidget {
                                       decoration: BoxDecoration(
                                         color: isSelected
                                             ? const Color(0xFF3DAA5C)
-                                            : const Color(0xFF1E1E1E),
+                                            : const Color(0xFFF0F0F0),
                                         borderRadius:
                                             BorderRadius.circular(20),
                                         border: Border.all(
                                           color: isSelected
                                               ? const Color(0xFF3DAA5C)
-                                              : const Color(0xFF2A2A2A),
+                                              : const Color(0xFFE0E0E0),
                                           width: 1,
                                         ),
                                       ),
@@ -94,7 +94,7 @@ class HomeScreen extends StatelessWidget {
                                               : FontWeight.w500,
                                           color: isSelected
                                               ? Colors.white
-                                              : const Color(0xFF9E9E9E),
+                                              : const Color(0xFF6B6B6B),
                                         ),
                                       ),
                                     ),
@@ -187,7 +187,7 @@ class HomeScreen extends StatelessWidget {
                                   child: Text(
                                     "No products found",
                                     style: TextStyle(
-                                        color: Color(0xFF5C5C5C),
+                                        color: Color(0xFF6B6B6B),
                                         fontFamily: 'Poppins'),
                                   ),
                                 ),
@@ -254,7 +254,7 @@ class _SectionHeader extends StatelessWidget {
               fontFamily: 'Poppins',
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: Colors.white,
+              color: Colors.black87,
               letterSpacing: -0.3,
             ),
           ),

@@ -16,7 +16,7 @@ class LocationHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF0D0D0D),
+      color: Colors.white,
       padding: const EdgeInsets.fromLTRB(20, 14, 16, 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -34,7 +34,7 @@ class LocationHeader extends StatelessWidget {
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -1.0,
-                  color: Color(0xFFFFFFFF),
+                  color: Color(0xFF1A1A1A),
                 ),
               ),
               // Subtle green accent underline
@@ -68,13 +68,13 @@ class LocationHeader extends StatelessWidget {
               height: 40,
               width: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
+                color: const Color(0xFFF0F0F0),
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF2A2A2A), width: 1),
+                border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
               ),
               child: const Icon(
                 Icons.person_outline_rounded,
-                color: Color(0xFF9E9E9E),
+                color: Color(0xFF6B6B6B),
                 size: 20,
               ),
             ),
@@ -94,7 +94,7 @@ class StickySearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF0D0D0D),
+      color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: GestureDetector(
         onTap: () {
@@ -104,20 +104,20 @@ class StickySearchBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E1E1E),
+            color: const Color(0xFFF0F0F0),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFF2A2A2A), width: 1),
+            border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
           ),
           child: const Row(
             children: [
-              Icon(Icons.search_rounded, color: Color(0xFF5C5C5C), size: 20),
+              Icon(Icons.search_rounded, color: Color(0xFF6B6B6B), size: 20),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
                   "Search for products...",
                   style: TextStyle(
                     fontFamily: 'Poppins',
-                    color: Color(0xFF5C5C5C),
+                    color: Color(0xFF6B6B6B),
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                   ),

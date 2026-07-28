@@ -14,9 +14,9 @@ class AppBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF111111),
+        color: Colors.white,
         border: Border(
-          top: BorderSide(color: Color(0xFF2A2A2A), width: 1),
+          top: BorderSide(color: Color(0xFFE0E0E0), width: 1),
         ),
       ),
       child: BottomNavigationBar(
@@ -26,7 +26,7 @@ class AppBottomNav extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         selectedItemColor: const Color(0xFF3DAA5C),
-        unselectedItemColor: const Color(0xFF5C5C5C),
+        unselectedItemColor: const Color(0xFF6B6B6B),
         selectedLabelStyle: const TextStyle(
           fontFamily: 'Poppins',
           fontWeight: FontWeight.w700,

@@ -12,7 +12,7 @@ class OrderAgainScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: const Color(0xFFFFFFFF),
       bottomNavigationBar: const FloatingCartBanner(),
 
       body: SafeArea(
@@ -55,21 +55,21 @@ class OrderAgainScreen extends StatelessWidget {
                                         fontFamily: 'Poppins',
                                         fontSize: 18,
                                         fontWeight: FontWeight.w800,
-                                        color: Colors.white)),
+                                        color: Colors.black87)),
                                 const SizedBox(height: 8),
                                 const Text(
                                     "Items you order will show up here so you can buy them again easily.",
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                         fontFamily: 'Poppins',
-                                        color: Color(0xFF9E9E9E),
+                                        color: Color(0xFF6B6B6B),
                                         fontSize: 13,
                                         height: 1.4)),
                               ],
                             ),
                           ),
                         ),
-                        const Divider(thickness: 1, color: Color(0xFF2A2A2A)),
+                        const Divider(thickness: 1, color: Color(0xFFE0E0E0)),
                         const Padding(
                           padding: EdgeInsets.fromLTRB(16, 24, 16, 16),
                           child: Text("Bestsellers",
@@ -77,7 +77,7 @@ class OrderAgainScreen extends StatelessWidget {
                                   fontFamily: 'Poppins',
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
-                                  color: Colors.white)),
+                                  color: Colors.black87)),
                         ),
                         GridView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 16),

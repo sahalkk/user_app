@@ -10,13 +10,13 @@ class OrdersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: const Color(0xFFFFFFFF),
       body: SafeArea(
         child: Column(
           children: [
             // Simple dark header
             Container(
-              color: const Color(0xFF0D0D0D),
+              color: const Color(0xFFFFFFFF),
               padding: const EdgeInsets.fromLTRB(20, 14, 16, 10),
               child: const Row(
                 children: [
@@ -30,7 +30,7 @@ class OrdersScreen extends StatelessWidget {
                           fontFamily: 'Poppins',
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                          color: Colors.black87,
                           letterSpacing: -0.5,
                         ),
                       ),
@@ -40,7 +40,7 @@ class OrdersScreen extends StatelessWidget {
                         style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 12,
-                          color: Color(0xFF9E9E9E),
+                          color: Color(0xFF6B6B6B),
                         ),
                       ),
                     ],
@@ -61,24 +61,24 @@ class OrdersScreen extends StatelessWidget {
                             width: 80,
                             height: 80,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1A1A1A),
+                              color: const Color(0xFFFFFFFF),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: const Icon(Icons.receipt_long_outlined,
-                                size: 40, color: Color(0xFF3A3A3A)),
+                                size: 40, color: Color(0xFFBDBDBD)),
                           ),
                           const SizedBox(height: 16),
                           const Text("No orders yet",
                               style: TextStyle(
                                   fontFamily: 'Poppins',
-                                  color: Color(0xFF9E9E9E),
+                                  color: Color(0xFF6B6B6B),
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600)),
                           const SizedBox(height: 6),
                           const Text("Your past orders will appear here",
                               style: TextStyle(
                                   fontFamily: 'Poppins',
-                                  color: Color(0xFF5C5C5C),
+                                  color: Color(0xFF6B6B6B),
                                   fontSize: 13)),
                         ],
                       ),
@@ -94,13 +94,13 @@ class OrdersScreen extends StatelessWidget {
                       return Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1A1A1A),
+                          color: const Color(0xFFFFFFFF),
                           borderRadius: BorderRadius.circular(16),
                           border:
-                              Border.all(color: const Color(0xFF2A2A2A)),
+                              Border.all(color: const Color(0xFFE0E0E0)),
                           boxShadow: [
                             BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
+                                color: Colors.black.withOpacity(0.08),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4)),
                           ],
@@ -117,7 +117,7 @@ class OrdersScreen extends StatelessWidget {
                                   style: const TextStyle(
                                       fontFamily: 'Poppins',
                                       fontWeight: FontWeight.w700,
-                                      color: Colors.white,
+                                      color: Colors.black87,
                                       fontSize: 14),
                                 ),
                                 Container(
@@ -143,7 +143,7 @@ class OrdersScreen extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            const Divider(color: Color(0xFF2A2A2A), height: 1),
+                            const Divider(color: Color(0xFFE0E0E0), height: 1),
                             const SizedBox(height: 12),
                             ...order.items.map((item) => Padding(
                                   padding: const EdgeInsets.only(bottom: 8.0),
@@ -160,13 +160,13 @@ class OrdersScreen extends StatelessWidget {
                                               overflow: TextOverflow.ellipsis,
                                               style: const TextStyle(
                                                   fontFamily: 'Poppins',
-                                                  color: Color(0xFFCCCCCC),
+                                                  color: Color(0xFF444444),
                                                   fontSize: 13))),
                                     ],
                                   ),
                                 )),
                             const SizedBox(height: 8),
-                            const Divider(color: Color(0xFF2A2A2A), height: 1),
+                            const Divider(color: Color(0xFFE0E0E0), height: 1),
                             const SizedBox(height: 12),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -176,7 +176,7 @@ class OrdersScreen extends StatelessWidget {
                                       .format(order.date),
                                   style: const TextStyle(
                                       fontFamily: 'Poppins',
-                                      color: Color(0xFF5C5C5C),
+                                      color: Color(0xFF6B6B6B),
                                       fontSize: 12),
                                 ),
                                 Text(
@@ -184,7 +184,7 @@ class OrdersScreen extends StatelessWidget {
                                   style: const TextStyle(
                                       fontFamily: 'Poppins',
                                       fontWeight: FontWeight.w900,
-                                      color: Colors.white,
+                                      color: Colors.black87,
                                       fontSize: 16),
                                 ),
                               ],

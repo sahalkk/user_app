@@ -53,22 +53,22 @@ class MyAppView extends StatelessWidget {
         child: MaterialApp(
           title: 'Beeyo App',
           debugShowCheckedModeBanner: false,
-          themeMode: ThemeMode.dark,
+          themeMode: ThemeMode.light,
           theme: ThemeData(
-            brightness: Brightness.dark,
-            scaffoldBackgroundColor: const Color(0xFF0D0D0D),
-            colorScheme: const ColorScheme.dark(
-              surface: Color(0xFF1A1A1A),
-              onSurface: Colors.white,
+            brightness: Brightness.light,
+            scaffoldBackgroundColor: Colors.white,
+            colorScheme: const ColorScheme.light(
+              surface: Colors.white,
+              onSurface: Colors.black,
               primary: Color(0xFF3DAA5C),
               onPrimary: Colors.white,
               secondary: Color(0xFF3DAA5C),
-              background: Color(0xFF0D0D0D),
+              background: Colors.white,
             ),
             fontFamily: 'Poppins',
-            dividerColor: const Color(0xFF2A2A2A),
+            dividerColor: const Color(0xFFE0E0E0),
             snackBarTheme: const SnackBarThemeData(
-              backgroundColor: Color(0xFF222222),
+              backgroundColor: Color(0xFF333333),
               contentTextStyle: TextStyle(color: Colors.white),
             ),
             progressIndicatorTheme: const ProgressIndicatorThemeData(

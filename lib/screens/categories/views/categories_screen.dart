@@ -27,7 +27,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: const Color(0xFFFFFFFF),
       // 🔥 2. Add the dynamic cart banner here
       bottomNavigationBar: const FloatingCartBanner(),
 
@@ -115,7 +115,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     fontFamily: 'Poppins',
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white),
+                    color: Colors.black87),
               ),
             ],
           ),
@@ -154,10 +154,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     child: Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
-                          color: const Color(0xFF1A1A1A),
+                          color: const Color(0xFFF0F0F0),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                              color: const Color(0xFF2A2A2A), width: 1)),
+                              color: const Color(0xFFE0E0E0), width: 1)),
                       padding: const EdgeInsets.all(8.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
@@ -165,8 +165,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                           imageUrl: category.imageUrl,
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Shimmer.fromColors(
-                            baseColor: const Color(0xFF2A2A2A),
-                            highlightColor: const Color(0xFF3A3A3A),
+                            baseColor: const Color(0xFFE0E0E0),
+                            highlightColor: const Color(0xFFBDBDBD),
                             child: Container(color: Colors.white),
                           ),
                           errorWidget: (context, url, error) => const Center(
@@ -186,7 +186,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                           fontFamily: 'Poppins',
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF9E9E9E),
+                          color: Color(0xFF6B6B6B),
                           height: 1.2)),
                 ],
               ),
@@ -217,8 +217,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             children: [
               Expanded(
                 child: Shimmer.fromColors(
-                  baseColor: const Color(0xFF1A1A1A),
-                  highlightColor: const Color(0xFF2A2A2A),
+                  baseColor: const Color(0xFFF0F0F0),
+                  highlightColor: const Color(0xFFE0E0E0),
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -229,8 +229,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               ),
               const SizedBox(height: 8),
               Shimmer.fromColors(
-                baseColor: const Color(0xFF1A1A1A),
-                highlightColor: const Color(0xFF2A2A2A),
+                baseColor: const Color(0xFFF0F0F0),
+                highlightColor: const Color(0xFFE0E0E0),
                 child: Container(
                   height: 10,
                   width: 40,
@@ -251,14 +251,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         child: Column(
           children: [
             const Icon(Icons.error_outline_rounded,
-                size: 48, color: Color(0xFF5C5C5C)),
+                size: 48, color: Color(0xFF6B6B6B)),
             const SizedBox(height: 16),
             const Text(
               "Couldn't load categories",
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 14,
-                color: Color(0xFF9E9E9E),
+                color: Color(0xFF6B6B6B),
               ),
             ),
             const SizedBox(height: 24),
@@ -269,7 +269,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               style: TextButton.styleFrom(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                backgroundColor: const Color(0xFF1A1A1A),
+                backgroundColor: const Color(0xFFF0F0F0),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                   side: const BorderSide(color: Color(0xFF3DAA5C), width: 1),
@@ -299,7 +299,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           style: TextStyle(
             fontFamily: 'Poppins',
             fontSize: 14,
-            color: Color(0xFF9E9E9E),
+            color: Color(0xFF6B6B6B),
           ),
         ),
       ),

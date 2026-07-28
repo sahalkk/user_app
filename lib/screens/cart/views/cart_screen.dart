@@ -13,16 +13,16 @@ class CartScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: const Color(0xFFFFFFFF),
       appBar: AppBar(
         title: const Text("My Cart",
             style: TextStyle(
                 fontFamily: 'Poppins',
-                color: Colors.white,
+                color: Colors.black87,
                 fontWeight: FontWeight.w700)),
-        backgroundColor: const Color(0xFF0D0D0D),
+        backgroundColor: const Color(0xFFFFFFFF),
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.black87),
       ),
       body: BlocBuilder<CartBloc, CartState>(
         builder: (context, state) {
@@ -35,18 +35,18 @@ class CartScreen extends StatelessWidget {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
+                      color: const Color(0xFFFFFFFF),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Icon(Icons.shopping_cart_outlined,
-                        size: 40, color: Color(0xFF3A3A3A)),
+                        size: 40, color: Color(0xFFBDBDBD)),
                   ),
                   const SizedBox(height: 16),
                   const Text("Your cart is empty",
                       style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 17,
-                          color: Color(0xFF9E9E9E))),
+                          color: Color(0xFF6B6B6B))),
                 ],
               ),
             );
@@ -68,9 +68,9 @@ class CartScreen extends StatelessWidget {
                     return Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A1A1A),
+                        color: const Color(0xFFFFFFFF),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF2A2A2A)),
+                        border: Border.all(color: const Color(0xFFE0E0E0)),
                       ),
                       child: Row(
                         children: [
@@ -79,7 +79,7 @@ class CartScreen extends StatelessWidget {
                             width: 70,
                             height: 70,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF141414),
+                              color: const Color(0xFFF0F0F0),
                               borderRadius: BorderRadius.circular(12),
                               image: DecorationImage(
                                 image: NetworkImage(cartItem.product.imageUrl),
@@ -100,7 +100,7 @@ class CartScreen extends StatelessWidget {
                                       fontFamily: 'Poppins',
                                       fontWeight: FontWeight.w700,
                                       fontSize: 15,
-                                      color: Colors.white),
+                                      color: Colors.black87),
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: 1,
                                 ),
@@ -111,7 +111,7 @@ class CartScreen extends StatelessWidget {
                                       : "1 Unit",
                                   style: const TextStyle(
                                       fontFamily: 'Poppins',
-                                      color: Color(0xFF9E9E9E),
+                                      color: Color(0xFF6B6B6B),
                                       fontSize: 11),
                                 ),
 
@@ -133,7 +133,7 @@ class CartScreen extends StatelessWidget {
                                               fontFamily: 'Poppins',
                                               fontWeight: FontWeight.w900,
                                               fontSize: 16,
-                                              color: Colors.white),
+                                              color: Colors.black87),
                                         ),
                                       ],
                                     ),
@@ -209,9 +209,9 @@ class CartScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
+                  color: const Color(0xFFFFFFFF),
                   border: const Border(
-                      top: BorderSide(color: Color(0xFF2A2A2A), width: 1)),
+                      top: BorderSide(color: Color(0xFFE0E0E0), width: 1)),
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(24)),
                 ),
@@ -225,14 +225,14 @@ class CartScreen extends StatelessWidget {
                               style: TextStyle(
                                   fontFamily: 'Poppins',
                                   fontSize: 16,
-                                  color: Color(0xFF9E9E9E))),
+                                  color: Color(0xFF6B6B6B))),
                           Text(
                             "₹${state.totalAmount.toStringAsFixed(2)}",
                             style: const TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 24,
                               fontWeight: FontWeight.w900,
-                              color: Colors.white,
+                              color: Colors.black87,
                             ),
                           ),
                         ],

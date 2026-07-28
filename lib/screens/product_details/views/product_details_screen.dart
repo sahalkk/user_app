@@ -19,13 +19,13 @@ class ProductDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: const Color(0xFFFFFFFF),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D0D0D),
+        backgroundColor: const Color(0xFFFFFFFF),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.keyboard_arrow_down_rounded,
-              color: Colors.white, size: 28),
+              color: Colors.black87, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -43,7 +43,7 @@ class ProductDetailsScreen extends StatelessWidget {
                       : Icons.favorite_border_rounded,
                   color: isWishlisted
                       ? const Color(0xFF3DAA5C)
-                      : const Color(0xFF9E9E9E),
+                      : const Color(0xFF6B6B6B),
                 ),
                 onPressed: () {
                   if (isWishlisted) {
@@ -59,11 +59,11 @@ class ProductDetailsScreen extends StatelessWidget {
           ),
           IconButton(
               icon: const Icon(Icons.search_rounded,
-                  color: Color(0xFF9E9E9E)),
+                  color: Color(0xFF6B6B6B)),
               onPressed: () {}),
           IconButton(
               icon: const Icon(Icons.ios_share_rounded,
-                  color: Color(0xFF9E9E9E)),
+                  color: Color(0xFF6B6B6B)),
               onPressed: () {}),
         ],
       ),
@@ -84,8 +84,8 @@ class ProductDetailsScreen extends StatelessWidget {
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              color: Color(0xFF1A1A1A),
-              border: Border(top: BorderSide(color: Color(0xFF2A2A2A), width: 1)),
+              color: Color(0xFFFFFFFF),
+              border: Border(top: BorderSide(color: Color(0xFFE0E0E0), width: 1)),
             ),
             child: SafeArea(
               top: false,
@@ -103,7 +103,7 @@ class ProductDetailsScreen extends StatelessWidget {
                               fontFamily: 'Poppins',
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF9E9E9E)),
+                              color: Color(0xFF6B6B6B)),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -112,7 +112,7 @@ class ProductDetailsScreen extends StatelessWidget {
                               fontFamily: 'Poppins',
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
-                              color: Colors.white),
+                              color: Colors.black87),
                         ),
                         const SizedBox(height: 2),
                         const Text(
@@ -120,7 +120,7 @@ class ProductDetailsScreen extends StatelessWidget {
                           style: TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 10,
-                              color: Color(0xFF5C5C5C),
+                              color: Color(0xFF6B6B6B),
                               fontWeight: FontWeight.w500),
                         ),
                       ],
@@ -155,9 +155,9 @@ class ProductDetailsScreen extends StatelessWidget {
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) => Container(
                           height: 250,
-                          color: const Color(0xFF141414),
+                          color: const Color(0xFFF0F0F0),
                           child: const Icon(Icons.image_not_supported_outlined,
-                              size: 50, color: Color(0xFF3A3A3A))),
+                              size: 50, color: Color(0xFFBDBDBD))),
                     ),
                   ),
                 ),
@@ -176,14 +176,14 @@ class ProductDetailsScreen extends StatelessWidget {
                         width: 6,
                         height: 6,
                         decoration: const BoxDecoration(
-                            color: Color(0xFF2A2A2A),
+                            color: Color(0xFFE0E0E0),
                             shape: BoxShape.circle)),
                     Container(
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         width: 6,
                         height: 6,
                         decoration: const BoxDecoration(
-                            color: Color(0xFF2A2A2A),
+                            color: Color(0xFFE0E0E0),
                             shape: BoxShape.circle)),
                   ],
                 ),
@@ -211,7 +211,7 @@ class ProductDetailsScreen extends StatelessWidget {
                               style: TextStyle(
                                   fontFamily: 'Poppins',
                                   fontSize: 11,
-                                  color: Color(0xFF9E9E9E),
+                                  color: Color(0xFF6B6B6B),
                                   fontWeight: FontWeight.w600)),
                         ],
                       ),
@@ -226,7 +226,7 @@ class ProductDetailsScreen extends StatelessWidget {
                                   fontFamily: 'Poppins',
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
-                                  color: Colors.white,
+                                  color: Colors.black87,
                                   height: 1.2),
                             ),
                           ),
@@ -262,7 +262,7 @@ class ProductDetailsScreen extends StatelessWidget {
                               fontFamily: 'Poppins',
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF9E9E9E))),
+                              color: Color(0xFF6B6B6B))),
                       const SizedBox(height: 20),
                       GestureDetector(
                         child: Row(
@@ -282,7 +282,7 @@ class ProductDetailsScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Divider(thickness: 1, color: Color(0xFF2A2A2A)),
+                const Divider(thickness: 1, color: Color(0xFFE0E0E0)),
                 Padding(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16.0, vertical: 16.0),
@@ -292,9 +292,9 @@ class ProductDetailsScreen extends StatelessWidget {
                         height: 48,
                         width: 48,
                         decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E1E),
+                            color: const Color(0xFFF0F0F0),
                             shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFF2A2A2A)),
+                            border: Border.all(color: const Color(0xFFE0E0E0)),
                             image: const DecorationImage(
                               image: NetworkImage(
                                   "https://images.unsplash.com/photo-1559525839-b184a4d698c7?w=100&q=80"),
@@ -311,22 +311,22 @@ class ProductDetailsScreen extends StatelessWidget {
                                     fontFamily: 'Poppins',
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.white)),
+                                    color: Colors.black87)),
                             const Text("Explore all products",
                                 style: TextStyle(
                                     fontFamily: 'Poppins',
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
-                                    color: Color(0xFF9E9E9E))),
+                                    color: Color(0xFF6B6B6B))),
                           ],
                         ),
                       ),
                       const Icon(Icons.chevron_right_rounded,
-                          color: Color(0xFF5C5C5C)),
+                          color: Color(0xFF6B6B6B)),
                     ],
                   ),
                 ),
-                const Divider(thickness: 1, color: Color(0xFF2A2A2A)),
+                const Divider(thickness: 1, color: Color(0xFFE0E0E0)),
                 const Padding(
                   padding: EdgeInsets.fromLTRB(16, 20, 16, 16),
                   child: Text(
@@ -335,7 +335,7 @@ class ProductDetailsScreen extends StatelessWidget {
                         fontFamily: 'Poppins',
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color: Colors.white),
+                        color: Colors.black87),
                   ),
                 ),
                 BlocBuilder<HomeBloc, HomeState>(
