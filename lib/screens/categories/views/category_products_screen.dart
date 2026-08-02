@@ -1,8 +1,8 @@
-import 'package:beeyo_customer/screens/home/views/widgets/product_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../home/blocs/home_bloc.dart';
 import '../../../shared/models/category_model.dart';
+import '../../../shared/widgets/product_grid.dart';
 
 // 🔥 1. Import the new floating cart banner!
 import '../../../shared/widgets/floating_cart_banner.dart';
@@ -160,20 +160,13 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                       );
                     }
 
-                    return GridView.builder(
+                    return SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(
                           12, 16, 12, 100), // Bottom padding for cart banner
-                      itemCount: categoryProducts.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
+                      child: ProductGrid(
+                        products: categoryProducts,
                         crossAxisCount: 2,
-                        mainAxisExtent: 260,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
                       ),
-                      itemBuilder: (context, index) {
-                        return ProductCard(product: categoryProducts[index]);
-                      },
                     );
                   }
 

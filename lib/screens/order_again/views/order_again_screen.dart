@@ -1,10 +1,10 @@
-import 'package:beeyo_customer/screens/home/views/widgets/product_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../home/blocs/home_bloc.dart';
 import '../../../shared/widgets/global_header.dart';
 // 🔥 1. Import the floating cart banner
 import '../../../shared/widgets/floating_cart_banner.dart';
+import '../../../shared/widgets/product_grid.dart';
 
 class OrderAgainScreen extends StatelessWidget {
   const OrderAgainScreen({super.key});
@@ -79,22 +79,12 @@ class OrderAgainScreen extends StatelessWidget {
                                   fontWeight: FontWeight.w800,
                                   color: Colors.black87)),
                         ),
-                        GridView.builder(
+                        Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          physics: const NeverScrollableScrollPhysics(),
-                          shrinkWrap: true,
-                          itemCount: state.allProducts.take(6).length,
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
+                          child: ProductGrid(
+                            products: state.allProducts.take(6).toList(),
                             crossAxisCount: 3,
-                            mainAxisExtent: 260,
-                            mainAxisSpacing: 12,
-                            crossAxisSpacing: 12,
                           ),
-                          itemBuilder: (context, index) {
-                            return ProductCard(
-                                product: state.allProducts[index]);
-                          },
                         ),
                       ],
                     ),

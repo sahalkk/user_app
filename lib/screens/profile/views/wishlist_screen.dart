@@ -1,5 +1,5 @@
-import 'package:beeyo_customer/screens/home/views/widgets/product_card.dart';
 import 'package:beeyo_customer/shared/widgets/floating_cart_banner.dart';
+import 'package:beeyo_customer/shared/widgets/product_grid.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 // REMOVED HomeBloc import
@@ -87,24 +87,15 @@ class WishlistScreen extends StatelessWidget {
                           color: Colors.black87),
                     ),
                   ),
-                  GridView.builder(
+                  Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    physics: const NeverScrollableScrollPhysics(),
-                    shrinkWrap: true,
-                    itemCount: wishlistItems.length,
-                    // Using the same grid delegate for consistency
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
+                    // ProductCard will automatically show the red heart
+                    // because it's listening to the same BLoC!
+                    child: ProductGrid(
+                      products: wishlistItems,
                       crossAxisCount: 3,
-                      mainAxisExtent: 260,
                       mainAxisSpacing: 16,
-                      crossAxisSpacing: 12,
                     ),
-                    itemBuilder: (context, index) {
-                      // The ProductCard will automatically show the red heart
-                      // because it's listening to the same BLoC!
-                      return ProductCard(product: wishlistItems[index]);
-                    },
                   ),
                 ],
               ),

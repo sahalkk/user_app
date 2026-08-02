@@ -1,4 +1,4 @@
-import 'package:beeyo_customer/screens/home/views/widgets/product_card.dart';
+import 'package:beeyo_customer/shared/widgets/product_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 // 🔥 1. Import the speech-to-text package
@@ -299,23 +299,9 @@ class _SearchScreenState extends State<SearchScreen> {
                             const SizedBox(height: 32),
                             _buildSectionHeader("Suggested for you"),
                             const SizedBox(height: 16),
-                            SizedBox(
-                              height: 280,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
-                                itemCount: state.allProducts.take(5).length,
-                                separatorBuilder: (context, index) =>
-                                    const SizedBox(width: 12),
-                                itemBuilder: (context, index) {
-                                  return SizedBox(
-                                    width: 145,
-                                    child: ProductCard(
-                                        product: state.allProducts[index]),
-                                  );
-                                },
-                              ),
+                            ProductRow(
+                              products: state.allProducts.take(5).toList(),
+                              itemWidth: 145,
                             ),
                           ],
                         ),

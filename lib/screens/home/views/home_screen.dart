@@ -1,4 +1,3 @@
-import 'package:beeyo_customer/screens/home/views/widgets/product_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/home_bloc.dart';
@@ -7,6 +6,8 @@ import '../../../blocs/wishlist_bloc/wishlist_bloc.dart';
 import '../../../blocs/wishlist_bloc/wishlist_state.dart';
 
 import '../../../shared/widgets/floating_cart_banner.dart';
+import '../../../shared/widgets/product_grid.dart';
+import '../../../shared/widgets/product_row.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -38,7 +39,7 @@ class HomeScreen extends StatelessWidget {
                   SliverPersistentHeader(
                     pinned: true,
                     delegate: StickyHeaderDelegate(
-                      height: 130,
+                      height: 108,
                       child: Container(
                         color: const Color(0xFFFFFFFF),
                         child: Column(
@@ -113,29 +114,15 @@ class HomeScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 12),
 
-                        // ── FESTIVE SPECIALS section header ──
-                        _SectionHeader(title: "Festive Specials"),
+                        // ── FESTIVE OFFERS section header ──
+                        _SectionHeader(title: "Festive Offers"),
                         const SizedBox(height: 14),
 
                         // Horizontal scroll of first 5 products
-                        SizedBox(
-                          height: 265,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: state.filteredProducts.length >= 5
-                                ? 5
-                                : state.filteredProducts.length,
-                            separatorBuilder: (context, index) =>
-                                const SizedBox(width: 12),
-                            itemBuilder: (context, index) => SizedBox(
-                                width: 140,
-                                child: ProductCard(
-                                    product: state.filteredProducts[index])),
-                          ),
+                        ProductRow(
+                          products: state.filteredProducts.take(5).toList(),
                         ),
 
                         const SizedBox(height: 28),
@@ -150,22 +137,8 @@ class HomeScreen extends StatelessWidget {
                                 children: [
                                   _SectionHeader(title: "Your Wishlist"),
                                   const SizedBox(height: 14),
-                                  SizedBox(
-                                    height: 265,
-                                    child: ListView.separated(
-                                      scrollDirection: Axis.horizontal,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 16),
-                                      itemCount:
-                                          wishlistState.wishlistItems.length,
-                                      separatorBuilder: (context, index) =>
-                                          const SizedBox(width: 12),
-                                      itemBuilder: (context, index) => SizedBox(
-                                          width: 140,
-                                          child: ProductCard(
-                                              product: wishlistState
-                                                  .wishlistItems[index])),
-                                    ),
+                                  ProductRow(
+                                    products: wishlistState.wishlistItems,
                                   ),
                                   const SizedBox(height: 28),
                                 ],
@@ -192,21 +165,13 @@ class HomeScreen extends StatelessWidget {
                                   ),
                                 ),
                               )
-                            : GridView.builder(
+                            : Padding(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 16),
-                                physics: const NeverScrollableScrollPhysics(),
-                                shrinkWrap: true,
-                                itemCount: state.filteredProducts.length,
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                child: ProductGrid(
+                                  products: state.filteredProducts,
                                   crossAxisCount: 3,
-                                  mainAxisExtent: 255,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
                                 ),
-                                itemBuilder: (context, index) => ProductCard(
-                                    product: state.filteredProducts[index]),
                               ),
                       ],
                     ),

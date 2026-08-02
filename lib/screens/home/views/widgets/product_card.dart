@@ -31,22 +31,11 @@ class ProductCard extends StatelessWidget {
                 builder: (context) => ProductDetailsScreen(product: product)));
       },
       child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+        color: Colors.white,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── IMAGE + WISHLIST ICON ──────────────────────────────────
+            // ── IMAGE + WISHLIST ICON + FLOATING ADD BUTTON ────────────
             Stack(
               clipBehavior: Clip.none,
               children: [
@@ -55,13 +44,12 @@ class ProductCard extends StatelessWidget {
                   child: Container(
                     width: double.infinity,
                     decoration: const BoxDecoration(
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(16)),
+                      borderRadius: BorderRadius.all(Radius.circular(16)),
                       color: Color(0xFFF5F5F5),
                     ),
                     child: ClipRRect(
                       borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(16)),
+                          const BorderRadius.all(Radius.circular(16)),
                       child: Image.network(
                         product.imageUrl,
                         fit: BoxFit.cover,
@@ -71,6 +59,13 @@ class ProductCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
+
+                // Floating ADD button (straddles the image's bottom edge)
+                Positioned(
+                  right: 8,
+                  bottom: -16,
+                  child: _buildAddButton(context),
                 ),
 
                 // Wishlist heart icon (top-right)
@@ -137,61 +132,58 @@ class ProductCard extends StatelessWidget {
               ],
             ),
 
-            // ── PRODUCT INFO ───────────────────────────────────────────
-            Expanded(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 9.0, vertical: 8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Unit badge (e.g. PIECE / GRAM)
-                    Text(
-                      (product.unit.isNotEmpty ? product.unit : "1 KG")
-                          .toUpperCase(),
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        color: Color(0xFF6B6B6B),
-                        fontSize: 8,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
+            const SizedBox(height: 20),
 
-                    // Product name
+            // ── PRODUCT INFO (sizes itself to its content) ─────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(9.0, 0, 9.0, 10.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Product name
+                  Text(
+                    product.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                      color: Colors.black87,
+                      height: 1.25,
+                    ),
+                  ),
+
+                  if (product.description.isNotEmpty) ...[
+                    const SizedBox(height: 4),
                     Text(
-                      product.title,
+                      product.description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                        color: Colors.black87,
+                        fontWeight: FontWeight.w400,
+                        fontSize: 9,
+                        color: Color(0xFF6B6B6B),
                         height: 1.25,
                       ),
                     ),
-
-                    const Spacer(),
-
-                    // Final price only (no strikethrough, no original price)
-                    Text(
-                      "₹${product.price}",
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // ADD / quantity button — full width
-                    _buildAddButton(context),
-                    const SizedBox(height: 2),
                   ],
-                ),
+
+                  const SizedBox(height: 6),
+
+                  // Final price only (no strikethrough, no original price)
+                  Text(
+                    "₹${product.price}",
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -248,81 +240,96 @@ class ProductCard extends StatelessWidget {
           quantity = cartItem.quantity;
         }
 
+        const outlineDecoration = BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.all(Radius.circular(8)),
+          border: Border.fromBorderSide(
+              BorderSide(color: Color(0xFF3DAA5C), width: 1.5)),
+        );
+
         if (quantity == 0) {
-          // ── Plain ADD button ──
+          // ── Plain ADD button (floating outline pill) ──
           return GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => context.read<CartBloc>().add(AddToCart(product)),
             child: Container(
-              height: 30,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: const Color(0xFF3DAA5C),
-                borderRadius: BorderRadius.circular(10),
-              ),
+              height: 32,
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              decoration: outlineDecoration,
               alignment: Alignment.center,
               child: const Text(
                 "ADD",
                 style: TextStyle(
                   fontFamily: 'Poppins',
-                  color: Colors.white,
+                  color: Color(0xFF3DAA5C),
                   fontWeight: FontWeight.w900,
-                  fontSize: 11,
+                  fontSize: 12,
                   letterSpacing: 0.6,
                 ),
               ),
             ),
           );
         } else {
-          // ── Quantity stepper ──
-          return Container(
-            height: 30,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: const Color(0xFF3DAA5C),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Minus
-                GestureDetector(
-                  onTap: () {
-                    if (quantity > 1) {
-                      context.read<CartBloc>().add(
-                          UpdateCartItemQuantity(product.id, quantity - 1));
-                    } else {
-                      context.read<CartBloc>().add(RemoveFromCart(product.id));
-                    }
-                  },
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Icon(Icons.remove_rounded,
-                        color: Colors.white, size: 15),
+          // ── Quantity stepper (floating outline pill) ──
+          // Wrapped in an opaque GestureDetector so a tap that lands on the
+          // count digit or the small gaps between elements is absorbed here
+          // instead of falling through to the card's "open details" tap.
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {},
+            child: Container(
+              height: 32,
+              decoration: outlineDecoration,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Minus — opaque so the full padded box is tappable,
+                  // not just the icon glyph itself.
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      if (quantity > 1) {
+                        context.read<CartBloc>().add(
+                            UpdateCartItemQuantity(product.id, quantity - 1));
+                      } else {
+                        context
+                            .read<CartBloc>()
+                            .add(RemoveFromCart(product.id));
+                      }
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      child: Icon(Icons.remove_rounded,
+                          color: Color(0xFF3DAA5C), size: 16),
+                    ),
                   ),
-                ),
 
-                // Count
-                Text(
-                  "$quantity",
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
+                  // Count
+                  Text(
+                    "$quantity",
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      color: Color(0xFF3DAA5C),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                    ),
                   ),
-                ),
 
-                // Plus
-                GestureDetector(
-                  onTap: () =>
-                      context.read<CartBloc>().add(AddToCart(product)),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child:
-                        Icon(Icons.add_rounded, color: Colors.white, size: 15),
+                  // Plus
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () =>
+                        context.read<CartBloc>().add(AddToCart(product)),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      child: Icon(Icons.add_rounded,
+                          color: Color(0xFF3DAA5C), size: 16),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         }

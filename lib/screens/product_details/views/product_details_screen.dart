@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../cart/views/cart_screen.dart';
 import '../../home/blocs/home_bloc.dart';
-import '../../home/views/widgets/product_card.dart';
+import '../../../shared/widgets/product_row.dart';
 import '../../../shared/models/product_model.dart';
 import '../../../shared/models/cart_item_model.dart';
 import '../../../blocs/cart_bloc/cart_bloc.dart';
@@ -347,22 +347,9 @@ class ProductDetailsScreen extends StatelessWidget {
                           .toList();
                       if (similarProducts.isEmpty) return const SizedBox();
 
-                      return SizedBox(
-                        height: 280,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: similarProducts.length,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(width: 12),
-                          itemBuilder: (context, index) {
-                            return SizedBox(
-                              width: 145,
-                              child:
-                                  ProductCard(product: similarProducts[index]),
-                            );
-                          },
-                        ),
+                      return ProductRow(
+                        products: similarProducts,
+                        itemWidth: 145,
                       );
                     }
                     return const SizedBox();
