@@ -173,15 +173,35 @@ class ProductCard extends StatelessWidget {
 
                   const SizedBox(height: 6),
 
-                  // Final price only (no strikethrough, no original price)
-                  Text(
-                    "₹${product.price}",
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 14,
-                    ),
+                  // Price + strikethrough "original" price.
+                  // TODO: hardcoded 20% markup as a stand-in for a real
+                  // discount/original price until the backend adds one.
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        "₹${product.price}",
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        "₹${(product.priceValue * 1.2).round()}",
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          color: Color(0xFF9E9E9E),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 10,
+                          decoration: TextDecoration.lineThrough,
+                          decorationColor: Color(0xFF9E9E9E),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
