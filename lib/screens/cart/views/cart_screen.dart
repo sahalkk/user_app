@@ -3,6 +3,7 @@ import 'package:beeyo_customer/blocs/auth_bloc/auth_state.dart';
 import 'package:beeyo_customer/screens/auth/views/login_screen.dart';
 import 'package:beeyo_customer/screens/checkout/views/add_address_screen.dart';
 import 'package:beeyo_customer/screens/checkout/views/checkout_screen.dart';
+import 'package:beeyo_customer/screens/product_details/views/product_details_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../blocs/cart_bloc/cart_bloc.dart';
@@ -65,140 +66,156 @@ class CartScreen extends StatelessWidget {
                     final itemTotal =
                         cartItem.product.priceValue * cartItem.quantity;
 
-                    return Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFFFF),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE0E0E0)),
-                      ),
-                      child: Row(
-                        children: [
-                          // --- Image ---
-                          Container(
-                            width: 70,
-                            height: 70,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF0F0F0),
-                              borderRadius: BorderRadius.circular(12),
-                              image: DecorationImage(
-                                image: NetworkImage(cartItem.product.imageUrl),
-                                fit: BoxFit.cover,
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                ProductDetailsScreen(product: cartItem.product),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFFFF),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE0E0E0)),
+                        ),
+                        child: Row(
+                          children: [
+                            // --- Image ---
+                            Container(
+                              width: 70,
+                              height: 70,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0F0F0),
+                                borderRadius: BorderRadius.circular(12),
+                                image: DecorationImage(
+                                  image:
+                                      NetworkImage(cartItem.product.imageUrl),
+                                  fit: BoxFit.cover,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
+                            const SizedBox(width: 16),
 
-                          // --- Details Column ---
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  cartItem.product.title,
-                                  style: const TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15,
-                                      color: Colors.black87),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  cartItem.product.unit.isNotEmpty
-                                      ? cartItem.product.unit
-                                      : "1 Unit",
-                                  style: const TextStyle(
-                                      fontFamily: 'Poppins',
-                                      color: Color(0xFF6B6B6B),
-                                      fontSize: 11),
-                                ),
+                            // --- Details Column ---
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    cartItem.product.title,
+                                    style: const TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                        color: Colors.black87),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    cartItem.product.unit.isNotEmpty
+                                        ? cartItem.product.unit
+                                        : "1 Unit",
+                                    style: const TextStyle(
+                                        fontFamily: 'Poppins',
+                                        color: Color(0xFF6B6B6B),
+                                        fontSize: 11),
+                                  ),
 
-                                const SizedBox(height: 12),
+                                  const SizedBox(height: 12),
 
-                                // Price and Quantity Controls Row
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    // --- PRICES SECTION (final price only) ---
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          "₹${itemTotal.toStringAsFixed(2)}",
-                                          style: const TextStyle(
-                                              fontFamily: 'Poppins',
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 16,
-                                              color: Colors.black87),
-                                        ),
-                                      ],
-                                    ),
-
-                                    // --- QUANTITY CONTROLS ---
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF3DAA5C),
-                                        borderRadius:
-                                            BorderRadius.circular(20),
-                                      ),
-                                      child: Row(
+                                  // Price and Quantity Controls Row
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      // --- PRICES SECTION (final price only) ---
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          InkWell(
-                                            onTap: () {
-                                              if (cartItem.quantity > 1) {
-                                                context.read<CartBloc>().add(
-                                                    UpdateCartItemQuantity(
-                                                        cartItem.product.id,
-                                                        cartItem.quantity - 1));
-                                              } else {
-                                                context.read<CartBloc>().add(
-                                                    RemoveFromCart(
-                                                        cartItem.product.id));
-                                              }
-                                            },
-                                            child: const Padding(
-                                              padding: EdgeInsets.symmetric(
-                                                  horizontal: 12, vertical: 8),
-                                              child: Icon(Icons.remove_rounded,
-                                                  size: 15,
-                                                  color: Colors.white),
-                                            ),
-                                          ),
                                           Text(
-                                            "${cartItem.quantity}",
+                                            "₹${itemTotal.toStringAsFixed(2)}",
                                             style: const TextStyle(
                                                 fontFamily: 'Poppins',
                                                 fontWeight: FontWeight.w900,
-                                                color: Colors.white),
-                                          ),
-                                          InkWell(
-                                            onTap: () {
-                                              context.read<CartBloc>().add(
-                                                  UpdateCartItemQuantity(
-                                                      cartItem.product.id,
-                                                      cartItem.quantity + 1));
-                                            },
-                                            child: const Padding(
-                                              padding: EdgeInsets.symmetric(
-                                                  horizontal: 12, vertical: 8),
-                                              child: Icon(Icons.add_rounded,
-                                                  size: 15,
-                                                  color: Colors.white),
-                                            ),
+                                                fontSize: 16,
+                                                color: Colors.black87),
                                           ),
                                         ],
                                       ),
-                                    )
-                                  ],
-                                ),
-                              ],
+
+                                      // --- QUANTITY CONTROLS ---
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF3DAA5C),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            InkWell(
+                                              onTap: () {
+                                                if (cartItem.quantity > 1) {
+                                                  context.read<CartBloc>().add(
+                                                      UpdateCartItemQuantity(
+                                                          cartItem.product.id,
+                                                          cartItem.quantity -
+                                                              1));
+                                                } else {
+                                                  context.read<CartBloc>().add(
+                                                      RemoveFromCart(
+                                                          cartItem.product.id));
+                                                }
+                                              },
+                                              child: const Padding(
+                                                padding: EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8),
+                                                child: Icon(
+                                                    Icons.remove_rounded,
+                                                    size: 15,
+                                                    color: Colors.white),
+                                              ),
+                                            ),
+                                            Text(
+                                              "${cartItem.quantity}",
+                                              style: const TextStyle(
+                                                  fontFamily: 'Poppins',
+                                                  fontWeight: FontWeight.w900,
+                                                  color: Colors.white),
+                                            ),
+                                            InkWell(
+                                              onTap: () {
+                                                context.read<CartBloc>().add(
+                                                    UpdateCartItemQuantity(
+                                                        cartItem.product.id,
+                                                        cartItem.quantity + 1));
+                                              },
+                                              child: const Padding(
+                                                padding: EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8),
+                                                child: Icon(Icons.add_rounded,
+                                                    size: 15,
+                                                    color: Colors.white),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -252,7 +269,9 @@ class CartScreen extends StatelessWidget {
                             final currentAuth = authBloc.state;
                             if (currentAuth is AuthInitial) {
                               try {
-                                await authBloc.stream.firstWhere((s) => s is! AuthInitial).timeout(const Duration(seconds: 2));
+                                await authBloc.stream
+                                    .firstWhere((s) => s is! AuthInitial)
+                                    .timeout(const Duration(seconds: 2));
                               } catch (_) {
                                 // ignore timeout and re-check below
                               }
