@@ -62,15 +62,12 @@ class ProductCard extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius:
                           const BorderRadius.vertical(top: Radius.circular(16)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(10.0),
-                        child: Image.network(
-                          product.imageUrl,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.image_not_supported_outlined,
-                                  color: Color(0xFFBDBDBD), size: 32),
-                        ),
+                      child: Image.network(
+                        product.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.image_not_supported_outlined,
+                                color: Color(0xFFBDBDBD), size: 32),
                       ),
                     ),
                   ),

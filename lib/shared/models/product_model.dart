@@ -24,12 +24,17 @@ class ProductModel {
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     String name = json['name'] ?? '';
 
+    final imageUrls = json['imageUrls'];
+    final resolvedImageUrl = (imageUrls is List && imageUrls.isNotEmpty)
+        ? imageUrls.first.toString()
+        : (json['imageUrl'] ?? '');
+
     return ProductModel(
       id: json['id'] ?? '',
       title: name.isNotEmpty ? name : 'Unknown Product',
       description: json['description'] ?? '',
       price: json['price']?.toString() ?? '0',
-      imageUrl: json['imageUrl'] ?? '',
+      imageUrl: resolvedImageUrl,
       unit: json['unit'] ?? '',
       categoryId: json['categoryId'] ?? 'Uncategorized',
     );
