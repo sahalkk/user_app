@@ -10,10 +10,36 @@ import '../../../blocs/wishlist_bloc/wishlist_bloc.dart';
 import '../../../blocs/wishlist_bloc/wishlist_state.dart';
 import '../../../blocs/wishlist_bloc/wishlist_event.dart';
 
-class ProductDetailsScreen extends StatelessWidget {
+class ProductDetailsScreen extends StatefulWidget {
   final ProductModel product;
 
   const ProductDetailsScreen({super.key, required this.product});
+
+  @override
+  State<ProductDetailsScreen> createState() => _ProductDetailsScreenState();
+}
+
+class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
+  ProductModel get product => widget.product;
+
+  late final PageController _imageController;
+  int _imageIndex = 0;
+  bool _isDetailsExpanded = false;
+
+  List<String> get _images =>
+      product.imageUrls.isNotEmpty ? product.imageUrls : [product.imageUrl];
+
+  @override
+  void initState() {
+    super.initState();
+    _imageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _imageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,47 +171,58 @@ class ProductDetailsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 32.0, vertical: 16.0),
-                    child: Image.network(
-                      product.imageUrl,
-                      height: 250,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                          height: 250,
-                          color: const Color(0xFFF0F0F0),
-                          child: const Icon(Icons.image_not_supported_outlined,
-                              size: 50, color: Color(0xFFBDBDBD))),
-                    ),
+                SizedBox(
+                  height: 320,
+                  width: double.infinity,
+                  child: Stack(
+                    children: [
+                      PageView.builder(
+                        controller: _imageController,
+                        physics: _images.length > 1
+                            ? const PageScrollPhysics()
+                            : const NeverScrollableScrollPhysics(),
+                        itemCount: _images.length,
+                        onPageChanged: (index) =>
+                            setState(() => _imageIndex = index),
+                        itemBuilder: (context, index) => Image.network(
+                          _images[index],
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                  color: const Color(0xFFF0F0F0),
+                                  child: const Icon(
+                                      Icons.image_not_supported_outlined,
+                                      size: 50,
+                                      color: Color(0xFFBDBDBD))),
+                        ),
+                      ),
+                      if (_images.length > 1)
+                        Positioned(
+                          bottom: 12,
+                          left: 0,
+                          right: 0,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(_images.length, (index) {
+                              final isActive = index == _imageIndex;
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                width: isActive ? 20 : 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                    color: isActive
+                                        ? const Color(0xFF3DAA5C)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(10)),
+                              );
+                            }),
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: 20,
-                        height: 6,
-                        decoration: BoxDecoration(
-                            color: const Color(0xFF3DAA5C),
-                            borderRadius: BorderRadius.circular(10))),
-                    Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                            color: Color(0xFFE0E0E0),
-                            shape: BoxShape.circle)),
-                    Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                            color: Color(0xFFE0E0E0),
-                            shape: BoxShape.circle)),
-                  ],
                 ),
                 const SizedBox(height: 24),
                 Padding(
@@ -193,29 +230,6 @@ class ProductDetailsScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Rating stars only (removed delivery time badge)
-                      Row(
-                        children: [
-                          Icon(Icons.star_rounded,
-                              size: 13, color: Colors.amber.shade400),
-                          Icon(Icons.star_rounded,
-                              size: 13, color: Colors.amber.shade400),
-                          Icon(Icons.star_rounded,
-                              size: 13, color: Colors.amber.shade400),
-                          Icon(Icons.star_rounded,
-                              size: 13, color: Colors.amber.shade400),
-                          Icon(Icons.star_half_rounded,
-                              size: 13, color: Colors.amber.shade400),
-                          const SizedBox(width: 4),
-                          const Text("(52)",
-                              style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 11,
-                                  color: Color(0xFF6B6B6B),
-                                  fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -265,6 +279,9 @@ class ProductDetailsScreen extends StatelessWidget {
                               color: Color(0xFF6B6B6B))),
                       const SizedBox(height: 20),
                       GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => setState(
+                            () => _isDetailsExpanded = !_isDetailsExpanded),
                         child: Row(
                           children: [
                             const Text("View product details",
@@ -273,60 +290,85 @@ class ProductDetailsScreen extends StatelessWidget {
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: Color(0xFF3DAA5C))),
-                            const Icon(Icons.arrow_drop_down_rounded,
-                                color: Color(0xFF3DAA5C)),
+                            AnimatedRotation(
+                              duration: const Duration(milliseconds: 200),
+                              turns: _isDetailsExpanded ? 0.5 : 0,
+                              child: const Icon(Icons.arrow_drop_down_rounded,
+                                  color: Color(0xFF3DAA5C)),
+                            ),
                           ],
                         ),
+                      ),
+                      AnimatedCrossFade(
+                        duration: const Duration(milliseconds: 200),
+                        crossFadeState: _isDetailsExpanded
+                            ? CrossFadeState.showFirst
+                            : CrossFadeState.showSecond,
+                        firstChild: Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            product.description.isNotEmpty
+                                ? product.description
+                                : "No additional details available for this product.",
+                            style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 13,
+                                height: 1.5,
+                                color: Color(0xFF6B6B6B)),
+                          ),
+                        ),
+                        secondChild: const SizedBox(width: double.infinity),
                       ),
                       const SizedBox(height: 16),
                     ],
                   ),
                 ),
                 const Divider(thickness: 1, color: Color(0xFFE0E0E0)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0, vertical: 16.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        height: 48,
-                        width: 48,
-                        decoration: BoxDecoration(
-                            color: const Color(0xFFF0F0F0),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFFE0E0E0)),
-                            image: const DecorationImage(
-                              image: NetworkImage(
-                                  "https://images.unsplash.com/photo-1559525839-b184a4d698c7?w=100&q=80"),
-                              fit: BoxFit.cover,
-                            )),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text("Premium Brand",
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.black87)),
-                            const Text("Explore all products",
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF6B6B6B))),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right_rounded,
-                          color: Color(0xFF6B6B6B)),
-                    ],
-                  ),
-                ),
-                const Divider(thickness: 1, color: Color(0xFFE0E0E0)),
+                // --- PRODUCT COMPANY / BRAND INFO SECTION (disabled for now) ---
+                // Padding(
+                //   padding: const EdgeInsets.symmetric(
+                //       horizontal: 16.0, vertical: 16.0),
+                //   child: Row(
+                //     children: [
+                //       Container(
+                //         height: 48,
+                //         width: 48,
+                //         decoration: BoxDecoration(
+                //             color: const Color(0xFFF0F0F0),
+                //             shape: BoxShape.circle,
+                //             border: Border.all(color: const Color(0xFFE0E0E0)),
+                //             image: const DecorationImage(
+                //               image: NetworkImage(
+                //                   "https://images.unsplash.com/photo-1559525839-b184a4d698c7?w=100&q=80"),
+                //               fit: BoxFit.cover,
+                //             )),
+                //       ),
+                //       const SizedBox(width: 16),
+                //       Expanded(
+                //         child: Column(
+                //           crossAxisAlignment: CrossAxisAlignment.start,
+                //           children: [
+                //             const Text("Premium Brand",
+                //                 style: TextStyle(
+                //                     fontFamily: 'Poppins',
+                //                     fontSize: 15,
+                //                     fontWeight: FontWeight.w700,
+                //                     color: Colors.black87)),
+                //             const Text("Explore all products",
+                //                 style: TextStyle(
+                //                     fontFamily: 'Poppins',
+                //                     fontSize: 12,
+                //                     fontWeight: FontWeight.w500,
+                //                     color: Color(0xFF6B6B6B))),
+                //           ],
+                //         ),
+                //       ),
+                //       const Icon(Icons.chevron_right_rounded,
+                //           color: Color(0xFF6B6B6B)),
+                //     ],
+                //   ),
+                // ),
+                // const Divider(thickness: 1, color: Color(0xFFE0E0E0)),
                 const Padding(
                   padding: EdgeInsets.fromLTRB(16, 20, 16, 16),
                   child: Text(
