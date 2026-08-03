@@ -17,8 +17,6 @@ fonts:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
-  flutter_svg: ^2.2.1
   flutter_dotenv: ^5.0.2
 
   bloc: ^8.1.4
@@ -26,16 +24,20 @@ dependencies:
   equatable: ^2.0.7
   http: ^1.3.0
 
-  user_repository:
-    path: packages/user_repository
   rxdart: ^0.27.7
   flutter_spinkit: ^5.2.2
   shared_preferences: ^2.5.3
   intl: ^0.20.2
-  share_plus: ^12.0.1
   speech_to_text: ^7.3.0
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
+
+  # Location / address module
+  geolocator: ^13.0.2
+  permission_handler: ^11.3.1
+  geocoding: ^3.0.0
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:

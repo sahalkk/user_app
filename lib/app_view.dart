@@ -3,6 +3,8 @@ import 'package:beeyo_customer/blocs/auth_bloc/auth_event.dart';
 import 'package:beeyo_customer/blocs/order_bloc/order_bloc.dart';
 import 'package:beeyo_customer/blocs/wishlist_bloc/wishlist_bloc.dart';
 import 'package:beeyo_customer/data/repositories/auth_repository.dart';
+import 'package:beeyo_customer/data/repositories/location_repository.dart';
+import 'package:beeyo_customer/screens/location/cubit/location_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'blocs/cart_bloc/cart_bloc.dart';
@@ -29,6 +31,9 @@ class MyAppView extends StatelessWidget {
         RepositoryProvider<CategoryRepository>(
           create: (context) => CategoryRepository(),
         ),
+        RepositoryProvider<LocationRepository>(
+          create: (context) => LocationRepository(),
+        ),
       ],
       // USE MULTI-BLOC PROVIDER HERE
       child: MultiBlocProvider(
@@ -48,6 +53,10 @@ class MyAppView extends StatelessWidget {
           ),
           BlocProvider(
             create: (context) => OrderBloc(),
+          ),
+          BlocProvider(
+            create: (context) =>
+                LocationCubit(context.read<LocationRepository>())..bootstrap(),
           ),
         ],
         child: MaterialApp(

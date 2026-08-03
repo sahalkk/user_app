@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 // Note: Make sure these import paths match your folder structure!
 import '../../screens/profile/views/profile_screen.dart';
 import '../../screens/search/views/search_screen.dart';
+import '../../screens/location/cubit/location_cubit.dart';
+import '../../screens/location/views/location_picker_sheet.dart';
 
 // =================================================================
 // 1. THE BEEYO BRAND HEADER (Scrolls Away)
@@ -22,33 +25,25 @@ class LocationHeader extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // --- BEEYO LOGO with green glow underline ---
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "beeyo",
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -1.0,
-                  color: Color(0xFF1A1A1A),
-                ),
-              ),
-              // Subtle green accent underline
-              Container(
-                height: 3,
-                width: 36,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF3DAA5C), Colors.transparent],
+          // --- BEEYO LOGO + LOCATION DROPDOWN ---
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "beeyo",
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1.0,
+                    color: Color(0xFF1A1A1A),
                   ),
-                  borderRadius: BorderRadius.circular(2),
                 ),
-              ),
-            ],
+                const _LocationDropdownRow(),
+              ],
+            ),
           ),
 
           const SizedBox(width: 16),
@@ -82,6 +77,74 @@ class LocationHeader extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// =================================================================
+// 1b. LOCATION DROPDOWN ROW (below "beeyo" — replaces the underline)
+// =================================================================
+class _LocationDropdownRow extends StatelessWidget {
+  const _LocationDropdownRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<LocationCubit, LocationState>(
+      builder: (context, state) {
+        final (text, isError) = _labelFor(state);
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => LocationPickerSheet.show(context),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isError ? Icons.location_off_rounded : Icons.location_on_rounded,
+                  size: 14,
+                  color: isError ? const Color(0xFFE53935) : const Color(0xFF3DAA5C),
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isError ? const Color(0xFFE53935) : const Color(0xFF6B6B6B),
+                    ),
+                  ),
+                ),
+                Icon(Icons.keyboard_arrow_down_rounded,
+                    size: 16,
+                    color: isError ? const Color(0xFFE53935) : const Color(0xFF6B6B6B)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  (String, bool) _labelFor(LocationState state) {
+    if (state is Bound) {
+      final a = state.address;
+      return ('${a.displayLabel} - ${a.formattedAddress}', false);
+    }
+    if (state is CheckingServiceability) {
+      return ('Checking delivery availability…', false);
+    }
+    if (state is Resolving || state is PermissionChecking) {
+      return ('Detecting location…', false);
+    }
+    if (state is NotDeliverable) {
+      return ('Not deliverable here', true);
+    }
+    return ('Select delivery location', false);
   }
 }
 

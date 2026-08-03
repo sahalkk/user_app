@@ -45,5 +45,7 @@
 		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Beeyo uses your location to show your delivery address and check whether we deliver to your area.</string>
 	</dict>
 </plist>
