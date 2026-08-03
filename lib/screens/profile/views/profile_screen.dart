@@ -7,6 +7,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 // Make sure these paths match your folder structure
 import '../../auth/views/login_screen.dart';
+import '../../address_book/views/address_book_screen.dart';
+import '../../location/cubit/location_cubit.dart';
 
 class ProfileScreen extends StatelessWidget {
   final VoidCallback? onNavigateToOrders;
@@ -245,7 +247,17 @@ class ProfileScreen extends StatelessWidget {
                                 fontSize: 14, fontWeight: FontWeight.w600)),
                         trailing:
                             const Icon(Icons.chevron_right, color: Colors.grey),
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BlocProvider.value(
+                                value: context.read<LocationCubit>(),
+                                child: const AddressBookScreen(),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       Divider(
                           height: 1,

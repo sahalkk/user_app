@@ -149,8 +149,22 @@ class LocationCubit extends Cubit<LocationState> {
     ));
   }
 
+  /// Seeds the confirm sheet with an already-known address (edit flow) —
+  /// avoids a re-geocode flicker showing slightly different wording than
+  /// what the user originally saved, until they actually move the pin.
+  void seedConfirming(SavedAddressModel address) {
+    emit(Confirming(
+      position: address.position,
+      formattedAddress: address.formattedAddress,
+      source: AddressSource.mapPin,
+    ));
+  }
+
   // ── Confirm -> serviceability -> bind ───────────────────────────
 
+  /// Creates a new saved address, or — when [editing] is passed — updates
+  /// that address in place (same id, original createdAt preserved) instead
+  /// of adding a duplicate.
   Future<void> confirmAddress({
     required LatLng position,
     required String formattedAddress,
@@ -158,17 +172,19 @@ class LocationCubit extends Cubit<LocationState> {
     String? customLabel,
     String? landmark,
     String? pincode,
+    SavedAddressModel? editing,
   }) async {
     final now = DateTime.now();
     final address = SavedAddressModel(
-      id: now.microsecondsSinceEpoch.toString(),
+      id: editing?.id ?? now.microsecondsSinceEpoch.toString(),
       label: label,
       customLabel: customLabel,
       position: position,
       formattedAddress: formattedAddress,
       landmark: landmark,
       pincode: pincode,
-      createdAt: now,
+      isDefault: editing?.isDefault ?? false,
+      createdAt: editing?.createdAt ?? now,
       updatedAt: now,
     );
 
@@ -240,5 +256,34 @@ class LocationCubit extends Cubit<LocationState> {
   Future<List<SavedAddressModel>> getSavedAddresses() =>
       _repository.getSavedAddresses();
 
-  Future<void> deleteAddress(String id) => _repository.deleteAddress(id);
+  String? get boundAddressId {
+    final s = state;
+    return s is Bound ? s.address.id : null;
+  }
+
+  /// Updates a saved address's details WITHOUT touching which address is
+  /// currently bound or emitting a new [LocationState] — editing "Work"
+  /// shouldn't silently switch your active delivery address to Work if
+  /// "Home" is what's actually bound right now.
+  Future<void> editSavedAddress(SavedAddressModel updated) =>
+      _repository.saveAddress(updated);
+
+  /// Deletes a saved address. If it was the currently-bound one, falls
+  /// back to the next most-recently-used saved address (re-running
+  /// serviceability for it), or drops to [ManualEntry] if none remain —
+  /// never leaves the app holding a reference to a deleted address.
+  Future<void> deleteAddress(String id) async {
+    final wasBound = boundAddressId == id;
+    await _repository.deleteAddress(id);
+    if (!wasBound) return;
+
+    final remaining = await _repository.getSavedAddresses();
+    if (remaining.isEmpty) {
+      emit(const ManualEntry());
+      return;
+    }
+    final next =
+        remaining.reduce((a, b) => a.updatedAt.isAfter(b.updatedAt) ? a : b);
+    await switchToSavedAddress(next);
+  }
 }

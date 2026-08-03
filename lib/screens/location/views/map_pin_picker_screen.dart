@@ -13,7 +13,16 @@ import '../cubit/location_cubit.dart';
 class MapPinPickerScreen extends StatefulWidget {
   final LatLng initialPosition;
 
-  const MapPinPickerScreen({super.key, required this.initialPosition});
+  /// When set, the screen opens in edit mode for this address — label,
+  /// custom label, and landmark are prefilled, and confirming updates it
+  /// in place instead of creating a new saved address.
+  final SavedAddressModel? existingAddress;
+
+  const MapPinPickerScreen({
+    super.key,
+    required this.initialPosition,
+    this.existingAddress,
+  });
 
   @override
   State<MapPinPickerScreen> createState() => _MapPinPickerScreenState();
@@ -21,18 +30,32 @@ class MapPinPickerScreen extends StatefulWidget {
 
 class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
   late final MapController _mapController;
-  AddressLabel _label = AddressLabel.home;
-  final _customLabelController = TextEditingController();
-  final _landmarkController = TextEditingController();
+  late AddressLabel _label;
+  late final TextEditingController _customLabelController;
+  late final TextEditingController _landmarkController;
   bool _isDragging = false;
 
   @override
   void initState() {
     super.initState();
     _mapController = MapController();
-    // Kick off reverse geocoding for the initial center immediately.
+
+    final existing = widget.existingAddress;
+    _label = existing?.label ?? AddressLabel.home;
+    _customLabelController =
+        TextEditingController(text: existing?.customLabel ?? '');
+    _landmarkController =
+        TextEditingController(text: existing?.landmark ?? '');
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<LocationCubit>().updatePinPosition(widget.initialPosition);
+      final cubit = context.read<LocationCubit>();
+      if (existing != null) {
+        // Avoid a re-geocode flicker showing different wording than what
+        // was originally saved, until the user actually moves the pin.
+        cubit.seedConfirming(existing);
+      } else {
+        cubit.updatePinPosition(widget.initialPosition);
+      }
     });
   }
 
@@ -52,7 +75,15 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BlocListener<LocationCubit, LocationState>(
+      // Closes this screen once a bind-worthy save completes (new address,
+      // or editing the address that's currently active). Editing a saved
+      // address that ISN'T active never emits Bound — it pops itself
+      // directly from the confirm button instead (see _ConfirmSheet).
+      listener: (context, state) {
+        if (state is Bound) Navigator.of(context).pop();
+      },
+      child: Scaffold(
       body: Stack(
         children: [
           FlutterMap(
@@ -130,9 +161,11 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
               onLabelChanged: (l) => setState(() => _label = l),
               customLabelController: _customLabelController,
               landmarkController: _landmarkController,
+              existingAddress: widget.existingAddress,
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -172,6 +205,7 @@ class _ConfirmSheet extends StatelessWidget {
   final ValueChanged<AddressLabel> onLabelChanged;
   final TextEditingController customLabelController;
   final TextEditingController landmarkController;
+  final SavedAddressModel? existingAddress;
 
   const _ConfirmSheet({
     required this.isDragging,
@@ -179,6 +213,7 @@ class _ConfirmSheet extends StatelessWidget {
     required this.onLabelChanged,
     required this.customLabelController,
     required this.landmarkController,
+    this.existingAddress,
   });
 
   @override
@@ -275,18 +310,36 @@ class _ConfirmSheet extends StatelessWidget {
               builder: (context, state) {
                 final isChecking = state is CheckingServiceability;
                 final canConfirm = state is Confirming && !isDragging;
+                final cubit = context.read<LocationCubit>();
+                final editing = existingAddress;
+                // Editing a saved address that ISN'T the one currently
+                // bound should just persist the change, not rebind it.
+                final isInactiveEdit =
+                    editing != null && editing.id != cubit.boundAddressId;
 
                 return ElevatedButton(
                   onPressed: !canConfirm || isChecking
                       ? null
-                      : () {
-                          context.read<LocationCubit>().confirmAddress(
-                                position: state.position,
-                                formattedAddress: state.formattedAddress,
-                                label: label,
-                                customLabel: customLabelController.text.trim(),
-                                landmark: landmarkController.text.trim(),
-                              );
+                      : () async {
+                          if (isInactiveEdit) {
+                            await cubit.editSavedAddress(editing.copyWith(
+                              label: label,
+                              customLabel: customLabelController.text.trim(),
+                              position: state.position,
+                              formattedAddress: state.formattedAddress,
+                              landmark: landmarkController.text.trim(),
+                            ));
+                            if (context.mounted) Navigator.pop(context);
+                            return;
+                          }
+                          cubit.confirmAddress(
+                            position: state.position,
+                            formattedAddress: state.formattedAddress,
+                            label: label,
+                            customLabel: customLabelController.text.trim(),
+                            landmark: landmarkController.text.trim(),
+                            editing: editing,
+                          );
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF3DAA5C),
@@ -302,9 +355,9 @@ class _ConfirmSheet extends StatelessWidget {
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text(
-                          "Confirm & Save",
-                          style: TextStyle(
+                      : Text(
+                          editing != null ? "Save Changes" : "Confirm & Save",
+                          style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
                               fontSize: 15),
