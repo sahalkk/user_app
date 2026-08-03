@@ -64,7 +64,7 @@ class ProductCard extends StatelessWidget {
                 // Floating ADD button (straddles the image's bottom edge)
                 Positioned(
                   right: 8,
-                  bottom: -16,
+                  bottom: -8,
                   child: _buildAddButton(context),
                 ),
 
@@ -132,7 +132,7 @@ class ProductCard extends StatelessWidget {
               ],
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 15),
 
             // ── PRODUCT INFO (sizes itself to its content) ─────────────
             Padding(
