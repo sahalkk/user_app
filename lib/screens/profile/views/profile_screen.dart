@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 // Make sure these paths match your folder structure
 import '../../auth/views/login_screen.dart';
+import '../../auth/views/set_name_screen.dart';
 import '../../address_book/views/address_book_screen.dart';
 import '../../location/cubit/location_cubit.dart';
 
@@ -198,7 +199,9 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      "U",
+                      (state.name?.trim().isNotEmpty ?? false)
+                          ? state.name!.trim()[0].toUpperCase()
+                          : "?",
                       style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
@@ -207,16 +210,39 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  "My Account",
-                  style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black87),
+                GestureDetector(
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            SetNameScreen(initialName: state.name),
+                      ),
+                    );
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        (state.name?.trim().isNotEmpty ?? false)
+                            ? state.name!.trim()
+                            : "Add your name",
+                        style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.black87),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(Icons.edit_outlined,
+                          size: 18, color: Colors.grey.shade500),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  "+91 XXXXX XXXXX",
+                  (state.phone?.trim().isNotEmpty ?? false)
+                      ? "+91 ${state.phone}"
+                      : "",
                   style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade700,

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_bloc.dart';
 
+import 'set_name_screen.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -52,7 +54,16 @@ class _LoginScreenState extends State<LoginScreen> {
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthAuthenticated) {
-            Navigator.pop(context, true);
+            if (state.isNewUser) {
+              // Replaces LoginScreen in the stack — when SetNameScreen pops,
+              // it lands back on whoever originally pushed LoginScreen.
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const SetNameScreen()),
+              );
+            } else {
+              Navigator.pop(context, true);
+            }
           } else if (state is AuthFailure) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(

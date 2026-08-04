@@ -25,7 +25,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         // Backfills the backend user id for sessions logged in before order
         // placement needed it — no-ops if already stored.
         await authRepository.ensureUserId();
-        emit(AuthAuthenticated(token ?? ""));
+        final phone = await authRepository.getUserPhone();
+        final name = await authRepository.getUserName();
+        emit(AuthAuthenticated(token ?? "", phone: phone, name: name));
       } else {
         emit(AuthUnauthenticated());
       }
@@ -38,11 +40,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       LoginRequested event, Emitter<AuthState> emit) async {
     emit(AuthLoading());
     try {
-      await authRepository.login(event.phone, event.otp);
+      final result = await authRepository.login(event.phone, event.otp);
       final token = await authRepository.getToken();
 
       if (token != null) {
-        emit(AuthAuthenticated(token));
+        emit(AuthAuthenticated(
+          token,
+          phone: event.phone,
+          name: result.name,
+          isNewUser: result.isNewUser,
+        ));
       } else {
         emit(const AuthFailure("Login failed: No token received"));
       }
