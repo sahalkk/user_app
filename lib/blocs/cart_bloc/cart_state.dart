@@ -4,7 +4,7 @@ abstract class CartState extends Equatable {
   const CartState();
 
   // 1. ADD THIS GETTER (This fixes the "not defined" error)
-  Map<String, String>? get deliveryAddress => null;
+  CheckoutAddressModel? get deliveryAddress => null;
 
   @override
   List<Object?> get props => [];
@@ -18,7 +18,7 @@ class CartLoaded extends CartState {
 
   // 2. This overrides the getter with the real variable
   @override
-  final Map<String, String>? deliveryAddress;
+  final CheckoutAddressModel? deliveryAddress;
 
   const CartLoaded({
     required this.items,
@@ -29,7 +29,7 @@ class CartLoaded extends CartState {
   CartLoaded copyWith({
     List<CartItemModel>? items,
     double? totalAmount,
-    Map<String, String>? deliveryAddress,
+    CheckoutAddressModel? deliveryAddress,
   }) {
     return CartLoaded(
       items: items ?? this.items,

@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../shared/models/cart_item_model.dart';
 import '../../shared/models/product_model.dart';
+import '../../shared/models/checkout_address_model.dart';
 
 part 'cart_event.dart';
 part 'cart_state.dart';
@@ -9,7 +10,7 @@ part 'cart_state.dart';
 class CartBloc extends Bloc<CartEvent, CartState> {
   // Internal data
   List<CartItemModel> _items = [];
-  Map<String, String>? _deliveryAddress; // 3. Store address here
+  CheckoutAddressModel? _deliveryAddress; // 3. Store address here
 
   CartBloc() : super(CartInitial()) {
     on<LoadCart>(_onLoadCart);

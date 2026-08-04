@@ -32,7 +32,7 @@ class UpdateCartItemQuantity extends CartEvent {
 
 // 2. New Event: User saves an address
 class UpdateDeliveryAddress extends CartEvent {
-  final Map<String, String> address;
+  final CheckoutAddressModel address;
   const UpdateDeliveryAddress(this.address);
   @override
   List<Object> get props => [address];

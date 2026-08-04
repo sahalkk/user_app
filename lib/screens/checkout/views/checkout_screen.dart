@@ -25,7 +25,7 @@ class CheckoutScreen extends StatelessWidget {
           // Safety check
           if (state is! CartLoaded) return const SizedBox();
 
-          final address = state.deliveryAddress ?? {};
+          final address = state.deliveryAddress;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -49,13 +49,15 @@ class CheckoutScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        address['name'] ?? "User",
+                        address?.recipientName ?? "User",
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       const SizedBox(height: 4),
-                      Text("${address['street']}, ${address['city']}"),
-                      Text("Phone: ${address['phone']}"),
+                      Text(address?.address.formattedAddress ?? "No address selected"),
+                      if (address?.address.landmark?.isNotEmpty ?? false)
+                        Text(address!.address.landmark!),
+                      Text("Phone: ${address?.recipientPhone ?? '-'}"),
                     ],
                   ),
                 ),
