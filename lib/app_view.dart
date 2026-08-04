@@ -4,6 +4,7 @@ import 'package:beeyo_customer/blocs/order_bloc/order_bloc.dart';
 import 'package:beeyo_customer/blocs/wishlist_bloc/wishlist_bloc.dart';
 import 'package:beeyo_customer/data/repositories/auth_repository.dart';
 import 'package:beeyo_customer/data/repositories/location_repository.dart';
+import 'package:beeyo_customer/data/repositories/order_repository.dart';
 import 'package:beeyo_customer/screens/location/cubit/location_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -34,6 +35,9 @@ class MyAppView extends StatelessWidget {
         RepositoryProvider<LocationRepository>(
           create: (context) => LocationRepository(),
         ),
+        RepositoryProvider<OrderRepository>(
+          create: (context) => OrderRepository(authRepository),
+        ),
       ],
       // USE MULTI-BLOC PROVIDER HERE
       child: MultiBlocProvider(
@@ -52,7 +56,7 @@ class MyAppView extends StatelessWidget {
             create: (context) => CategoriesBloc(context.read<CategoryRepository>())..add(LoadCategories()),
           ),
           BlocProvider(
-            create: (context) => OrderBloc(),
+            create: (context) => OrderBloc(context.read<OrderRepository>()),
           ),
           BlocProvider(
             create: (context) =>

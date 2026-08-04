@@ -15,6 +15,8 @@ import '../shared/widgets/app_bottom_nav.dart';
 import '../../blocs/auth_bloc/auth_bloc.dart';
 import '../../blocs/auth_bloc/auth_state.dart';
 import '../../blocs/cart_bloc/cart_bloc.dart';
+import '../../blocs/order_bloc/order_bloc.dart';
+import '../../blocs/order_bloc/order_event.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});
@@ -39,6 +41,11 @@ class _MainWrapperState extends State<MainWrapper> {
         final newState = context.read<AuthBloc>().state;
         if (newState is! AuthAuthenticated) return;
       }
+      // Refresh order history every time the tab opens — IndexedStack
+      // keeps OrdersScreen alive after its first build, so its own
+      // initState only fires once and would otherwise miss orders
+      // placed after that.
+      context.read<OrderBloc>().add(LoadOrders());
     }
     setState(() {
       _currentIndex = index;
