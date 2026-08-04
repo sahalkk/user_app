@@ -18,10 +18,16 @@ class MapPinPickerScreen extends StatefulWidget {
   /// in place instead of creating a new saved address.
   final SavedAddressModel? existingAddress;
 
+  /// When the caller already resolved an address for [initialPosition]
+  /// (e.g. a GPS fix or search result), pass it here so the screen shows
+  /// it immediately instead of firing a redundant reverse-geocode call.
+  final String? initialFormattedAddress;
+
   const MapPinPickerScreen({
     super.key,
     required this.initialPosition,
     this.existingAddress,
+    this.initialFormattedAddress,
   });
 
   @override
@@ -53,6 +59,11 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
         // Avoid a re-geocode flicker showing different wording than what
         // was originally saved, until the user actually moves the pin.
         cubit.seedConfirming(existing);
+      } else if (widget.initialFormattedAddress != null) {
+        // Already resolved by the caller (GPS fix, search result) — don't
+        // fire a second reverse-geocode call for the same position.
+        cubit.seedConfirmingPosition(
+            widget.initialPosition, widget.initialFormattedAddress!);
       } else {
         cubit.updatePinPosition(widget.initialPosition);
       }
@@ -234,13 +245,25 @@ class _ConfirmSheet extends StatelessWidget {
         children: [
           BlocBuilder<LocationCubit, LocationState>(
             builder: (context, state) {
+              final isNotDeliverable = state is NotDeliverable;
               final address = isDragging
                   ? "Locating…"
-                  : (state is Confirming ? state.formattedAddress : "…");
+                  : state is Confirming
+                      ? state.formattedAddress
+                      : state is NotDeliverable
+                          ? state.formattedAddress
+                          : "…";
               return Row(
                 children: [
-                  const Icon(Icons.location_on_rounded,
-                      color: Color(0xFF3DAA5C), size: 18),
+                  Icon(
+                    isNotDeliverable
+                        ? Icons.location_off_rounded
+                        : Icons.location_on_rounded,
+                    color: isNotDeliverable
+                        ? const Color(0xFFE53935)
+                        : const Color(0xFF3DAA5C),
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -255,6 +278,21 @@ class _ConfirmSheet extends StatelessWidget {
                     ),
                   ),
                 ],
+              );
+            },
+          ),
+          BlocBuilder<LocationCubit, LocationState>(
+            builder: (context, state) {
+              if (state is! NotDeliverable) return const SizedBox();
+              return const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(
+                  "We don't deliver here yet. Drag the map to try a nearby spot.",
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      color: Color(0xFFE53935)),
+                ),
               );
             },
           ),

@@ -59,6 +59,31 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     });
   }
 
+  /// Pushes the map screen and, once it returns, closes this sheet if the
+  /// pin was successfully confirmed & bound. Deliberately lives here (on
+  /// the sheet's own long-lived State) rather than inside _ConfirmAddressView
+  /// — that sub-view gets swapped out by the BlocBuilder the instant state
+  /// becomes Bound, disposing its context before the awaited Navigator.push
+  /// future even resolves, which silently no-ops any pop attempted from it.
+  Future<void> _adjustPinOnMap(Confirming state) async {
+    final cubit = context.read<LocationCubit>();
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: cubit,
+          child: MapPinPickerScreen(
+            initialPosition: state.position,
+            initialFormattedAddress: state.formattedAddress,
+          ),
+        ),
+      ),
+    );
+    if (mounted && cubit.state is Bound) {
+      Navigator.of(context).maybePop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -75,8 +100,17 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
           child: BlocConsumer<LocationCubit, LocationState>(
             listener: (context, state) {
               // Binding succeeded — the header already reflects it, so
-              // close the sheet automatically.
-              if (state is Bound) Navigator.of(context).maybePop();
+              // close the sheet automatically. Only do this when the
+              // sheet is actually the topmost route: when "Adjust pin on
+              // map & save" has pushed MapPinPickerScreen on top, that
+              // screen owns closing itself on Bound — popping here too
+              // would race it and could pop the wrong route.
+              if (state is Bound) {
+                final route = ModalRoute.of(context);
+                if (route == null || route.isCurrent) {
+                  Navigator.of(context).maybePop();
+                }
+              }
             },
             builder: (context, state) {
               if (state is PermissionPrimer) {
@@ -95,6 +129,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 return _ConfirmAddressView(
                   state: state,
                   scrollController: scrollController,
+                  onAdjustPin: () => _adjustPinOnMap(state),
                 );
               }
               return _MainPickerView(
@@ -212,7 +247,12 @@ class _PermissionPrimerView extends StatelessWidget {
 class _ConfirmAddressView extends StatelessWidget {
   final Confirming state;
   final ScrollController scrollController;
-  const _ConfirmAddressView({required this.state, required this.scrollController});
+  final VoidCallback onAdjustPin;
+  const _ConfirmAddressView({
+    required this.state,
+    required this.scrollController,
+    required this.onAdjustPin,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -260,15 +300,7 @@ class _ConfirmAddressView extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => BlocProvider.value(
-                    value: context.read<LocationCubit>(),
-                    child: MapPinPickerScreen(initialPosition: state.position),
-                  ),
-                ),
-              ),
+              onPressed: onAdjustPin,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF3DAA5C),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

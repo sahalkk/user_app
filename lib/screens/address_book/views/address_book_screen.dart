@@ -55,7 +55,10 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
         MaterialPageRoute(
           builder: (_) => BlocProvider.value(
             value: cubit,
-            child: MapPinPickerScreen(initialPosition: state.position),
+            child: MapPinPickerScreen(
+              initialPosition: state.position,
+              initialFormattedAddress: state.formattedAddress,
+            ),
           ),
         ),
       );

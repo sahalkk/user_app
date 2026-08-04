@@ -133,9 +133,6 @@ class LocationRepository {
 
   /// Checks a point against delivery-zone polygons/radii. This math is
   /// deliberately server-side — see the design note in delivery_zone_model.
-  /// NOTE: `/api/v1/serviceability/check` doesn't exist on the backend yet;
-  /// this call will fail until that endpoint is implemented, and the
-  /// failure path below is what the UI falls back to in the meantime.
   Future<ServiceabilityResultModel> checkServiceability(
       LatLng position) async {
     try {
@@ -151,6 +148,17 @@ class LocationRepository {
       if (response.statusCode == 200) {
         return ServiceabilityResultModel.fromJson(jsonDecode(response.body));
       }
+
+      if (response.statusCode == 404) {
+        // `/api/v1/serviceability/check` isn't implemented on the backend
+        // yet. Treating a missing endpoint the same as "not deliverable"
+        // would mean NO address could ever be confirmed anywhere, blocking
+        // the rest of the app. Optimistically allow the bind (no zone/
+        // dark-store info) until the real endpoint ships — once it does,
+        // it'll return 200 and this branch stops being hit.
+        return const ServiceabilityResultModel(isServiceable: true);
+      }
+
       return const ServiceabilityResultModel.notServiceable();
     } catch (_) {
       return const ServiceabilityResultModel.notServiceable();

@@ -81,7 +81,10 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         MaterialPageRoute(
           builder: (_) => BlocProvider.value(
             value: cubit,
-            child: MapPinPickerScreen(initialPosition: state.position),
+            child: MapPinPickerScreen(
+              initialPosition: state.position,
+              initialFormattedAddress: state.formattedAddress,
+            ),
           ),
         ),
       );

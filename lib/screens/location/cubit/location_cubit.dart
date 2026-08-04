@@ -160,6 +160,20 @@ class LocationCubit extends Cubit<LocationState> {
     ));
   }
 
+  /// Same idea as [seedConfirming] but for a raw position + address that
+  /// isn't a saved address yet — e.g. entering the map screen right after
+  /// a GPS fix or search result that already resolved successfully.
+  /// Avoids firing a second, redundant native geocode call back-to-back
+  /// with the one that just ran; some devices' Geocoder implementations
+  /// don't handle rapid repeated calls well and can hang on the second one.
+  void seedConfirmingPosition(LatLng position, String formattedAddress) {
+    emit(Confirming(
+      position: position,
+      formattedAddress: formattedAddress,
+      source: AddressSource.mapPin,
+    ));
+  }
+
   // ── Confirm -> serviceability -> bind ───────────────────────────
 
   /// Creates a new saved address, or — when [editing] is passed — updates

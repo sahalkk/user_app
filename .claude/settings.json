@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -qE \"Flutter run key commands\" \"C:\\\\Users\\\\Sahal\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Sahal-Delivery-App-rider-app\\\\d1a5f47b-3b0a-49ad-b4ba-1545dd654e32\\\\tasks\\\\bda8vptd2.output\")"
+    ]
+  }
+}
