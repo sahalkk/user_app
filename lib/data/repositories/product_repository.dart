@@ -9,7 +9,9 @@ class ProductRepository {
 
   Future<List<ProductModel>> getProducts() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/api/v1/products'));
+      final response = await http
+          .get(Uri.parse('$baseUrl/api/v1/products'))
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         // 1. Decode the JSON

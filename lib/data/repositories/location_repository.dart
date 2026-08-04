@@ -84,10 +84,15 @@ class LocationRepository {
   /// should fall back to showing the raw coordinates rather than blocking.
   Future<String?> reverseGeocode(LatLng position) async {
     try {
-      final placemarks = await geocoding.placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
+      // The native geocoder can hang instead of throwing promptly (no
+      // network, flaky Play Services, etc.) — without this timeout that
+      // leaves the caller's Future stuck forever, which stalls the whole
+      // confirm screen (address text never resolves, button stays
+      // permanently disabled). Timing out lets us fall back to the raw
+      // lat/lng text below instead.
+      final placemarks = await geocoding
+          .placemarkFromCoordinates(position.latitude, position.longitude)
+          .timeout(const Duration(seconds: 8));
       if (placemarks.isEmpty) return null;
 
       final p = placemarks.first;
@@ -109,7 +114,9 @@ class LocationRepository {
       String query) async {
     if (query.trim().length < 3) return [];
     try {
-      final locations = await geocoding.locationFromAddress(query);
+      final locations = await geocoding
+          .locationFromAddress(query)
+          .timeout(const Duration(seconds: 8));
       final results = <({String label, LatLng position})>[];
       for (final loc in locations.take(5)) {
         final pos = LatLng(loc.latitude, loc.longitude);
@@ -139,7 +146,7 @@ class LocationRepository {
           'lat': position.latitude,
           'lng': position.longitude,
         }),
-      );
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         return ServiceabilityResultModel.fromJson(jsonDecode(response.body));
@@ -196,7 +203,7 @@ class LocationRepository {
           'lng': position.longitude,
           'pincode': pincode,
         }),
-      );
+      ).timeout(const Duration(seconds: 10));
     } catch (_) {
       // Best-effort — swallow network errors, the UI just shows a
       // generic "we'll let you know" confirmation regardless.
