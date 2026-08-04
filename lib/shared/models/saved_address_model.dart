@@ -30,6 +30,10 @@ class SavedAddressModel extends Equatable {
   final bool isDefault;
   final DateTime createdAt;
   final DateTime updatedAt;
+  // The backend's `/api/v1/addresses` record id for this address, once it's
+  // been synced there (lazily, the first time it's needed for an order —
+  // see LocationRepository.syncAddressToBackend). Null until then.
+  final String? backendId;
 
   const SavedAddressModel({
     required this.id,
@@ -42,6 +46,7 @@ class SavedAddressModel extends Equatable {
     this.isDefault = false,
     required this.createdAt,
     required this.updatedAt,
+    this.backendId,
   });
 
   String get displayLabel =>
@@ -60,6 +65,7 @@ class SavedAddressModel extends Equatable {
     bool? isDefault,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? backendId,
   }) {
     return SavedAddressModel(
       id: id ?? this.id,
@@ -72,6 +78,7 @@ class SavedAddressModel extends Equatable {
       isDefault: isDefault ?? this.isDefault,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      backendId: backendId ?? this.backendId,
     );
   }
 
@@ -87,6 +94,7 @@ class SavedAddressModel extends Equatable {
         'isDefault': isDefault,
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
+        'backendId': backendId,
       };
 
   factory SavedAddressModel.fromJson(Map<String, dynamic> json) {
@@ -109,6 +117,7 @@ class SavedAddressModel extends Equatable {
           DateTime.now(),
       updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
           DateTime.now(),
+      backendId: json['backendId'] as String?,
     );
   }
 
@@ -123,5 +132,6 @@ class SavedAddressModel extends Equatable {
         pincode,
         isDefault,
         updatedAt,
+        backendId,
       ];
 }

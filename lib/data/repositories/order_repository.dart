@@ -4,15 +4,15 @@ import 'package:http/http.dart' as http;
 
 import '../../shared/constants/api_constants.dart';
 import '../../shared/models/cart_item_model.dart';
-import '../../shared/models/checkout_address_model.dart';
 import '../../shared/models/order_model.dart';
 import 'auth_repository.dart';
 
-/// Talks to the backend order endpoints. These routes (`/api/v1/orders`)
-/// don't exist on the backend yet (confirmed 404) — this repository is
-/// wired ahead of time so the client is ready the moment the backend team
-/// ships them. Until then, placing an order or loading order history will
-/// surface a real error instead of silently pretending to succeed.
+/// Talks to the backend's real `/api/v1/orders` endpoints (confirmed live
+/// against the Swagger spec at `/api/v1/docs-json`). Two things the spec
+/// left untyped: the `Order` response shape (empty schema — field names
+/// are best-effort/defensive in [OrderModel.fromJson]) and whether
+/// `orderItems` come back populated with product details — until verified
+/// live, `createOrder` falls back to the items we sent for display.
 class OrderRepository {
   final AuthRepository authRepository;
 
@@ -27,32 +27,28 @@ class OrderRepository {
   }
 
   Future<OrderModel> createOrder({
+    required String userId,
+    required String deliveryAddressId,
     required List<CartItemModel> items,
-    required double totalAmount,
-    required CheckoutAddressModel address,
+    String? deliverySlotId,
+    String? notes,
   }) async {
     final response = await http
         .post(
           Uri.parse('${ApiConstants.baseUrl}/api/v1/orders'),
           headers: await _authHeaders(),
           body: jsonEncode({
-            'items': items
+            'userId': userId,
+            'deliveryAddressId': deliveryAddressId,
+            if (deliverySlotId != null) 'deliverySlotId': deliverySlotId,
+            if (notes != null) 'notes': notes,
+            'orderItems': items
                 .map((item) => {
                       'productId': item.product.id,
                       'quantity': item.quantity,
-                      'price': item.product.priceValue,
+                      'priceAtPurchase': item.product.priceValue,
                     })
                 .toList(),
-            'totalAmount': totalAmount,
-            'deliveryAddress': {
-              'recipientName': address.recipientName,
-              'recipientPhone': address.recipientPhone,
-              'formattedAddress': address.address.formattedAddress,
-              'landmark': address.address.landmark,
-              'lat': address.address.position.latitude,
-              'lng': address.address.position.longitude,
-            },
-            'paymentMethod': 'COD',
           }),
         )
         .timeout(const Duration(seconds: 10));
@@ -62,15 +58,18 @@ class OrderRepository {
       final data = decoded is Map && decoded['data'] is Map
           ? decoded['data'] as Map<String, dynamic>
           : decoded as Map<String, dynamic>;
-      return OrderModel.fromJson(data);
+      return OrderModel.fromJson(data, fallbackItems: items);
     }
     throw Exception('Failed to place order (${response.statusCode})');
   }
 
-  Future<List<OrderModel>> getOrders() async {
+  /// Order history is per-user (`GET /orders/user/{userId}`) — the
+  /// unscoped `GET /orders` the spec also exposes returns every user's
+  /// orders (an admin listing), so it's deliberately not used here.
+  Future<List<OrderModel>> getOrders(String userId) async {
     final response = await http
         .get(
-          Uri.parse('${ApiConstants.baseUrl}/api/v1/orders'),
+          Uri.parse('${ApiConstants.baseUrl}/api/v1/orders/user/$userId'),
           headers: await _authHeaders(),
         )
         .timeout(const Duration(seconds: 10));

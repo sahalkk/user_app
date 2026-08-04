@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../shared/constants/api_constants.dart';
 import '../../shared/models/saved_address_model.dart';
 import '../../shared/models/serviceability_result_model.dart';
+import 'auth_repository.dart';
 
 /// Reasons `getCurrentPosition` can fail — the cubit maps these to the
 /// right branch of the permission/geocode state machine instead of just
@@ -28,7 +29,19 @@ class LocationFailure implements Exception {
 }
 
 class LocationRepository {
+  final AuthRepository authRepository;
+
+  LocationRepository(this.authRepository);
+
   static const _savedAddressesKey = 'saved_addresses';
+
+  Future<Map<String, String>> _authHeaders() async {
+    final token = await authRepository.getToken();
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
 
   // ── Permission + GPS ──────────────────────────────────────────────
 
@@ -187,6 +200,76 @@ class LocationRepository {
       _savedAddressesKey,
       updated.map((a) => jsonEncode(a.toJson())).toList(),
     );
+  }
+
+  /// Creates (or updates, if already synced once) this address as a real
+  /// record on the backend's `/api/v1/addresses` and returns its id.
+  ///
+  /// The backend's `CreateAddressDto` wants structured street/city/state
+  /// fields (no lat/lng) rather than the single free-text
+  /// `formattedAddress` + coordinates we store locally, so this re-geocodes
+  /// the saved position to recover those components rather than guessing
+  /// by splitting the formatted string.
+  Future<String> syncAddressToBackend(SavedAddressModel address) async {
+    geocoding.Placemark? placemark;
+    try {
+      final placemarks = await geocoding
+          .placemarkFromCoordinates(
+              address.position.latitude, address.position.longitude)
+          .timeout(const Duration(seconds: 8));
+      if (placemarks.isNotEmpty) placemark = placemarks.first;
+    } catch (_) {
+      // Fall through — we still have formattedAddress/pincode as a fallback.
+    }
+
+    final street = [
+      placemark?.subThoroughfare,
+      placemark?.thoroughfare,
+      placemark?.subLocality,
+    ].where((s) => s != null && s.trim().isNotEmpty).join(' ').trim();
+
+    final body = jsonEncode({
+      'street': street.isNotEmpty ? street : address.formattedAddress,
+      'city': (placemark?.locality?.isNotEmpty ?? false)
+          ? placemark!.locality
+          : (placemark?.subAdministrativeArea ?? ''),
+      'state': placemark?.administrativeArea ?? '',
+      'postalCode': address.pincode ?? placemark?.postalCode ?? '',
+      'country': placemark?.country ?? 'India',
+      'addressType': address.label.name.toUpperCase(),
+      'isDefault': address.isDefault,
+    });
+
+    final headers = await _authHeaders();
+    final response = address.backendId != null
+        ? await http
+            .put(
+              Uri.parse(
+                  '${ApiConstants.baseUrl}/api/v1/addresses/${address.backendId}'),
+              headers: headers,
+              body: body,
+            )
+            .timeout(const Duration(seconds: 10))
+        : await http
+            .post(
+              Uri.parse('${ApiConstants.baseUrl}/api/v1/addresses'),
+              headers: headers,
+              body: body,
+            )
+            .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final decoded = jsonDecode(response.body);
+      final data = (decoded is Map && decoded['data'] is Map)
+          ? decoded['data'] as Map<String, dynamic>
+          : decoded as Map<String, dynamic>;
+      final id = data['id'] ?? data['_id'];
+      if (id == null) {
+        throw Exception('Backend did not return an address id');
+      }
+      return id.toString();
+    }
+    throw Exception('Failed to save address to backend (${response.statusCode})');
   }
 
   Future<void> deleteAddress(String id) async {

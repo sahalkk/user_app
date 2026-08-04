@@ -33,7 +33,7 @@ class MyAppView extends StatelessWidget {
           create: (context) => CategoryRepository(),
         ),
         RepositoryProvider<LocationRepository>(
-          create: (context) => LocationRepository(),
+          create: (context) => LocationRepository(authRepository),
         ),
         RepositoryProvider<OrderRepository>(
           create: (context) => OrderRepository(authRepository),
@@ -56,7 +56,11 @@ class MyAppView extends StatelessWidget {
             create: (context) => CategoriesBloc(context.read<CategoryRepository>())..add(LoadCategories()),
           ),
           BlocProvider(
-            create: (context) => OrderBloc(context.read<OrderRepository>()),
+            create: (context) => OrderBloc(
+              context.read<OrderRepository>(),
+              context.read<LocationRepository>(),
+              authRepository,
+            ),
           ),
           BlocProvider(
             create: (context) =>

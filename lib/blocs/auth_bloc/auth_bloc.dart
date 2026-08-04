@@ -22,6 +22,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final isLoggedIn = await authRepository.isLoggedIn();
       if (isLoggedIn) {
         final token = await authRepository.getToken();
+        // Backfills the backend user id for sessions logged in before order
+        // placement needed it — no-ops if already stored.
+        await authRepository.ensureUserId();
         emit(AuthAuthenticated(token ?? ""));
       } else {
         emit(AuthUnauthenticated());
