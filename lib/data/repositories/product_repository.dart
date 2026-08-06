@@ -9,23 +9,38 @@ class ProductRepository {
 
   Future<List<ProductModel>> getProducts() async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/api/v1/products'))
-          .timeout(const Duration(seconds: 10));
+      final products = <ProductModel>[];
+      // Undocumented in the backend's Swagger spec, but confirmed live: this
+      // endpoint is paginated (defaults to page=1&limit=10) and reports
+      // {metadata: {limit, page, total}} — without paging through it, only
+      // the first 10 products would ever be returned, silently dropping the
+      // rest of the catalog. Loop until every page is collected.
+      const pageSize = 50;
+      int page = 1;
 
-      if (response.statusCode == 200) {
-        // 1. Decode the JSON
+      while (true) {
+        final response = await http
+            .get(Uri.parse(
+                '$baseUrl/api/v1/products?page=$page&limit=$pageSize'))
+            .timeout(const Duration(seconds: 10));
+
+        if (response.statusCode != 200) {
+          throw Exception("Failed to load products: ${response.statusCode}");
+        }
+
         final Map<String, dynamic> responseData = json.decode(response.body);
-
-        // 2. Access the 'data' list inside the wrapper
-        // Structure is: { "data": [ ...products... ], "metadata": ... }
         final List<dynamic> productList = responseData['data'];
+        products.addAll(productList.map((json) => ProductModel.fromJson(json)));
 
-        // 3. Convert List<dynamic> to List<ProductModel>
-        return productList.map((json) => ProductModel.fromJson(json)).toList();
-      } else {
-        throw Exception("Failed to load products: ${response.statusCode}");
+        final metadata = responseData['metadata'] as Map<String, dynamic>?;
+        final total = (metadata?['total'] as num?)?.toInt();
+        if (productList.isEmpty || total == null || products.length >= total) {
+          break;
+        }
+        page++;
       }
+
+      return products;
     } catch (e) {
       print("Error fetching products: $e");
       throw Exception("Error fetching products");

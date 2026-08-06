@@ -4,7 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 // 🔥 1. Import the speech-to-text package
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+import '../../../data/repositories/product_repository.dart';
 import '../../home/blocs/home_bloc.dart';
+import '../../product_details/views/product_details_screen.dart';
+import '../blocs/search_bloc.dart';
+import 'widgets/search_result_tile.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -16,6 +20,13 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+
+  // Owned directly by this State rather than looked up via Provider —
+  // dispatching from onChanged/onPressed closures needs a context that's a
+  // *descendant* of BlocProvider, but those closures capture build()'s own
+  // context, which sits above it. Owning the instance sidesteps that.
+  late final SearchBloc _searchBloc =
+      SearchBloc(context.read<ProductRepository>());
 
   // 🔥 2. Create the SpeechToText instance
   late stt.SpeechToText _speech;
@@ -47,6 +58,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _searchController.dispose();
     _searchFocusNode.dispose();
     _speech.stop(); // Clean up the mic
+    _searchBloc.close();
     super.dispose();
   }
 
@@ -154,7 +166,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back_rounded,
-                      color: Colors.black87),
+                        color: Colors.black87),
                     onPressed: () => Navigator.pop(context),
                   ),
                   Expanded(
@@ -191,6 +203,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     setState(() {
                                       _searchController.clear();
                                     });
+                                    _searchBloc.add(SearchQueryChanged(''));
                                   },
                                 )
                               : IconButton(
@@ -203,6 +216,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         ),
                         onChanged: (value) {
                           setState(() {});
+                          _searchBloc.add(SearchQueryChanged(value));
                         },
                       ),
                     ),
@@ -308,23 +322,66 @@ class _SearchScreenState extends State<SearchScreen> {
                       );
                     } else {
                       // --- 3. LIVE SEARCH RESULTS ---
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.search_rounded,
-                                size: 64, color: Color(0xFFE0E0E0)),
-                            const SizedBox(height: 16),
-                            Text(
-                              "Searching for '${_searchController.text}'...",
-                              style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  color: Color(0xFF6B6B6B),
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
+                      return BlocBuilder<SearchBloc, SearchState>(
+                        bloc: _searchBloc,
+                        builder: (context, searchState) {
+                          if (searchState is SearchLoading ||
+                              searchState is SearchInitial) {
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                  color: Color(0xFF3DAA5C)),
+                            );
+                          }
+
+                          if (searchState is SearchLoaded) {
+                            if (searchState.results.isEmpty) {
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.search_off_rounded,
+                                        size: 64, color: Color(0xFFE0E0E0)),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      "No results for '${searchState.query}'",
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          color: Color(0xFF6B6B6B),
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            return ListView.builder(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                              itemCount: searchState.results.length,
+                              itemBuilder: (context, index) {
+                                final product = searchState.results[index];
+                                return SearchResultTile(
+                                  product: product,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ProductDetailsScreen(
+                                            product: product),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            );
+                          }
+
+                          // SearchEmpty (bar was cleared) — shouldn't
+                          // normally be reached here since this whole
+                          // branch only renders while text is non-empty.
+                          return const SizedBox();
+                        },
                       );
                     }
                   }

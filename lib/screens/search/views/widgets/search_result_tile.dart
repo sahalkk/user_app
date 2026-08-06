@@ -46,26 +46,13 @@ class SearchResultTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-
-                  // Star Rating & Price (Keeping it simple per request)
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.orange, size: 16),
-                      const SizedBox(width: 4),
-                      const Text(
-                        "4.5", // Static rating for now
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        product.price,
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    "₹${product.price}",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: Colors.black87,
+                    ),
                   ),
                 ],
               ),
