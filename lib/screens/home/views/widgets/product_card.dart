@@ -13,7 +13,7 @@ import '../../../../shared/models/product_model.dart';
 // ─────────────────────────────────────────────
 //  Premium Dark-Mode Product Card for beeyo
 // ─────────────────────────────────────────────
-class ProductCard extends StatelessWidget {
+class ProductCard extends StatefulWidget {
   final ProductModel product;
 
   const ProductCard({
@@ -22,7 +22,28 @@ class ProductCard extends StatelessWidget {
   });
 
   @override
+  State<ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<ProductCard> {
+  ProductModel get product => widget.product;
+
+  late final PageController _imageController = PageController();
+  int _imageIndex = 0;
+
+  List<String> get _images =>
+      product.imageUrls.isNotEmpty ? product.imageUrls : [product.imageUrl];
+
+  @override
+  void dispose() {
+    _imageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final images = _images;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -50,12 +71,62 @@ class ProductCard extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius:
                           const BorderRadius.all(Radius.circular(16)),
-                      child: Image.network(
-                        product.imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.image_not_supported_outlined,
-                                color: Color(0xFFBDBDBD), size: 32),
+                      child: Stack(
+                        children: [
+                          PageView.builder(
+                            controller: _imageController,
+                            physics: images.length > 1
+                                ? const PageScrollPhysics()
+                                : const NeverScrollableScrollPhysics(),
+                            itemCount: images.length,
+                            onPageChanged: (index) =>
+                                setState(() => _imageIndex = index),
+                            itemBuilder: (context, index) => Image.network(
+                              images[index],
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(
+                                      Icons.image_not_supported_outlined,
+                                      color: Color(0xFFBDBDBD),
+                                      size: 32),
+                            ),
+                          ),
+                          if (images.length > 1)
+                            Positioned(
+                              bottom: 6,
+                              left: 8,
+                              right: 0,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: List.generate(images.length,
+                                    (index) {
+                                  final isActive = index == _imageIndex;
+                                  return AnimatedContainer(
+                                    duration:
+                                        const Duration(milliseconds: 200),
+                                    margin: const EdgeInsets.symmetric(
+                                        horizontal: 2),
+                                    width: isActive ? 12 : 4,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      color: isActive
+                                          ? const Color(0xFF3DAA5C)
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color: Colors.black
+                                                .withOpacity(0.15),
+                                            blurRadius: 2),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
