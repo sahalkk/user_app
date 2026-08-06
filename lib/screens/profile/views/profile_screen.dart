@@ -4,6 +4,7 @@ import 'package:beeyo_customer/blocs/auth_bloc/auth_state.dart';
 import 'package:beeyo_customer/screens/profile/views/wishlist_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:share_plus/share_plus.dart';
 
 // Make sure these paths match your folder structure
 import '../../auth/views/login_screen.dart';
@@ -15,6 +16,16 @@ class ProfileScreen extends StatelessWidget {
   final VoidCallback? onNavigateToOrders;
 
   const ProfileScreen({super.key, this.onNavigateToOrders});
+
+  // Play Store link is built from the real applicationId so it's ready the
+  // moment the app is published — until then it just won't resolve yet.
+  void _shareApp(BuildContext context) {
+    Share.share(
+      "Check out Beeyo — fresh groceries delivered to your doorstep!\n"
+      "https://play.google.com/store/apps/details?id=com.beeyo.customer",
+      subject: "Beeyo — groceries delivered fast",
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -148,7 +159,7 @@ class ProfileScreen extends StatelessWidget {
                                 fontSize: 14, fontWeight: FontWeight.w600)),
                         trailing:
                             const Icon(Icons.chevron_right, color: Colors.grey),
-                        onTap: () {},
+                        onTap: () => _shareApp(context),
                       ),
                       Divider(
                           height: 1,
@@ -361,7 +372,7 @@ class ProfileScreen extends StatelessWidget {
                                 fontSize: 14, fontWeight: FontWeight.w600)),
                         trailing:
                             const Icon(Icons.chevron_right, color: Colors.grey),
-                        onTap: () {},
+                        onTap: () => _shareApp(context),
                       ),
                       Divider(
                           height: 1,
