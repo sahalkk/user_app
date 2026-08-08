@@ -158,9 +158,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                               color: const Color(0xFFE0E0E0), width: 1)),
-                      padding: const EdgeInsets.all(8.0),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(13),
                         child: CachedNetworkImage(
                           imageUrl: category.imageUrl,
                           fit: BoxFit.cover,
