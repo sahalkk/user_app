@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -5,6 +7,8 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../shared/models/saved_address_model.dart';
 import '../cubit/location_cubit.dart';
+
+typedef _SearchResult = ({String label, LatLng position});
 
 /// Full-screen "drop a pin" picker. The pin stays fixed at the screen
 /// center — the map pans underneath it — which is what riders' navigation
@@ -41,6 +45,12 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
   late final TextEditingController _landmarkController;
   bool _isDragging = false;
 
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  Timer? _searchDebounce;
+  List<_SearchResult> _searchResults = [];
+  bool _isSearching = false;
+
   @override
   void initState() {
     super.initState();
@@ -74,6 +84,9 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
   void dispose() {
     _customLabelController.dispose();
     _landmarkController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -82,6 +95,38 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
     context
         .read<LocationCubit>()
         .updatePinPosition(_mapController.camera.center);
+  }
+
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    if (query.trim().length < 3) {
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+      return;
+    }
+    setState(() => _isSearching = true);
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () async {
+      final results = await context.read<LocationCubit>().searchAddress(query);
+      if (!mounted) return;
+      setState(() {
+        _searchResults = results;
+        _isSearching = false;
+      });
+    });
+  }
+
+  void _selectSearchResult(_SearchResult result) {
+    _searchController.clear();
+    _searchFocusNode.unfocus();
+    setState(() => _searchResults = []);
+    // The label is already known from the search result itself, so this
+    // goes straight to Confirming — .move() below only re-centers the map
+    // and is ignored by onMapEvent's mapController-source check, avoiding
+    // a redundant second reverse-geocode call for the same point.
+    context.read<LocationCubit>().selectSearchResult(result.label, result.position);
+    _mapController.move(result.position, 16);
   }
 
   @override
@@ -108,7 +153,15 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                 }
               },
               onMapEvent: (event) {
-                if (event is MapEventMoveEnd) _onMapEventFinished();
+                // mapController-sourced moves (our own .move() calls from
+                // the locate-me FAB and search result selection) already
+                // know their address — re-geocoding them here would be a
+                // redundant, back-to-back native geocoder call for the
+                // exact position that was just resolved.
+                if (event is MapEventMoveEnd &&
+                    event.source != MapEventSource.mapController) {
+                  _onMapEventFinished();
+                }
               },
             ),
             children: [
@@ -136,12 +189,117 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
             top: MediaQuery.of(context).padding.top + 8,
             left: 16,
             right: 16,
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _RoundIconButton(
-                  icon: Icons.arrow_back_rounded,
-                  onTap: () => Navigator.pop(context),
+                Row(
+                  children: [
+                    _RoundIconButton(
+                      icon: Icons.arrow_back_rounded,
+                      onTap: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Container(
+                        height: 42,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(21),
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2)),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search_rounded,
+                                color: Color(0xFF6B6B6B), size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                focusNode: _searchFocusNode,
+                                onChanged: _onSearchChanged,
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins', fontSize: 14),
+                                decoration: const InputDecoration(
+                                  hintText: "Search for area, street...",
+                                  hintStyle: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 14,
+                                      color: Color(0xFF9E9E9E)),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                            if (_isSearching)
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF3DAA5C)),
+                              )
+                            else if (_searchController.text.isNotEmpty)
+                              GestureDetector(
+                                onTap: () {
+                                  _searchController.clear();
+                                  setState(() => _searchResults = []);
+                                },
+                                child: const Icon(Icons.close_rounded,
+                                    color: Color(0xFF6B6B6B), size: 18),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+                if (_searchResults.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8, left: 52),
+                    constraints: const BoxConstraints(maxHeight: 260),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4)),
+                      ],
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      itemCount: _searchResults.length,
+                      separatorBuilder: (_, __) => const Divider(
+                          height: 1, color: Color(0xFFE0E0E0)),
+                      itemBuilder: (context, index) {
+                        final result = _searchResults[index];
+                        return ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.location_on_outlined,
+                              color: Color(0xFF3DAA5C), size: 20),
+                          title: Text(
+                            result.label,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87),
+                          ),
+                          onTap: () => _selectSearchResult(result),
+                        );
+                      },
+                    ),
+                  ),
               ],
             ),
           ),
