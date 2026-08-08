@@ -20,19 +20,31 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onAppStarted(AppStarted event, Emitter<AuthState> emit) async {
     try {
       final isLoggedIn = await authRepository.isLoggedIn();
-      if (isLoggedIn) {
-        final token = await authRepository.getToken();
-        // Backfills the backend user id for sessions logged in before order
-        // placement needed it — no-ops if already stored.
-        await authRepository.ensureUserId();
-        final phone = await authRepository.getUserPhone();
-        final name = await authRepository.getUserName();
-        emit(AuthAuthenticated(token ?? "", phone: phone, name: name));
-      } else {
+      if (!isLoggedIn) {
         emit(AuthUnauthenticated());
+        return;
       }
+
+      // Resolve from fast local reads (SharedPreferences) and emit
+      // immediately — the "am I logged in" answer must never be blocked on
+      // a network call.
+      final token = await authRepository.getToken();
+      final phone = await authRepository.getUserPhone();
+      final name = await authRepository.getUserName();
+      emit(AuthAuthenticated(token ?? "", phone: phone, name: name));
     } catch (_) {
       emit(AuthUnauthenticated());
+      return;
+    }
+
+    // Best-effort backfill for legacy sessions that predate userId capture
+    // at login — runs *after* the emit above so it can't hold up startup,
+    // and is isolated in its own try/catch so a failure here can never
+    // downgrade the AuthAuthenticated state already emitted.
+    try {
+      await authRepository.ensureUserId();
+    } catch (_) {
+      // ignore — order placement surfaces a clear error if still missing.
     }
   }
 

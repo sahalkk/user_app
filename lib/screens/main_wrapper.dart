@@ -17,6 +17,7 @@ import '../../blocs/auth_bloc/auth_state.dart';
 import '../../blocs/cart_bloc/cart_bloc.dart';
 import '../../blocs/order_bloc/order_bloc.dart';
 import '../../blocs/order_bloc/order_event.dart';
+import '../shared/utils/bloc_ready.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});
@@ -31,7 +32,15 @@ class _MainWrapperState extends State<MainWrapper> {
   void _onTabTapped(int index) async {
     // Protect Orders (Index 3) - User must log in to see past orders!
     if (index == 3) {
-      final authState = context.read<AuthBloc>().state;
+      // Defense-in-depth: SplashScreen already guarantees AuthBloc has left
+      // AuthInitial before MainWrapper ever mounts, so this normally
+      // resolves instantly. Reading .state directly here would silently
+      // misreport "logged out" for a real session if any future entry
+      // point ever reaches MainWrapper without going through that gate.
+      final authState = await context
+          .read<AuthBloc>()
+          .firstWhereReady((s) => s is! AuthInitial);
+      if (!mounted) return;
       if (authState is! AuthAuthenticated) {
         await Navigator.push(
           context,
