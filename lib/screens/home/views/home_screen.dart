@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../blocs/home_bloc.dart';
 import '../../../shared/widgets/global_header.dart';
 import '../../../blocs/wishlist_bloc/wishlist_bloc.dart';
 import '../../../blocs/wishlist_bloc/wishlist_state.dart';
+import '../../../shared/models/category_model.dart';
 
 import '../../../shared/widgets/floating_cart_banner.dart';
 import '../../../shared/widgets/product_grid.dart';
@@ -169,6 +171,74 @@ class HomeScreen extends StatelessWidget {
                   }
 
                   if (state is HomeLoaded) {
+                    // A selected root chip with subcategories (e.g. "Fresh
+                    // Product" -> Fruits/Vegetables) swaps the usual
+                    // homepage sections for a subcategory sidebar + grid,
+                    // matching how a category-with-children is meant to be
+                    // browsed. "All" and childless categories keep the
+                    // normal Festive Offers / Wishlist / All Products feed.
+                    final subcategories = state.selectedCategory == 'All'
+                        ? const <CategoryModel>[]
+                        : state.allCategories
+                            .where((c) => c.parentId == state.selectedCategory)
+                            .toList();
+
+                    if (subcategories.isNotEmpty) {
+                      // Stack (not IntrinsicHeight) so the sidebar's grey
+                      // background can span the full content height — the
+                      // grid below is built on a LayoutBuilder internally,
+                      // and Flutter can't compute intrinsic dimensions
+                      // through a LayoutBuilder.
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Stack(
+                          children: [
+                            const Positioned(
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: 78,
+                              child: ColoredBox(color: Color(0xFFFAFAFA)),
+                            ),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _SubcategorySidebar(
+                                  subcategories: subcategories,
+                                  selectedId: state.selectedSubcategory,
+                                  onSelect: (id) => context
+                                      .read<HomeBloc>()
+                                      .add(SelectSubcategory(id)),
+                                ),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        12, 4, 16, 0),
+                                    child: state.filteredProducts.isEmpty
+                                        ? const Padding(
+                                            padding: EdgeInsets.all(40.0),
+                                            child: Center(
+                                              child: Text(
+                                                "No products found",
+                                                style: TextStyle(
+                                                    color: Color(0xFF6B6B6B),
+                                                    fontFamily: 'Poppins'),
+                                              ),
+                                            ),
+                                          )
+                                        : ProductGrid(
+                                            products: state.filteredProducts,
+                                            crossAxisCount: 2,
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -241,6 +311,124 @@ class HomeScreen extends StatelessWidget {
             ),
 
             const SliverPadding(padding: EdgeInsets.only(bottom: 32)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Left sidebar of subcategory circles ("All" + each subcategory) shown
+//  when the selected root chip has children — matches the same visual
+//  language (green accent, Poppins, rounded pills) as the rest of Home.
+// ─────────────────────────────────────────────
+class _SubcategorySidebar extends StatelessWidget {
+  final List<CategoryModel> subcategories;
+  final String? selectedId;
+  final ValueChanged<String?> onSelect;
+
+  const _SubcategorySidebar({
+    required this.subcategories,
+    required this.selectedId,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Background is painted by the Positioned ColoredBox behind this Row in
+    // HomeScreen — this just reserves the width and lays out the items.
+    return SizedBox(
+      width: 78,
+      child: Column(
+        children: [
+          _SubcategoryTile(
+            name: "All",
+            imageUrl: null,
+            isSelected: selectedId == null,
+            onTap: () => onSelect(null),
+          ),
+          ...subcategories.map((c) => _SubcategoryTile(
+                name: c.name,
+                imageUrl: c.imageUrl,
+                isSelected: selectedId == c.id,
+                onTap: () => onSelect(c.id),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubcategoryTile extends StatelessWidget {
+  final String name;
+  final String? imageUrl;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _SubcategoryTile({
+    required this.name,
+    required this.imageUrl,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFE8F5E9) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFF3DAA5C)
+                      : const Color(0xFFE0E0E0),
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+              child: ClipOval(
+                child: imageUrl == null
+                    ? const Icon(Icons.apps_rounded,
+                        color: Color(0xFF3DAA5C), size: 22)
+                    : CachedNetworkImage(
+                        imageUrl: imageUrl!,
+                        fit: BoxFit.cover,
+                        errorWidget: (context, url, error) => const Icon(
+                            Icons.shopping_basket_rounded,
+                            color: Color(0xFF3DAA5C),
+                            size: 20),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? const Color(0xFF3DAA5C)
+                    : const Color(0xFF6B6B6B),
+              ),
+            ),
           ],
         ),
       ),

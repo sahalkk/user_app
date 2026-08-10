@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../home/blocs/home_bloc.dart';
 import '../../../shared/models/category_model.dart';
+import '../../../shared/models/product_model.dart';
 import '../../../shared/widgets/product_grid.dart';
 
 // 🔥 1. Import the new floating cart banner!
@@ -67,57 +69,11 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
       // 🔥 2. Add the banner here! It automatically floats above the body.
       bottomNavigationBar: const FloatingCartBanner(),
 
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // --- 1. HORIZONTAL TABS (Subcategories) ---
-          SizedBox(
-            height: 50,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              scrollDirection: Axis.horizontal,
-              itemCount: widget.subcategories.length + 1,
-              separatorBuilder: (context, index) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final isSelected = _selectedSubCategoryIndex == index;
-                final name =
-                    index == 0 ? "All" : widget.subcategories[index - 1].name;
-
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedSubCategoryIndex = index;
-                    });
-                  },
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFF3DAA5C)
-                          : const Color(0xFFF0F0F0),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Center(
-                      child: Text(
-                        name,
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 12,
-                          fontWeight:
-                              isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected
-                              ? Colors.white
-                              : const Color(0xFF6B6B6B),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 8),
+          // --- 1. LEFT SIDEBAR (Subcategories) ---
+          _buildSidebar(),
 
           // --- 2. PRODUCT GRID ---
           Expanded(
@@ -132,24 +88,21 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                   }
 
                   if (state is HomeLoaded) {
-                    // Filter logic: Attempt to get products for this category/subcategory.
-                    String filterCategoryId = widget.categoryId;
-                    if (_selectedSubCategoryIndex > 0) {
-                      filterCategoryId = widget
-                          .subcategories[_selectedSubCategoryIndex - 1].id;
-                    }
-
-                    var categoryProducts = state.allProducts
-                        .where((p) => p.categoryId == filterCategoryId)
-                        .toList();
-
-                    // MOCK FALLBACK FOR CLIENT DEMO:
-                    // If the backend has no products for this specific category ID yet,
-                    // just show *some* products so the screen isn't empty during the presentation.
-                    if (categoryProducts.isEmpty &&
-                        state.allProducts.isNotEmpty) {
-                      categoryProducts = state.allProducts.take(8).toList();
-                    }
+                    // "All" (index 0) shows every product across the root
+                    // category and all of its subcategories, in the same
+                    // order they appear in the master list — not a random
+                    // sample — so browsing "All" feels stable and grouped
+                    // rather than shuffled.
+                    final categoryProducts = _selectedSubCategoryIndex == 0
+                        ? _productsForIds(state, {
+                            widget.categoryId,
+                            ...widget.subcategories.map((s) => s.id),
+                          })
+                        : _productsForIds(state, {
+                            widget
+                                .subcategories[_selectedSubCategoryIndex - 1]
+                                .id,
+                          });
 
                     if (categoryProducts.isEmpty) {
                       return Center(
@@ -180,6 +133,92 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  List<ProductModel> _productsForIds(HomeLoaded state, Set<String> ids) {
+    return state.allProducts.where((p) => ids.contains(p.categoryId)).toList();
+  }
+
+  Widget _buildSidebar() {
+    return Container(
+      width: 78,
+      color: const Color(0xFFFAFAFA),
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        itemCount: widget.subcategories.length + 1,
+        itemBuilder: (context, index) {
+          final isSelected = _selectedSubCategoryIndex == index;
+          final name = index == 0 ? "All" : widget.subcategories[index - 1].name;
+          final imageUrl =
+              index == 0 ? null : widget.subcategories[index - 1].imageUrl;
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedSubCategoryIndex = index;
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFFE8F5E9)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(
+                        color: isSelected
+                            ? const Color(0xFF3DAA5C)
+                            : const Color(0xFFE0E0E0),
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: imageUrl == null
+                          ? const Icon(Icons.apps_rounded,
+                              color: Color(0xFF3DAA5C), size: 22)
+                          : CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.cover,
+                              errorWidget: (context, url, error) => const Icon(
+                                  Icons.shopping_basket_rounded,
+                                  color: Color(0xFF3DAA5C),
+                                  size: 20),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    name,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 10,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected
+                          ? const Color(0xFF3DAA5C)
+                          : const Color(0xFF6B6B6B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

@@ -18,3 +18,15 @@ class SelectCategory extends HomeEvent {
   @override
   List<Object> get props => [category];
 }
+
+// Triggered when the user taps an item in the subcategory sidebar
+// (null == the sidebar's own "All" entry).
+class SelectSubcategory extends HomeEvent {
+  final String? subcategoryId;
+
+  const SelectSubcategory(this.subcategoryId);
+
+  @override
+  List<Object> get props =>
+      subcategoryId == null ? [] : [subcategoryId as Object];
+}
