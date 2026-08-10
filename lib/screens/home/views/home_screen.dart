@@ -48,10 +48,10 @@ class HomeScreen extends StatelessWidget {
                             return ListView.separated(
                               scrollDirection: Axis.horizontal,
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 4),
+                                  horizontal: 16, vertical: 5),
                               itemCount: state.categories.length,
                               separatorBuilder: (context, index) =>
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 4),
                               itemBuilder: (context, index) {
                                 final category = state.categories[index];
                                 final categoryId = category['id'] ?? '';
@@ -73,7 +73,7 @@ class HomeScreen extends StatelessWidget {
                                           ? const Color(0xFF3DAA5C)
                                           : const Color(0xFFF0F0F0),
                                       borderRadius:
-                                          BorderRadius.circular(20),
+                                          BorderRadius.circular(10),
                                       border: Border.all(
                                         color: isSelected
                                             ? const Color(0xFF3DAA5C)
@@ -242,7 +242,7 @@ class HomeScreen extends StatelessWidget {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 6),
 
                         // ── FESTIVE OFFERS section header ──
                         _SectionHeader(title: "Festive Offers"),
@@ -253,7 +253,7 @@ class HomeScreen extends StatelessWidget {
                           products: state.filteredProducts.take(5).toList(),
                         ),
 
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 6),
 
                         // ── WISHLIST section (if not empty) ──
                         BlocBuilder<WishlistBloc, WishlistState>(
@@ -268,7 +268,7 @@ class HomeScreen extends StatelessWidget {
                                   ProductRow(
                                     products: wishlistState.wishlistItems,
                                   ),
-                                  const SizedBox(height: 28),
+                                  const SizedBox(height: 6),
                                 ],
                               );
                             }

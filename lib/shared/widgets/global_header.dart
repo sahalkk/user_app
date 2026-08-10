@@ -158,14 +158,14 @@ class StickySearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
       child: GestureDetector(
         onTap: () {
           Navigator.push(context,
               MaterialPageRoute(builder: (context) => const SearchScreen()));
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: const Color(0xFFF0F0F0),
             borderRadius: BorderRadius.circular(14),
