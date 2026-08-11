@@ -53,7 +53,6 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
       }
 
       final order = await orderRepository.createOrder(
-        userId: userId,
         deliveryAddressId: deliveryAddressId,
         items: event.items,
       );

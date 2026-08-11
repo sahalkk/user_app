@@ -13,6 +13,9 @@ import 'auth_repository.dart';
 /// are best-effort/defensive in [OrderModel.fromJson]) and whether
 /// `orderItems` come back populated with product details — until verified
 /// live, `createOrder` falls back to the items we sent for display.
+///
+/// The user is never sent in the request body — every user-scoped endpoint
+/// in this API (orders, addresses, ...) derives ownership from the JWT.
 class OrderRepository {
   final AuthRepository authRepository;
 
@@ -27,7 +30,6 @@ class OrderRepository {
   }
 
   Future<OrderModel> createOrder({
-    required String userId,
     required String deliveryAddressId,
     required List<CartItemModel> items,
     String? deliverySlotId,
@@ -38,7 +40,8 @@ class OrderRepository {
           Uri.parse('${ApiConstants.baseUrl}/api/v1/orders'),
           headers: await _authHeaders(),
           body: jsonEncode({
-            'userId': userId,
+            // No userId here — CreateOrderDto has no such field; the
+            // backend derives the owner from the JWT (confirmed live).
             'deliveryAddressId': deliveryAddressId,
             if (deliverySlotId != null) 'deliverySlotId': deliverySlotId,
             if (notes != null) 'notes': notes,
@@ -46,7 +49,8 @@ class OrderRepository {
                 .map((item) => {
                       'productId': item.product.id,
                       'quantity': item.quantity,
-                      'priceAtPurchase': item.product.priceValue,
+                      // OrderItemDto.priceAtPurchase is a string, not a number.
+                      'priceAtPurchase': item.product.priceValue.toString(),
                     })
                 .toList(),
           }),

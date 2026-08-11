@@ -56,8 +56,11 @@ class OrderModel {
 
     final computedTotal =
         items.fold<double>(0.0, (sum, item) => sum + item.totalPrice);
-    final totalAmount = (json['totalAmount'] as num?)?.toDouble() ??
-        (json['total'] as num?)?.toDouble() ??
+    // totalAmount comes back as a JSON string (e.g. "0"), not a number —
+    // same NUMERIC-column-as-string convention as priceAtPurchase — so
+    // parse rather than cast.
+    final totalAmount = double.tryParse(json['totalAmount']?.toString() ?? '') ??
+        double.tryParse(json['total']?.toString() ?? '') ??
         fallbackTotal ??
         computedTotal;
 
