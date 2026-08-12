@@ -76,12 +76,19 @@ class LocationRepository {
     }
 
     try {
+      // `timeLimit` is enforced natively (Android-side) — if that native
+      // timer ever fails to fire (observed intermittently), the Dart Future
+      // just hangs forever with nothing to catch it, since there's no
+      // client-side timeout as a backstop. The `.timeout()` below is purely
+      // a safety net: slightly longer than `timeLimit` itself, so the
+      // plugin's own timeout (with its own cleanup) wins on the normal
+      // path, and this only kicks in if that native timer never fires.
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 12),
         ),
-      );
+      ).timeout(const Duration(seconds: 14));
       return LatLng(position.latitude, position.longitude);
     } on TimeoutException catch (_) {
       throw const LocationFailure(LocationFailureReason.timeout);

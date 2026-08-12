@@ -1,7 +1,7 @@
 name: beeyo_customer  # Was app123
 description: Delivery app for Beeyo.
 publish_to: "none"
-version: 0.1.0+14
+version: 0.1.0+15
 
 environment:
   sdk: ">=3.2.3 <4.0.0"

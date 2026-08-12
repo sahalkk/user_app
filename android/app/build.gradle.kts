@@ -20,7 +20,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.beeyo.customer"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -36,7 +36,11 @@ android {
         applicationId = "com.beeyo.customer"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23
+        // Flutter's tooling force-migrates any minSdk value 16-23 back to
+        // flutter.minSdkVersion on every build — that range is no longer
+        // reliably supported by this Flutter version's engine, so don't
+        // fight it (see MinSdkVersionMigration in flutter_tools).
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

@@ -39,16 +39,18 @@ class ProfileScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: BlocBuilder<AuthBloc, AuthState>(
-        builder: (context, state) {
-          if (state is AuthAuthenticated) {
-            // USER IS LOGGED IN
-            return _buildLoggedInProfile(context, state);
-          } else {
-            // USER IS A GUEST
-            return _buildGuestProfile(context);
-          }
-        },
+      body: SafeArea(
+        child: BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, state) {
+            if (state is AuthAuthenticated) {
+              // USER IS LOGGED IN
+              return _buildLoggedInProfile(context, state);
+            } else {
+              // USER IS A GUEST
+              return _buildGuestProfile(context);
+            }
+          },
+        ),
       ),
     );
   }
