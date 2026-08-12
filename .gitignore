@@ -53,3 +53,5 @@ Desktop.ini
 
 # Environment file for local secrets
 .env
+# Local tooling
+android/bundletool.jar
