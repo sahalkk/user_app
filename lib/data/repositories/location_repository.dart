@@ -34,6 +34,10 @@ class LocationRepository {
   LocationRepository(this.authRepository);
 
   static const _savedAddressesKey = 'saved_addresses';
+  // Single-slot, session-style cache for guests — restores their last bound
+  // location on relaunch without giving them a real, multi-entry saved-
+  // addresses list (which the Address Book / picker UI are gated on).
+  static const _guestLastLocationKey = 'guest_last_location';
 
   Future<Map<String, String>> _authHeaders() async {
     final token = await authRepository.getToken();
@@ -277,6 +281,18 @@ class LocationRepository {
       return id.toString();
     }
     throw Exception('Failed to save address to backend (${response.statusCode})');
+  }
+
+  Future<SavedAddressModel?> getGuestLastLocation() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_guestLastLocationKey);
+    if (raw == null) return null;
+    return SavedAddressModel.fromJson(jsonDecode(raw));
+  }
+
+  Future<void> saveGuestLastLocation(SavedAddressModel address) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_guestLastLocationKey, jsonEncode(address.toJson()));
   }
 
   Future<void> deleteAddress(String id) async {

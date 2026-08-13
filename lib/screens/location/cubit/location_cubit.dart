@@ -36,6 +36,20 @@ class LocationCubit extends Cubit<LocationState> {
       return;
     }
 
+    // No persisted saved addresses — either a guest, or a logged-in user
+    // who hasn't saved one yet. Fall back to the guest's session-only last
+    // location (if any) so guests don't have to re-pick on every relaunch.
+    final guestLast = await _repository.getGuestLastLocation();
+    if (guestLast != null) {
+      emit(Bound(address: guestLast));
+      await _runServiceabilityCheck(
+        position: guestLast.position,
+        formattedAddress: guestLast.formattedAddress,
+        existingAddress: guestLast,
+      );
+      return;
+    }
+
     await checkInitialPermission();
   }
 
@@ -206,7 +220,6 @@ class LocationCubit extends Cubit<LocationState> {
       position: position,
       formattedAddress: formattedAddress,
       existingAddress: address,
-      persistOnSuccess: true,
     );
   }
 
@@ -224,7 +237,6 @@ class LocationCubit extends Cubit<LocationState> {
     required LatLng position,
     required String formattedAddress,
     required SavedAddressModel existingAddress,
-    bool persistOnSuccess = false,
   }) async {
     emit(CheckingServiceability(
       position: position,
@@ -234,12 +246,15 @@ class LocationCubit extends Cubit<LocationState> {
     final result = await _repository.checkServiceability(position);
 
     if (result.isServiceable) {
-      if (persistOnSuccess) {
+      // Guests can browse/order against a bound address for the session,
+      // but only logged-in users get it written to the persistent saved-
+      // addresses list (and, by extension, the Address Book). Guests still
+      // get a single-slot session cache so they aren't dropped back to
+      // square one on every relaunch — see bootstrap().
+      if (await _repository.authRepository.isLoggedIn()) {
         await _repository.saveAddress(existingAddress);
       } else {
-        // Bump updatedAt so bootstrap()'s "most recently used" pick stays
-        // accurate even for pure switches.
-        await _repository.saveAddress(existingAddress);
+        await _repository.saveGuestLastLocation(existingAddress);
       }
       emit(Bound(
         address: existingAddress,

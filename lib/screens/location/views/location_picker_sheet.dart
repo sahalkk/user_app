@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../blocs/auth_bloc/auth_bloc.dart';
+import '../../../blocs/auth_bloc/auth_state.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../cubit/location_cubit.dart';
 import 'map_pin_picker_screen.dart';
@@ -342,6 +344,8 @@ class _MainPickerView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isGuest = context.watch<AuthBloc>().state is! AuthAuthenticated;
+
     return ListView(
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -437,47 +441,51 @@ class _MainPickerView extends StatelessWidget {
           ),
           const Divider(height: 24, color: Color(0xFFE0E0E0)),
 
-          const Text("Saved addresses",
-              style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF6B6B6B))),
-          const SizedBox(height: 8),
-          FutureBuilder<List<SavedAddressModel>>(
-            future: context.read<LocationCubit>().getSavedAddresses(),
-            builder: (context, snapshot) {
-              final addresses = snapshot.data ?? [];
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: LinearProgressIndicator(
-                      color: Color(0xFF3DAA5C), backgroundColor: Color(0xFFF0F0F0)),
+          // Guests have no saved-addresses concept — the picked location
+          // only lives for the session (see LocationCubit._runServiceabilityCheck),
+          // so showing an always-empty "Saved addresses" list is just noise.
+          if (!isGuest) ...[
+            const Text("Saved addresses",
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF6B6B6B))),
+            const SizedBox(height: 8),
+            FutureBuilder<List<SavedAddressModel>>(
+              future: context.read<LocationCubit>().getSavedAddresses(),
+              builder: (context, snapshot) {
+                final addresses = snapshot.data ?? [];
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: LinearProgressIndicator(
+                        color: Color(0xFF3DAA5C), backgroundColor: Color(0xFFF0F0F0)),
+                  );
+                }
+                if (addresses.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text("No saved addresses yet",
+                        style: TextStyle(
+                            fontFamily: 'Poppins', fontSize: 13, color: Color(0xFF9E9E9E))),
+                  );
+                }
+                return Column(
+                  children: addresses
+                      .map((a) => _SavedAddressTile(address: a))
+                      .toList(),
                 );
-              }
-              if (addresses.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text("No saved addresses yet",
-                      style: TextStyle(
-                          fontFamily: 'Poppins', fontSize: 13, color: Color(0xFF9E9E9E))),
-                );
-              }
-              return Column(
-                children: addresses
-                    .map((a) => _SavedAddressTile(address: a))
-                    .toList(),
-              );
-            },
-          ),
-
-          const SizedBox(height: 8),
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.add_location_alt_outlined,
                 color: Color(0xFF3DAA5C)),
-            title: const Text("Add new address",
-                style: TextStyle(
+            title: Text(isGuest ? "Pick a different location" : "Add new address",
+                style: const TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,

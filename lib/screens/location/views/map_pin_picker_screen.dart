@@ -5,6 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../blocs/auth_bloc/auth_bloc.dart';
+import '../../../blocs/auth_bloc/auth_state.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../cubit/location_cubit.dart';
 
@@ -387,6 +389,8 @@ class _ConfirmSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isGuest = context.watch<AuthBloc>().state is! AuthAuthenticated;
+
     return Container(
       padding: EdgeInsets.fromLTRB(
           20, 16, 20, MediaQuery.of(context).padding.bottom + 16),
@@ -456,42 +460,46 @@ class _ConfirmSheet extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Label chips
-          Wrap(
-            spacing: 8,
-            children: AddressLabel.values.map((l) {
-              final selected = l == label;
-              return ChoiceChip(
-                label: Text(l.display),
-                selected: selected,
-                onSelected: (_) => onLabelChanged(l),
-                selectedColor: const Color(0xFF3DAA5C),
-                backgroundColor: const Color(0xFFF0F0F0),
-                labelStyle: TextStyle(
-                  color: selected ? Colors.white : Colors.black87,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(
-                      color: selected
-                          ? const Color(0xFF3DAA5C)
-                          : const Color(0xFFE0E0E0)),
-                ),
-              );
-            }).toList(),
-          ),
-
-          if (label == AddressLabel.other) ...[
-            const SizedBox(height: 12),
-            _InputField(
-              controller: customLabelController,
-              hint: "Label (e.g. Friend's place)",
+          // Label chips + custom label are Address Book framing (Home/Work/
+          // Other) — meaningless for guests, whose pick never joins a saved
+          // addresses list, so skip straight to the landmark field for them.
+          if (!isGuest) ...[
+            Wrap(
+              spacing: 8,
+              children: AddressLabel.values.map((l) {
+                final selected = l == label;
+                return ChoiceChip(
+                  label: Text(l.display),
+                  selected: selected,
+                  onSelected: (_) => onLabelChanged(l),
+                  selectedColor: const Color(0xFF3DAA5C),
+                  backgroundColor: const Color(0xFFF0F0F0),
+                  labelStyle: TextStyle(
+                    color: selected ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(
+                        color: selected
+                            ? const Color(0xFF3DAA5C)
+                            : const Color(0xFFE0E0E0)),
+                  ),
+                );
+              }).toList(),
             ),
-          ],
 
-          const SizedBox(height: 12),
+            if (label == AddressLabel.other) ...[
+              const SizedBox(height: 12),
+              _InputField(
+                controller: customLabelController,
+                hint: "Label (e.g. Friend's place)",
+              ),
+            ],
+
+            const SizedBox(height: 12),
+          ],
           _InputField(
             controller: landmarkController,
             hint: "Landmark / floor / gate instructions (helps riders)",
@@ -552,7 +560,9 @@ class _ConfirmSheet extends StatelessWidget {
                               strokeWidth: 2, color: Colors.white),
                         )
                       : Text(
-                          editing != null ? "Save Changes" : "Confirm & Save",
+                          editing != null
+                              ? "Save Changes"
+                              : (isGuest ? "Confirm location" : "Confirm & Save"),
                           style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
