@@ -69,9 +69,12 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     // _selectedAddress deliberately stays unchanged.
   }
 
+  // Precise mode throughout this screen: we're building a real delivery
+  // address here, so GPS/search picks should still land on Confirming and
+  // let the pin be adjusted rather than auto-confirming past it.
   Future<void> _useCurrentLocation() async {
     final cubit = context.read<LocationCubit>();
-    await cubit.useCurrentLocation();
+    await cubit.useCurrentLocation(autoConfirm: false);
     if (!mounted) return;
 
     final state = cubit.state;
@@ -89,7 +92,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         ),
       );
     } else {
-      await LocationPickerSheet.show(context);
+      await LocationPickerSheet.show(context, precise: true);
     }
     if (!mounted) return;
     _reloadAddresses();
@@ -99,7 +102,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
   Future<void> _addNew() async {
     final cubit = context.read<LocationCubit>();
-    await LocationPickerSheet.show(context);
+    await LocationPickerSheet.show(context, precise: true);
     if (!mounted) return;
     _reloadAddresses();
     final state = cubit.state;

@@ -28,6 +28,14 @@ class LocationFailure implements Exception {
   const LocationFailure(this.reason);
 }
 
+/// Thrown by [LocationRepository.checkServiceability] when the check itself
+/// couldn't complete (network/timeout/parse failure) — distinct from the
+/// backend authoritatively answering "not deliverable", so callers can
+/// offer a retry instead of showing a hard sorry-we-don't-deliver-here screen.
+class ServiceabilityCheckFailed implements Exception {
+  const ServiceabilityCheckFailed();
+}
+
 class LocationRepository {
   final AuthRepository authRepository;
 
@@ -49,8 +57,7 @@ class LocationRepository {
 
   // ── Permission + GPS ──────────────────────────────────────────────
 
-  Future<LocationPermission> checkPermission() =>
-      Geolocator.checkPermission();
+  Future<LocationPermission> checkPermission() => Geolocator.checkPermission();
 
   Future<LocationPermission> requestPermission() =>
       Geolocator.requestPermission();
@@ -157,20 +164,29 @@ class LocationRepository {
 
   /// Checks a point against delivery-zone polygons/radii. This math is
   /// deliberately server-side — see the design note in delivery_zone_model.
-  Future<ServiceabilityResultModel> checkServiceability(
-      LatLng position) async {
+  Future<ServiceabilityResultModel> checkServiceability(LatLng position) async {
     try {
-      final response = await http.post(
-        Uri.parse('${ApiConstants.baseUrl}/api/v1/serviceability/check'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'lat': position.latitude,
-          'lng': position.longitude,
-        }),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse('${ApiConstants.baseUrl}/api/v1/serviceability/check'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'lat': position.latitude,
+              'lng': position.longitude,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        return ServiceabilityResultModel.fromJson(jsonDecode(response.body));
+        final decoded = jsonDecode(response.body);
+        // Backend wraps every response in a {success, data, ...} envelope —
+        // unwrap it the same way syncAddressToBackend does below, otherwise
+        // isServiceable is read from the wrong level and silently defaults
+        // to false regardless of the real answer.
+        final data = (decoded is Map && decoded['data'] is Map)
+            ? decoded['data'] as Map<String, dynamic>
+            : decoded as Map<String, dynamic>;
+        return ServiceabilityResultModel.fromJson(data);
       }
 
       if (response.statusCode == 404) {
@@ -185,7 +201,12 @@ class LocationRepository {
 
       return const ServiceabilityResultModel.notServiceable();
     } catch (_) {
-      return const ServiceabilityResultModel.notServiceable();
+      // A network/timeout/parse failure here means we simply don't know
+      // the answer — it must NOT be treated the same as the backend
+      // authoritatively saying "outside every zone" (that shows a hard
+      // "sorry, we don't deliver here" screen; a flaky connection at cold
+      // start shouldn't).
+      throw const ServiceabilityCheckFailed();
     }
   }
 
@@ -194,9 +215,7 @@ class LocationRepository {
   Future<List<SavedAddressModel>> getSavedAddresses() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_savedAddressesKey) ?? [];
-    return raw
-        .map((s) => SavedAddressModel.fromJson(jsonDecode(s)))
-        .toList()
+    return raw.map((s) => SavedAddressModel.fromJson(jsonDecode(s))).toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
@@ -280,7 +299,8 @@ class LocationRepository {
       }
       return id.toString();
     }
-    throw Exception('Failed to save address to backend (${response.statusCode})');
+    throw Exception(
+        'Failed to save address to backend (${response.statusCode})');
   }
 
   Future<SavedAddressModel?> getGuestLastLocation() async {
@@ -309,15 +329,17 @@ class LocationRepository {
 
   Future<void> joinNotifyList(LatLng position, {String? pincode}) async {
     try {
-      await http.post(
-        Uri.parse('${ApiConstants.baseUrl}/api/v1/notify-list'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'lat': position.latitude,
-          'lng': position.longitude,
-          'pincode': pincode,
-        }),
-      ).timeout(const Duration(seconds: 10));
+      await http
+          .post(
+            Uri.parse('${ApiConstants.baseUrl}/api/v1/notify-list'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'lat': position.latitude,
+              'lng': position.longitude,
+              'pincode': pincode,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
     } catch (_) {
       // Best-effort — swallow network errors, the UI just shows a
       // generic "we'll let you know" confirmation regardless.

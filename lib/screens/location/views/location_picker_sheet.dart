@@ -12,9 +12,17 @@ import 'map_pin_picker_screen.dart';
 import 'not_deliverable_view.dart';
 
 class LocationPickerSheet extends StatefulWidget {
-  const LocationPickerSheet({super.key});
+  /// False (default): the ambient "is my area serviceable" flow — GPS/search
+  /// picks skip straight to the answer, and "Add new address" is hidden
+  /// since there's no named-address feature to attach a manually-dropped
+  /// pin to from here. True: an explicit add/edit-a-delivery-address flow
+  /// (Address Book, checkout) — GPS/search picks land on the pin-adjust
+  /// step, and "Add new address" (precise pin drop) stays available.
+  final bool precise;
 
-  static Future<void> show(BuildContext context) {
+  const LocationPickerSheet({super.key, this.precise = false});
+
+  static Future<void> show(BuildContext context, {bool precise = false}) {
     final cubit = context.read<LocationCubit>();
     return showModalBottomSheet(
       context: context,
@@ -22,7 +30,7 @@ class LocationPickerSheet extends StatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => BlocProvider.value(
         value: cubit,
-        child: const LocationPickerSheet(),
+        child: LocationPickerSheet(precise: precise),
       ),
     );
   }
@@ -141,6 +149,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 results: _results,
                 isSearching: _isSearching,
                 isResolving: state is Resolving || state is PermissionChecking,
+                precise: widget.precise,
               );
             },
           ),
@@ -332,6 +341,7 @@ class _MainPickerView extends StatelessWidget {
   final List<({String label, LatLng position})> results;
   final bool isSearching;
   final bool isResolving;
+  final bool precise;
 
   const _MainPickerView({
     required this.scrollController,
@@ -340,6 +350,7 @@ class _MainPickerView extends StatelessWidget {
     required this.results,
     required this.isSearching,
     required this.isResolving,
+    required this.precise,
   });
 
   @override
@@ -415,7 +426,8 @@ class _MainPickerView extends StatelessWidget {
                         fontFamily: 'Poppins', fontSize: 13, color: Colors.black87)),
                 onTap: () => context
                     .read<LocationCubit>()
-                    .selectSearchResult(r.label, r.position),
+                    .selectSearchResult(r.label, r.position,
+                        autoConfirm: !precise),
               )),
         ] else ...[
           const SizedBox(height: 8),
@@ -437,7 +449,9 @@ class _MainPickerView extends StatelessWidget {
                     color: Color(0xFF3DAA5C))),
             onTap: isResolving
                 ? null
-                : () => context.read<LocationCubit>().useCurrentLocation(),
+                : () => context
+                    .read<LocationCubit>()
+                    .useCurrentLocation(autoConfirm: !precise),
           ),
           const Divider(height: 24, color: Color(0xFFE0E0E0)),
 
@@ -480,28 +494,34 @@ class _MainPickerView extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.add_location_alt_outlined,
-                color: Color(0xFF3DAA5C)),
-            title: Text(isGuest ? "Pick a different location" : "Add new address",
-                style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF3DAA5C))),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => BlocProvider.value(
-                  value: context.read<LocationCubit>(),
-                  child: const MapPinPickerScreen(
-                    initialPosition: LatLng(8.5241, 76.9366), // Trivandrum
+          // Manually dropping a pin without a search match only matters
+          // when actually building a named delivery address — the ambient
+          // "is my area serviceable" flow has no address to attach it to,
+          // so this stays hidden there and only shows in precise mode
+          // (Address Book / checkout).
+          if (precise)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.add_location_alt_outlined,
+                  color: Color(0xFF3DAA5C)),
+              title: const Text("Add new address",
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF3DAA5C))),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BlocProvider.value(
+                    value: context.read<LocationCubit>(),
+                    child: const MapPinPickerScreen(
+                      initialPosition: LatLng(8.5241, 76.9366), // Trivandrum
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ],
     );

@@ -43,9 +43,12 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     // no pop, so the user can immediately pick something else.
   }
 
+  // Precise mode throughout this screen: Address Book manages real,
+  // named delivery addresses, so GPS/search picks should land on
+  // Confirming and let the pin be adjusted rather than auto-confirming.
   Future<void> _useCurrentLocation() async {
     final cubit = context.read<LocationCubit>();
-    await cubit.useCurrentLocation();
+    await cubit.useCurrentLocation(autoConfirm: false);
     if (!mounted) return;
 
     final state = cubit.state;
@@ -66,7 +69,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
       // Permission primer / manual-entry fallback needed — the full
       // picker sheet already knows how to handle every one of those
       // sub-states, no need to duplicate that UI here.
-      await LocationPickerSheet.show(context);
+      await LocationPickerSheet.show(context, precise: true);
     }
     if (!mounted) return;
     _reload();
@@ -74,7 +77,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   }
 
   Future<void> _addNew() async {
-    await LocationPickerSheet.show(context);
+    await LocationPickerSheet.show(context, precise: true);
     if (!mounted) return;
     _reload();
     if (context.read<LocationCubit>().state is Bound) {

@@ -123,11 +123,13 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
     _searchController.clear();
     _searchFocusNode.unfocus();
     setState(() => _searchResults = []);
-    // The label is already known from the search result itself, so this
-    // goes straight to Confirming — .move() below only re-centers the map
-    // and is ignored by onMapEvent's mapController-source check, avoiding
-    // a redundant second reverse-geocode call for the same point.
-    context.read<LocationCubit>().selectSearchResult(result.label, result.position);
+    // autoConfirm: false — we're already mid pin-adjustment on this screen,
+    // so a search result here should just re-center the pin (landing on
+    // Confirming, same as GPS/drag), not immediately confirm out from
+    // under whatever the user is still doing here.
+    context
+        .read<LocationCubit>()
+        .selectSearchResult(result.label, result.position, autoConfirm: false);
     _mapController.move(result.position, 16);
   }
 
@@ -313,8 +315,12 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
             child: _RoundIconButton(
               icon: Icons.my_location_rounded,
               onTap: () async {
+                // autoConfirm: false — this FAB just re-centers the map on
+                // the device's GPS position while mid pin-adjustment; it
+                // must land on Confirming, not confirm out from under the
+                // in-progress edit.
                 final cubit = context.read<LocationCubit>();
-                await cubit.useCurrentLocation();
+                await cubit.useCurrentLocation(autoConfirm: false);
                 final state = cubit.state;
                 if (state is Confirming) {
                   _mapController.move(state.position, 16);

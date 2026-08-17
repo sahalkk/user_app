@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../data/repositories/location_repository.dart';
 import '../../../shared/models/delivery_zone_model.dart';
 import '../../../shared/models/saved_address_model.dart';
+import '../../../shared/models/serviceability_result_model.dart';
 
 part 'location_state.dart';
 
@@ -50,17 +51,22 @@ class LocationCubit extends Cubit<LocationState> {
       return;
     }
 
-    await checkInitialPermission();
+    // autoConfirm: a returning user's permission is already granted, so
+    // there's no primer/UI step for them to interact with here — go
+    // straight through GPS -> serviceability instead of stopping at
+    // Confirming and silently leaving MainWrapper showing full shopping
+    // content while nothing ever prompts for a manual confirm tap.
+    await checkInitialPermission(autoConfirm: true);
   }
 
-  Future<void> checkInitialPermission() async {
+  Future<void> checkInitialPermission({bool autoConfirm = false}) async {
     emit(const PermissionChecking());
     final status = await _repository.checkPermission();
 
     switch (status) {
       case LocationPermission.always:
       case LocationPermission.whileInUse:
-        await _resolveCurrentLocation();
+        await _resolveCurrentLocation(autoConfirm: autoConfirm);
         break;
       case LocationPermission.deniedForever:
         emit(const ManualEntry(
@@ -76,14 +82,16 @@ class LocationCubit extends Cubit<LocationState> {
   // ── Permission primer flow ──────────────────────────────────────
 
   /// User tapped "Allow" on our own rationale UI — now show the real OS
-  /// dialog.
+  /// dialog. The primer only ever appears in the ambient "check my area"
+  /// flow (never mid-precision-editing inside MapPinPickerScreen), so this
+  /// always auto-confirms straight through to the serviceability answer.
   Future<void> acknowledgePrimer() async {
     emit(const PermissionRequesting());
     final status = await _repository.requestPermission();
 
     if (status == LocationPermission.always ||
         status == LocationPermission.whileInUse) {
-      await _resolveCurrentLocation();
+      await _resolveCurrentLocation(autoConfirm: true);
     } else {
       emit(ManualEntry(
         message: status == LocationPermission.deniedForever
@@ -97,16 +105,40 @@ class LocationCubit extends Cubit<LocationState> {
     emit(const ManualEntry());
   }
 
-  /// Entry point for the "Use my current location" row in the picker sheet
-  /// — re-runs the same permission dance a fresh install would go through.
-  Future<void> useCurrentLocation() => checkInitialPermission();
+  /// Entry point for the "Use my current location" row — re-runs the same
+  /// permission dance a fresh install would go through.
+  ///
+  /// [autoConfirm] is caller-decided, not inferred from bound state: the
+  /// ambient "am I in a serviceable area" flow (Home header, the picker
+  /// sheet's default mode) wants to skip straight to the answer, while an
+  /// explicit "add/edit a delivery address" flow (Address Book, checkout,
+  /// or the locate-me FAB *inside* MapPinPickerScreen while mid-edit) wants
+  /// to land on [Confirming] so the pin can still be adjusted. Defaults to
+  /// true for the common ambient case.
+  Future<void> useCurrentLocation({bool autoConfirm = true}) =>
+      checkInitialPermission(autoConfirm: autoConfirm);
 
-  Future<void> _resolveCurrentLocation() async {
+  Future<void> _resolveCurrentLocation({bool autoConfirm = false}) async {
     emit(const Resolving());
     try {
       final position = await _repository.getCurrentPosition();
       final address = await _repository.reverseGeocode(position) ??
           '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
+
+      if (autoConfirm) {
+        // Cold-start auto-detect: nobody's here to review/adjust the pin,
+        // so go straight to the serviceability check instead of stopping
+        // at Confirming. The label is never shown for this path — it only
+        // matters once/if the user later edits this into a real saved
+        // address from the Address Book.
+        await confirmAddress(
+          position: position,
+          formattedAddress: address,
+          label: AddressLabel.home,
+        );
+        return;
+      }
+
       emit(Confirming(
         position: position,
         formattedAddress: address,
@@ -139,11 +171,26 @@ class LocationCubit extends Cubit<LocationState> {
 
   void enterManualMode() => emit(const ManualEntry());
 
-  Future<List<({String label, LatLng position})>> searchAddress(
-          String query) =>
+  Future<List<({String label, LatLng position})>> searchAddress(String query) =>
       _repository.searchAddress(query);
 
-  void selectSearchResult(String label, LatLng position) {
+  /// Same caller-decided [autoConfirm] rule as [useCurrentLocation] — a
+  /// search query is just as valid a way to check "is my area serviceable"
+  /// as GPS is, in the ambient flow. Reachable both from the main picker
+  /// sheet's search box (ambient, defaults to true) and from within
+  /// [MapPinPickerScreen]'s own search box (mid-edit, passes false so
+  /// picking a result there only re-centers the pin instead of confirming
+  /// out from under the user).
+  void selectSearchResult(String label, LatLng position,
+      {bool autoConfirm = true}) {
+    if (autoConfirm) {
+      confirmAddress(
+        position: position,
+        formattedAddress: label,
+        label: AddressLabel.home,
+      );
+      return;
+    }
     emit(Confirming(
       position: position,
       formattedAddress: label,
@@ -243,7 +290,19 @@ class LocationCubit extends Cubit<LocationState> {
       formattedAddress: formattedAddress,
     ));
 
-    final result = await _repository.checkServiceability(position);
+    final ServiceabilityResultModel result;
+    try {
+      result = await _repository.checkServiceability(position);
+    } on ServiceabilityCheckFailed {
+      // Couldn't get an authoritative answer (network/timeout) — don't
+      // conflate that with the backend actually saying "not deliverable
+      // here". Fall back to ManualEntry so the user gets a retry-friendly
+      // prompt instead of a hard sorry screen for what might just be a
+      // flaky connection.
+      emit(const ManualEntry(
+          message: "Couldn't check delivery availability. Please try again."));
+      return;
+    }
 
     if (result.isServiceable) {
       // Guests can browse/order against a bound address for the session,
