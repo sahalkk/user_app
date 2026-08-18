@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:beeyo_customer/shared/constants/api_constants.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -77,10 +78,10 @@ class AuthRepository {
         }),
       );
 
-      print("=== LOGIN API RESPONSE ===");
-      print("Status Code: ${response.statusCode}");
-      print("Body: ${response.body}");
-      print("==========================");
+      debugPrint("=== LOGIN API RESPONSE ===");
+      debugPrint("Status Code: ${response.statusCode}");
+      debugPrint("Body: ${response.body}");
+      debugPrint("==========================");
 
       // Check if the API returned 201 Created (or 200 OK)
       if (response.statusCode == 201 || response.statusCode == 200) {

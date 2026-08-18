@@ -9,7 +9,7 @@ part 'cart_state.dart';
 
 class CartBloc extends Bloc<CartEvent, CartState> {
   // Internal data
-  List<CartItemModel> _items = [];
+  final List<CartItemModel> _items = [];
   CheckoutAddressModel? _deliveryAddress; // 3. Store address here
 
   CartBloc() : super(CartInitial()) {

@@ -80,7 +80,6 @@ class MyAppView extends StatelessWidget {
               primary: Color(0xFF3DAA5C),
               onPrimary: Colors.white,
               secondary: Color(0xFF3DAA5C),
-              background: Colors.white,
             ),
             fontFamily: 'Poppins',
             dividerColor: const Color(0xFFE0E0E0),

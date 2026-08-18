@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rxdart/rxdart.dart'; // Optional: for debounce if you have it
 import '../../../../data/repositories/product_repository.dart'; // Import Repo
@@ -33,7 +34,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       final results = await productRepository.searchProducts(event.query);
       emit(SearchLoaded(results, event.query));
     } catch (e) {
-      print("Search Error: $e");
+      debugPrint("Search Error: $e");
       // Fallback to empty or error state
       emit(SearchLoaded(const [], event.query));
     }

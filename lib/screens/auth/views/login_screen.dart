@@ -102,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: TextButton(
             onPressed: () => Navigator.pop(context),
             style: TextButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.1),
+              backgroundColor: Colors.white.withValues(alpha: 0.1),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20)),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -257,7 +257,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                color: Colors.white.withValues(alpha: 0.1), shape: BoxShape.circle),
             child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
           ),
         ),
@@ -313,7 +313,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       shape: BoxShape.circle,
                       color: isFilled
                           ? const Color(0xFF00E676)
-                          : Colors.white.withOpacity(0.1),
+                          : Colors.white.withValues(alpha: 0.1),
                     ),
                     child: Center(
                       child: Text(

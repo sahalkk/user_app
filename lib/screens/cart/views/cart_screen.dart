@@ -181,6 +181,7 @@ class _CartScreenState extends State<CartScreen> {
                               } catch (_) {
                                 // ignore timeout and re-check below
                               }
+                              if (!context.mounted) return;
                             }
 
                             final authState = authBloc.state;

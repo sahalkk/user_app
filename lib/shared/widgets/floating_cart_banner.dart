@@ -34,7 +34,7 @@ class FloatingCartBanner extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF3DAA5C).withOpacity(0.3),
+                        color: const Color(0xFF3DAA5C).withValues(alpha: 0.3),
                         blurRadius: 16,
                         offset: const Offset(0, 4),
                       )

@@ -193,7 +193,7 @@ class ProductQuantitySelector extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             elevation: 2,
-            shadowColor: Colors.green.withOpacity(0.5),
+            shadowColor: Colors.green.withValues(alpha: 0.5),
           ),
           child: const Row(
             mainAxisAlignment: MainAxisAlignment.center,

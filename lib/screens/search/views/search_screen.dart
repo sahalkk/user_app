@@ -47,8 +47,8 @@ class _SearchScreenState extends State<SearchScreen> {
   // 🔥 3. Initialize Speech to Text
   void _initSpeech() async {
     _isSpeechAvailable = await _speech.initialize(
-      onError: (val) => print('Speech Error: $val'),
-      onStatus: (val) => print('Speech Status: $val'),
+      onError: (val) => debugPrint('Speech Error: $val'),
+      onStatus: (val) => debugPrint('Speech Status: $val'),
     );
     setState(() {});
   }
@@ -115,7 +115,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 height: 80,
                 width: 80,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3DAA5C).withOpacity(0.15),
+                  color: const Color(0xFF3DAA5C).withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFF3DAA5C), width: 2),
                 ),

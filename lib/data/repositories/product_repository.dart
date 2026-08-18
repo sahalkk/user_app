@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:beeyo_customer/shared/constants/api_constants.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../shared/models/product_model.dart';
 
@@ -42,7 +43,7 @@ class ProductRepository {
 
       return products;
     } catch (e) {
-      print("Error fetching products: $e");
+      debugPrint("Error fetching products: $e");
       throw Exception("Error fetching products");
     }
   }

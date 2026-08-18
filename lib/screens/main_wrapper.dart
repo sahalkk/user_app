@@ -130,7 +130,7 @@ class _MainWrapperState extends State<MainWrapper> {
                               boxShadow: [
                                 BoxShadow(
                                   color:
-                                      const Color(0xFF3DAA5C).withOpacity(0.25),
+                                      const Color(0xFF3DAA5C).withValues(alpha: 0.25),
                                   blurRadius: 16,
                                   offset: const Offset(0, 4),
                                 )

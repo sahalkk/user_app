@@ -162,7 +162,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 Border.all(color: const Color(0xFFE0E0E0)),
                             boxShadow: [
                               BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
+                                  color: Colors.black.withValues(alpha: 0.08),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4)),
                             ],
@@ -187,11 +187,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                         horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFF3DAA5C)
-                                          .withOpacity(0.15),
+                                          .withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
                                           color: const Color(0xFF3DAA5C)
-                                              .withOpacity(0.4)),
+                                              .withValues(alpha: 0.4)),
                                     ),
                                     child: Text(
                                       order.status,
