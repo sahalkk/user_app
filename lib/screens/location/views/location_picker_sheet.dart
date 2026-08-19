@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../blocs/auth_bloc/auth_bloc.dart';
 import '../../../blocs/auth_bloc/auth_state.dart';
+import '../../../data/repositories/location_repository.dart' show distanceMeters;
 import '../../../shared/models/saved_address_model.dart';
 import '../cubit/location_cubit.dart';
 import 'map_pin_picker_screen.dart';
@@ -24,6 +25,22 @@ class LocationPickerSheet extends StatefulWidget {
 
   static Future<void> show(BuildContext context, {bool precise = false}) {
     final cubit = context.read<LocationCubit>();
+    // Opening the sheet while state is already NotDeliverable (carried over
+    // from before it was opened — e.g. "Choose a different location" on
+    // NotServiceableScreen, the header's "Not deliverable here" dropdown,
+    // or Address Book/AddAddressScreen's own "Add new"/"Use current
+    // location" reached while their embedded NotDeliverableView is already
+    // showing) would otherwise render that exact same sorry message a
+    // second time, stacked on top of the one already visible behind it.
+    // Reset to ManualEntry first so the sheet opens fresh on the actual
+    // search view instead. Doesn't affect the legitimate case — reaching
+    // NotDeliverable from an action taken *inside* the sheet (a saved-
+    // address tap, "Use current location") still renders NotDeliverableView
+    // inline as normal, since that happens after this one-time check, via
+    // the sheet's own BlocConsumer further down.
+    if (cubit.state is NotDeliverable) {
+      cubit.pickDifferentLocation();
+    }
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -44,6 +61,19 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   Timer? _debounce;
   List<({String label, LatLng position})> _results = [];
   bool _isSearching = false;
+
+  // Best-effort, non-blocking — powers the "X km away" badges on saved
+  // addresses. Never gates the sheet's own usability: null just means the
+  // badges are omitted (see LocationCubit.tryGetCurrentPosition).
+  LatLng? _currentPosition;
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<LocationCubit>().tryGetCurrentPosition().then((pos) {
+      if (mounted) setState(() => _currentPosition = pos);
+    });
+  }
 
   @override
   void dispose() {
@@ -71,11 +101,16 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
 
   /// Pushes the map screen and, once it returns, closes this sheet if the
   /// pin was successfully confirmed & bound. Deliberately lives here (on
-  /// the sheet's own long-lived State) rather than inside _ConfirmAddressView
-  /// — that sub-view gets swapped out by the BlocBuilder the instant state
-  /// becomes Bound, disposing its context before the awaited Navigator.push
-  /// future even resolves, which silently no-ops any pop attempted from it.
-  Future<void> _adjustPinOnMap(Confirming state) async {
+  /// the sheet's own long-lived State) rather than inside a sub-view that
+  /// gets swapped out by the BlocBuilder the instant state becomes Bound,
+  /// disposing its context before the awaited Navigator.push future even
+  /// resolves, which silently no-ops any pop attempted from it.
+  ///
+  /// Shared by both entry modes: the precise flow's explicit "Adjust pin on
+  /// map & save" button, and the ambient flow's auto-navigation the instant
+  /// a search result lands on [Confirming] (see the listener in [build]).
+  Future<void> _pushMapConfirm(Confirming state,
+      {required bool ambientConfirm}) async {
     final cubit = context.read<LocationCubit>();
     await Navigator.push(
       context,
@@ -85,6 +120,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
           child: MapPinPickerScreen(
             initialPosition: state.position,
             initialFormattedAddress: state.formattedAddress,
+            ambientConfirm: ambientConfirm,
           ),
         ),
       ),
@@ -111,15 +147,27 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
             listener: (context, state) {
               // Binding succeeded — the header already reflects it, so
               // close the sheet automatically. Only do this when the
-              // sheet is actually the topmost route: when "Adjust pin on
-              // map & save" has pushed MapPinPickerScreen on top, that
-              // screen owns closing itself on Bound — popping here too
-              // would race it and could pop the wrong route.
+              // sheet is actually the topmost route: when a map confirm
+              // step has pushed MapPinPickerScreen on top, that screen
+              // owns closing itself on Bound — popping here too would
+              // race it and could pop the wrong route.
+              final route = ModalRoute.of(context);
+              final isTopmost = route == null || route.isCurrent;
               if (state is Bound) {
-                final route = ModalRoute.of(context);
-                if (route == null || route.isCurrent) {
-                  Navigator.of(context).maybePop();
-                }
+                if (isTopmost) Navigator.of(context).maybePop();
+              } else if (state is Confirming && !widget.precise && isTopmost) {
+                // Ambient mode: a search result should land straight on the
+                // map+pin confirm step, not the precise flow's intermediate
+                // text preview — see the builder's own Confirming branch
+                // below, which is only reachable in precise mode. Gated on
+                // isTopmost for the same reason as the Bound case above:
+                // once MapPinPickerScreen is pushed, IT keeps re-emitting
+                // Confirming as its own normal operation (initState seeding,
+                // dragging the pin, its own search box) — without this
+                // guard, every one of those would push ANOTHER map screen
+                // on top, since this listener stays subscribed the whole
+                // time the sheet is merely buried, not disposed.
+                _pushMapConfirm(state, ambientConfirm: true);
               }
             },
             builder: (context, state) {
@@ -136,10 +184,18 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 );
               }
               if (state is Confirming) {
+                // Ambient mode never renders this — the listener above
+                // already navigates away the instant this state arrives.
+                // A brief loader covers that one frame rather than flashing
+                // the precise flow's text preview first.
+                if (!widget.precise) {
+                  return const _CenteredLoader(label: "Loading map…");
+                }
                 return _ConfirmAddressView(
                   state: state,
                   scrollController: scrollController,
-                  onAdjustPin: () => _adjustPinOnMap(state),
+                  onAdjustPin: () =>
+                      _pushMapConfirm(state, ambientConfirm: false),
                 );
               }
               return _MainPickerView(
@@ -150,6 +206,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 isSearching: _isSearching,
                 isResolving: state is Resolving || state is PermissionChecking,
                 precise: widget.precise,
+                currentPosition: _currentPosition,
               );
             },
           ),
@@ -342,6 +399,7 @@ class _MainPickerView extends StatelessWidget {
   final bool isSearching;
   final bool isResolving;
   final bool precise;
+  final LatLng? currentPosition;
 
   const _MainPickerView({
     required this.scrollController,
@@ -351,6 +409,7 @@ class _MainPickerView extends StatelessWidget {
     required this.isSearching,
     required this.isResolving,
     required this.precise,
+    this.currentPosition,
   });
 
   @override
@@ -372,12 +431,30 @@ class _MainPickerView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        const Text("Select delivery location",
-            style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: Colors.black87)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text("Select delivery location",
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black87)),
+            GestureDetector(
+              onTap: () => Navigator.of(context).maybePop(),
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF0F0F0),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close_rounded,
+                    size: 18, color: Color(0xFF6B6B6B)),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 16),
 
         // Search field
@@ -424,10 +501,13 @@ class _MainPickerView extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontFamily: 'Poppins', fontSize: 13, color: Colors.black87)),
+                // autoConfirm defaults to false: every search result lands
+                // on Confirming and gets reviewed on the map first (see
+                // the sheet's listener/builder for how each mode routes
+                // from there).
                 onTap: () => context
                     .read<LocationCubit>()
-                    .selectSearchResult(r.label, r.position,
-                        autoConfirm: !precise),
+                    .selectSearchResult(r.label, r.position),
               )),
         ] else ...[
           const SizedBox(height: 8),
@@ -487,7 +567,8 @@ class _MainPickerView extends StatelessWidget {
                 }
                 return Column(
                   children: addresses
-                      .map((a) => _SavedAddressTile(address: a))
+                      .map((a) => _SavedAddressTile(
+                          address: a, currentPosition: currentPosition))
                       .toList(),
                 );
               },
@@ -530,7 +611,8 @@ class _MainPickerView extends StatelessWidget {
 
 class _SavedAddressTile extends StatelessWidget {
   final SavedAddressModel address;
-  const _SavedAddressTile({required this.address});
+  final LatLng? currentPosition;
+  const _SavedAddressTile({required this.address, this.currentPosition});
 
   IconData get _icon {
     switch (address.label) {
@@ -545,24 +627,99 @@ class _SavedAddressTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(
-        backgroundColor: const Color(0xFFF0F0F0),
-        child: Icon(_icon, color: const Color(0xFF6B6B6B), size: 18),
-      ),
-      title: Text(address.displayLabel,
-          style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Colors.black87)),
-      subtitle: Text(address.formattedAddress,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-              fontFamily: 'Poppins', fontSize: 12, color: Color(0xFF6B6B6B))),
+    final pos = currentPosition;
+    final distanceLabel =
+        pos == null ? null : _formatDistance(distanceMeters(pos, address.position));
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => context.read<LocationCubit>().switchToSavedAddress(address),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4)),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                  color: Color(0xFFE8F5E9), shape: BoxShape.circle),
+              child: Icon(_icon, color: const Color(0xFF3DAA5C), size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(address.displayLabel,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87)),
+                  const SizedBox(height: 4),
+                  Text(address.formattedAddress,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          color: Color(0xFF6B6B6B))),
+                  if (distanceLabel != null) ...[
+                    const SizedBox(height: 8),
+                    _DistanceBadge(label: distanceLabel),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _formatDistance(double meters) {
+  if (meters < 1000) return "${meters.round()} m away";
+  return "${(meters / 1000).toStringAsFixed(1)} km away";
+}
+
+class _DistanceBadge extends StatelessWidget {
+  final String label;
+  const _DistanceBadge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.near_me_rounded, size: 11, color: Color(0xFF6B6B6B)),
+          const SizedBox(width: 4),
+          Text(label,
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF6B6B6B))),
+        ],
+      ),
     );
   }
 }

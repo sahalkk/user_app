@@ -5,8 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../blocs/auth_bloc/auth_bloc.dart';
-import '../../../blocs/auth_bloc/auth_state.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../cubit/location_cubit.dart';
 
@@ -29,11 +27,22 @@ class MapPinPickerScreen extends StatefulWidget {
   /// it immediately instead of firing a redundant reverse-geocode call.
   final String? initialFormattedAddress;
 
+  /// True when entered from the ambient "is my area serviceable" search
+  /// flow (LocationPickerSheet in precise:false mode) rather than an
+  /// explicit add/edit-a-delivery-address flow. Trims the chrome down to
+  /// just the map + a "Confirm Location" action — no title bar in the
+  /// default mode, no Home/Work/Other label chips, no custom-label or
+  /// landmark field, and confirming never writes into the real saved-
+  /// address list (see LocationCubit.confirmAddress's
+  /// persistAsSavedAddress). [existingAddress] is never set alongside this.
+  final bool ambientConfirm;
+
   const MapPinPickerScreen({
     super.key,
     required this.initialPosition,
     this.existingAddress,
     this.initialFormattedAddress,
+    this.ambientConfirm = false,
   });
 
   @override
@@ -62,8 +71,7 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
     _label = existing?.label ?? AddressLabel.home;
     _customLabelController =
         TextEditingController(text: existing?.customLabel ?? '');
-    _landmarkController =
-        TextEditingController(text: existing?.landmark ?? '');
+    _landmarkController = TextEditingController(text: existing?.landmark ?? '');
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final cubit = context.read<LocationCubit>();
@@ -140,209 +148,228 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
       // or editing the address that's currently active). Editing a saved
       // address that ISN'T active never emits Bound — it pops itself
       // directly from the confirm button instead (see _ConfirmSheet).
+      //
+      // NotDeliverable in ambient mode deliberately does NOT pop anymore —
+      // _ConfirmSheet now handles that state inline with its own "Use
+      // current location" / "Select another location" actions instead of
+      // bouncing back to the underlying LocationPickerSheet. Precise mode
+      // keeps today's behavior (stays put, pin still adjustable via the
+      // disabled-button + drag message) — deliberately not touched here.
       listener: (context, state) {
-        if (state is Bound) Navigator.of(context).pop();
+        if (state is Bound) {
+          Navigator.of(context).pop();
+        }
       },
       child: Scaffold(
-      body: Stack(
-        children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: widget.initialPosition,
-              initialZoom: 16,
-              onPositionChanged: (position, hasGesture) {
-                if (hasGesture && !_isDragging) {
-                  setState(() => _isDragging = true);
-                }
-              },
-              onMapEvent: (event) {
-                // mapController-sourced moves (our own .move() calls from
-                // the locate-me FAB and search result selection) already
-                // know their address — re-geocoding them here would be a
-                // redundant, back-to-back native geocoder call for the
-                // exact position that was just resolved.
-                if (event is MapEventMoveEnd &&
-                    event.source != MapEventSource.mapController) {
-                  _onMapEventFinished();
-                }
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.beeyo.customer',
+        body: Stack(
+          children: [
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: widget.initialPosition,
+                initialZoom: 16,
+                onPositionChanged: (position, hasGesture) {
+                  if (hasGesture && !_isDragging) {
+                    setState(() => _isDragging = true);
+                  }
+                },
+                onMapEvent: (event) {
+                  // mapController-sourced moves (our own .move() calls from
+                  // the locate-me FAB and search result selection) already
+                  // know their address — re-geocoding them here would be a
+                  // redundant, back-to-back native geocoder call for the
+                  // exact position that was just resolved.
+                  if (event is MapEventMoveEnd &&
+                      event.source != MapEventSource.mapController) {
+                    _onMapEventFinished();
+                  }
+                },
               ),
-            ],
-          ),
-
-          // Fixed center pin
-          const IgnorePointer(
-            child: Center(
-              child: Padding(
-                padding: EdgeInsets.only(bottom: 40),
-                child: Icon(Icons.location_pin,
-                    size: 44, color: Color(0xFF3DAA5C)),
-              ),
-            ),
-          ),
-
-          // Top bar: back + search
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            left: 16,
-            right: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    _RoundIconButton(
-                      icon: Icons.arrow_back_rounded,
-                      onTap: () => Navigator.pop(context),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Container(
-                        height: 42,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(21),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.15),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2)),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.search_rounded,
-                                color: Color(0xFF6B6B6B), size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                focusNode: _searchFocusNode,
-                                onChanged: _onSearchChanged,
-                                style: const TextStyle(
-                                    fontFamily: 'Poppins', fontSize: 14),
-                                decoration: const InputDecoration(
-                                  hintText: "Search for area, street...",
-                                  hintStyle: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 14,
-                                      color: Color(0xFF9E9E9E)),
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                ),
-                              ),
-                            ),
-                            if (_isSearching)
-                              const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Color(0xFF3DAA5C)),
-                              )
-                            else if (_searchController.text.isNotEmpty)
-                              GestureDetector(
-                                onTap: () {
-                                  _searchController.clear();
-                                  setState(() => _searchResults = []);
-                                },
-                                child: const Icon(Icons.close_rounded,
-                                    color: Color(0xFF6B6B6B), size: 18),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.beeyo.customer',
                 ),
-                if (_searchResults.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(top: 8, left: 52),
-                    constraints: const BoxConstraints(maxHeight: 260),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.12),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4)),
-                      ],
-                    ),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      itemCount: _searchResults.length,
-                      separatorBuilder: (_, __) => const Divider(
-                          height: 1, color: Color(0xFFE0E0E0)),
-                      itemBuilder: (context, index) {
-                        final result = _searchResults[index];
-                        return ListTile(
-                          dense: true,
-                          leading: const Icon(Icons.location_on_outlined,
-                              color: Color(0xFF3DAA5C), size: 20),
-                          title: Text(
-                            result.label,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87),
-                          ),
-                          onTap: () => _selectSearchResult(result),
-                        );
-                      },
-                    ),
-                  ),
               ],
             ),
-          ),
 
-          // Locate-me FAB
-          Positioned(
-            right: 16,
-            bottom: 260,
-            child: _RoundIconButton(
-              icon: Icons.my_location_rounded,
-              onTap: () async {
-                // autoConfirm: false — this FAB just re-centers the map on
-                // the device's GPS position while mid pin-adjustment; it
-                // must land on Confirming, not confirm out from under the
-                // in-progress edit.
-                final cubit = context.read<LocationCubit>();
-                await cubit.useCurrentLocation(autoConfirm: false);
-                final state = cubit.state;
-                if (state is Confirming) {
-                  _mapController.move(state.position, 16);
-                }
-              },
+            // Fixed center pin
+            const IgnorePointer(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 40),
+                  child: Icon(Icons.location_pin,
+                      size: 44, color: Color(0xFF3DAA5C)),
+                ),
+              ),
             ),
-          ),
 
-          // Bottom confirm sheet
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: _ConfirmSheet(
-              isDragging: _isDragging,
-              label: _label,
-              onLabelChanged: (l) => setState(() => _label = l),
-              customLabelController: _customLabelController,
-              landmarkController: _landmarkController,
-              existingAddress: widget.existingAddress,
+            // Top bar: back + search
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 16,
+              right: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (widget.ambientConfirm) ...[
+                    const Text(
+                      "Confirm location",
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black87),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  Row(
+                    children: [
+                      _RoundIconButton(
+                        icon: Icons.arrow_back_rounded,
+                        onTap: () => Navigator.pop(context),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Container(
+                          height: 42,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(21),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2)),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.search_rounded,
+                                  color: Color(0xFF6B6B6B), size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  focusNode: _searchFocusNode,
+                                  onChanged: _onSearchChanged,
+                                  style: const TextStyle(
+                                      fontFamily: 'Poppins', fontSize: 14),
+                                  decoration: const InputDecoration(
+                                    hintText: "Search for area, street...",
+                                    hintStyle: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 14,
+                                        color: Color(0xFF9E9E9E)),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                              if (_isSearching)
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Color(0xFF3DAA5C)),
+                                )
+                              else if (_searchController.text.isNotEmpty)
+                                GestureDetector(
+                                  onTap: () {
+                                    _searchController.clear();
+                                    setState(() => _searchResults = []);
+                                  },
+                                  child: const Icon(Icons.close_rounded,
+                                      color: Color(0xFF6B6B6B), size: 18),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_searchResults.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 8, left: 52),
+                      constraints: const BoxConstraints(maxHeight: 260),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.12),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: _searchResults.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                        itemBuilder: (context, index) {
+                          final result = _searchResults[index];
+                          return ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.location_on_outlined,
+                                color: Color(0xFF3DAA5C), size: 20),
+                            title: Text(
+                              result.label,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87),
+                            ),
+                            onTap: () => _selectSearchResult(result),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+
+            // Locate-me FAB
+            Positioned(
+              right: 16,
+              bottom: 260,
+              child: _RoundIconButton(
+                icon: Icons.my_location_rounded,
+                onTap: () async {
+                  // autoConfirm: false — this FAB just re-centers the map on
+                  // the device's GPS position while mid pin-adjustment; it
+                  // must land on Confirming, not confirm out from under the
+                  // in-progress edit.
+                  final cubit = context.read<LocationCubit>();
+                  await cubit.useCurrentLocation(autoConfirm: false);
+                  final state = cubit.state;
+                  if (state is Confirming) {
+                    _mapController.move(state.position, 16);
+                  }
+                },
+              ),
+            ),
+
+            // Bottom confirm sheet
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: _ConfirmSheet(
+                isDragging: _isDragging,
+                label: _label,
+                onLabelChanged: (l) => setState(() => _label = l),
+                customLabelController: _customLabelController,
+                landmarkController: _landmarkController,
+                existingAddress: widget.existingAddress,
+                ambientConfirm: widget.ambientConfirm,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -383,6 +410,7 @@ class _ConfirmSheet extends StatelessWidget {
   final TextEditingController customLabelController;
   final TextEditingController landmarkController;
   final SavedAddressModel? existingAddress;
+  final bool ambientConfirm;
 
   const _ConfirmSheet({
     required this.isDragging,
@@ -391,12 +419,11 @@ class _ConfirmSheet extends StatelessWidget {
     required this.customLabelController,
     required this.landmarkController,
     this.existingAddress,
+    required this.ambientConfirm,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isGuest = context.watch<AuthBloc>().state is! AuthAuthenticated;
-
     return Container(
       padding: EdgeInsets.fromLTRB(
           20, 16, 20, MediaQuery.of(context).padding.bottom + 16),
@@ -411,6 +438,17 @@ class _ConfirmSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (ambientConfirm) ...[
+            const Text(
+              "Delivering to",
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF6B6B6B)),
+            ),
+            const SizedBox(height: 4),
+          ],
           BlocBuilder<LocationCubit, LocationState>(
             builder: (context, state) {
               final isNotDeliverable = state is NotDeliverable;
@@ -449,9 +487,14 @@ class _ConfirmSheet extends StatelessWidget {
               );
             },
           ),
+          // Ambient mode replaces this drag-message + the confirm button
+          // below with an inline "oops" action state instead (see the
+          // bottom BlocBuilder) — this stays precise-mode only.
           BlocBuilder<LocationCubit, LocationState>(
             builder: (context, state) {
-              if (state is! NotDeliverable) return const SizedBox();
+              if (state is! NotDeliverable || ambientConfirm) {
+                return const SizedBox();
+              }
               return const Padding(
                 padding: EdgeInsets.only(top: 8),
                 child: Text(
@@ -466,10 +509,11 @@ class _ConfirmSheet extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Label chips + custom label are Address Book framing (Home/Work/
-          // Other) — meaningless for guests, whose pick never joins a saved
-          // addresses list, so skip straight to the landmark field for them.
-          if (!isGuest) ...[
+          // Label chips, custom label, and the landmark field are Address
+          // Book framing (Home/Work/Other + rider instructions) — meaningless
+          // for the ambient "just checking this area" flow, whose pick never
+          // joins the saved-address list, so skip straight to the button.
+          if (!ambientConfirm) ...[
             Wrap(
               spacing: 8,
               children: AddressLabel.values.map((l) {
@@ -495,7 +539,6 @@ class _ConfirmSheet extends StatelessWidget {
                 );
               }).toList(),
             ),
-
             if (label == AddressLabel.other) ...[
               const SizedBox(height: 12),
               _InputField(
@@ -503,34 +546,122 @@ class _ConfirmSheet extends StatelessWidget {
                 hint: "Label (e.g. Friend's place)",
               ),
             ],
-
             const SizedBox(height: 12),
+            _InputField(
+              controller: landmarkController,
+              hint: "Landmark / floor / gate instructions (helps riders)",
+              maxLines: 2,
+            ),
           ],
-          _InputField(
-            controller: landmarkController,
-            hint: "Landmark / floor / gate instructions (helps riders)",
-            maxLines: 2,
-          ),
 
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: BlocBuilder<LocationCubit, LocationState>(
-              builder: (context, state) {
-                final isChecking = state is CheckingServiceability;
-                final canConfirm = state is Confirming && !isDragging;
+          BlocBuilder<LocationCubit, LocationState>(
+            builder: (context, state) {
+              // Ambient-only inline "oops" state: replaces the confirm
+              // button entirely rather than just disabling it, since there's
+              // a real way out of it here — re-check on current GPS, or
+              // bail back to search. State-driven off this same builder (not
+              // a separate listener/imperative branch), so re-tapping "Use
+              // current location" and landing on NotDeliverable again just
+              // re-renders this same branch with the new address — no extra
+              // state-tracking needed.
+              if (ambientConfirm && state is NotDeliverable) {
                 final cubit = context.read<LocationCubit>();
-                final editing = existingAddress;
-                // Editing a saved address that ISN'T the one currently
-                // bound should just persist the change, not rebind it.
-                final isInactiveEdit =
-                    editing != null && editing.id != cubit.boundAddressId;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Oops, it's an unserviceable area",
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFE53935)),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: () =>
+                            cubit.useCurrentLocation(autoConfirm: true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3DAA5C),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          "Use current location",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          // ManualEntry is what makes the underlying
+                          // LocationPickerSheet's builder fall through to
+                          // _MainPickerView (the plain search sheet) rather
+                          // than NotDeliverableView — the user is choosing
+                          // to search fresh here, not being told no again.
+                          cubit.pickDifferentLocation();
+                          Navigator.pop(context);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFE0E0E0)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text(
+                          "Select another location",
+                          style: TextStyle(
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
 
-                return ElevatedButton(
+              final isChecking = state is CheckingServiceability;
+              final canConfirm = state is Confirming && !isDragging;
+              final cubit = context.read<LocationCubit>();
+              final editing = existingAddress;
+              // Editing a saved address that ISN'T the one currently
+              // bound should just persist the change, not rebind it.
+              final isInactiveEdit =
+                  editing != null && editing.id != cubit.boundAddressId;
+
+              return SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
                   onPressed: !canConfirm || isChecking
                       ? null
                       : () async {
+                          if (ambientConfirm) {
+                            // No label/landmark collected in this mode, and
+                            // it must never silently grow the user's real
+                            // saved-address list — see
+                            // LocationCubit.confirmAddress's
+                            // persistAsSavedAddress doc.
+                            cubit.confirmAddress(
+                              position: state.position,
+                              formattedAddress: state.formattedAddress,
+                              label: AddressLabel.home,
+                              persistAsSavedAddress: false,
+                            );
+                            return;
+                          }
                           if (isInactiveEdit) {
                             await cubit.editSavedAddress(editing.copyWith(
                               label: label,
@@ -566,17 +697,19 @@ class _ConfirmSheet extends StatelessWidget {
                               strokeWidth: 2, color: Colors.white),
                         )
                       : Text(
-                          editing != null
-                              ? "Save Changes"
-                              : (isGuest ? "Confirm location" : "Confirm & Save"),
+                          ambientConfirm
+                              ? "Confirm Location"
+                              : (editing != null
+                                  ? "Save Changes"
+                                  : "Confirm & Save"),
                           style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
                               fontSize: 15),
                         ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
         ],
       ),

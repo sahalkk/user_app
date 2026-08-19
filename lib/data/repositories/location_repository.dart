@@ -42,10 +42,13 @@ class LocationRepository {
   LocationRepository(this.authRepository);
 
   static const _savedAddressesKey = 'saved_addresses';
-  // Single-slot, session-style cache for guests — restores their last bound
-  // location on relaunch without giving them a real, multi-entry saved-
-  // addresses list (which the Address Book / picker UI are gated on).
-  static const _guestLastLocationKey = 'guest_last_location';
+  // Single-slot, session-style cache for the ambient "is my area
+  // serviceable" flow — restores the last bound location on relaunch
+  // without writing a real, multi-entry saved-address-list entry (which
+  // the Address Book / picker UI are gated on). Used for guests always,
+  // and for logged-in users specifically when they bind via the ambient
+  // ("just checking") flow rather than an explicit add/edit-address flow.
+  static const _lastAmbientLocationKey = 'guest_last_location';
 
   Future<Map<String, String>> _authHeaders() async {
     final token = await authRepository.getToken();
@@ -303,16 +306,17 @@ class LocationRepository {
         'Failed to save address to backend (${response.statusCode})');
   }
 
-  Future<SavedAddressModel?> getGuestLastLocation() async {
+  Future<SavedAddressModel?> getLastAmbientLocation() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_guestLastLocationKey);
+    final raw = prefs.getString(_lastAmbientLocationKey);
     if (raw == null) return null;
     return SavedAddressModel.fromJson(jsonDecode(raw));
   }
 
-  Future<void> saveGuestLastLocation(SavedAddressModel address) async {
+  Future<void> saveLastAmbientLocation(SavedAddressModel address) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_guestLastLocationKey, jsonEncode(address.toJson()));
+    await prefs.setString(
+        _lastAmbientLocationKey, jsonEncode(address.toJson()));
   }
 
   Future<void> deleteAddress(String id) async {

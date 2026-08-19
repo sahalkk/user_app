@@ -38,15 +38,16 @@ class LocationCubit extends Cubit<LocationState> {
     }
 
     // No persisted saved addresses — either a guest, or a logged-in user
-    // who hasn't saved one yet. Fall back to the guest's session-only last
-    // location (if any) so guests don't have to re-pick on every relaunch.
-    final guestLast = await _repository.getGuestLastLocation();
-    if (guestLast != null) {
-      emit(Bound(address: guestLast));
+    // who hasn't saved one (or has only bound via the ambient flow) yet.
+    // Fall back to the session-only ambient cache so they don't have to
+    // re-pick on every relaunch.
+    final ambientLast = await _repository.getLastAmbientLocation();
+    if (ambientLast != null) {
+      emit(Bound(address: ambientLast));
       await _runServiceabilityCheck(
-        position: guestLast.position,
-        formattedAddress: guestLast.formattedAddress,
-        existingAddress: guestLast,
+        position: ambientLast.position,
+        formattedAddress: ambientLast.formattedAddress,
+        existingAddress: ambientLast,
       );
       return;
     }
@@ -118,6 +119,27 @@ class LocationCubit extends Cubit<LocationState> {
   Future<void> useCurrentLocation({bool autoConfirm = true}) =>
       checkInitialPermission(autoConfirm: autoConfirm);
 
+  /// Best-effort current position for UI decoration only (e.g. "3.2 km
+  /// away" badges on saved addresses) — deliberately doesn't touch cubit
+  /// state and swallows every failure by returning null, so callers can
+  /// just omit whatever depends on it instead of the whole sheet waiting
+  /// on or erroring over a GPS fix. Checks permission first and bails
+  /// without asking: [LocationRepository.getCurrentPosition] itself would
+  /// trigger the real OS permission dialog on a bare "denied" status, and
+  /// a decorative badge must never surprise the user with that popup.
+  Future<LatLng?> tryGetCurrentPosition() async {
+    try {
+      final permission = await _repository.checkPermission();
+      if (permission != LocationPermission.always &&
+          permission != LocationPermission.whileInUse) {
+        return null;
+      }
+      return await _repository.getCurrentPosition();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _resolveCurrentLocation({bool autoConfirm = false}) async {
     emit(const Resolving());
     try {
@@ -174,15 +196,15 @@ class LocationCubit extends Cubit<LocationState> {
   Future<List<({String label, LatLng position})>> searchAddress(String query) =>
       _repository.searchAddress(query);
 
-  /// Same caller-decided [autoConfirm] rule as [useCurrentLocation] — a
-  /// search query is just as valid a way to check "is my area serviceable"
-  /// as GPS is, in the ambient flow. Reachable both from the main picker
-  /// sheet's search box (ambient, defaults to true) and from within
-  /// [MapPinPickerScreen]'s own search box (mid-edit, passes false so
-  /// picking a result there only re-centers the pin instead of confirming
-  /// out from under the user).
+  /// Same caller-decided [autoConfirm] rule as [useCurrentLocation]. Unlike
+  /// GPS, a search result — in both the ambient sheet and inside
+  /// [MapPinPickerScreen]'s own search box — always lands on [Confirming]
+  /// first so the result can be reviewed/adjusted on the map before it's
+  /// bound: the ambient sheet auto-navigates straight to a trimmed-chrome
+  /// map confirm step, while the precise flow shows the existing text
+  /// preview with an explicit "adjust pin" action.
   void selectSearchResult(String label, LatLng position,
-      {bool autoConfirm = true}) {
+      {bool autoConfirm = false}) {
     if (autoConfirm) {
       confirmAddress(
         position: position,
@@ -240,6 +262,15 @@ class LocationCubit extends Cubit<LocationState> {
   /// Creates a new saved address, or — when [editing] is passed — updates
   /// that address in place (same id, original createdAt preserved) instead
   /// of adding a duplicate.
+  ///
+  /// [persistAsSavedAddress] (default true) controls whether a *logged-in*
+  /// user's confirm writes into their real, multi-entry saved-address list
+  /// (and thus the Address Book) or just the lightweight ambient cache —
+  /// pass false from the ambient "just checking this area" flow, where no
+  /// label/landmark was even collected, so nothing gets silently appended
+  /// to their address book. Guests are unaffected either way — they only
+  /// ever get the ambient cache, same as always (see
+  /// [_runServiceabilityCheck]).
   Future<void> confirmAddress({
     required LatLng position,
     required String formattedAddress,
@@ -248,6 +279,7 @@ class LocationCubit extends Cubit<LocationState> {
     String? landmark,
     String? pincode,
     SavedAddressModel? editing,
+    bool persistAsSavedAddress = true,
   }) async {
     final now = DateTime.now();
     final address = SavedAddressModel(
@@ -267,6 +299,7 @@ class LocationCubit extends Cubit<LocationState> {
       position: position,
       formattedAddress: formattedAddress,
       existingAddress: address,
+      persistAsSavedAddress: persistAsSavedAddress,
     );
   }
 
@@ -284,6 +317,7 @@ class LocationCubit extends Cubit<LocationState> {
     required LatLng position,
     required String formattedAddress,
     required SavedAddressModel existingAddress,
+    bool persistAsSavedAddress = true,
   }) async {
     emit(CheckingServiceability(
       position: position,
@@ -306,14 +340,18 @@ class LocationCubit extends Cubit<LocationState> {
 
     if (result.isServiceable) {
       // Guests can browse/order against a bound address for the session,
-      // but only logged-in users get it written to the persistent saved-
-      // addresses list (and, by extension, the Address Book). Guests still
-      // get a single-slot session cache so they aren't dropped back to
-      // square one on every relaunch — see bootstrap().
-      if (await _repository.authRepository.isLoggedIn()) {
+      // but only logged-in users confirming through an explicit add/edit
+      // flow (persistAsSavedAddress: true, the default) get it written to
+      // the persistent saved-addresses list (and, by extension, the
+      // Address Book). Everyone else — guests always, or a logged-in user
+      // just checking an area via the ambient flow — gets the lightweight
+      // single-slot ambient cache instead, so they aren't dropped back to
+      // square one on every relaunch (see bootstrap()) without silently
+      // growing their real address book.
+      if (persistAsSavedAddress && await _repository.authRepository.isLoggedIn()) {
         await _repository.saveAddress(existingAddress);
       } else {
-        await _repository.saveGuestLastLocation(existingAddress);
+        await _repository.saveLastAmbientLocation(existingAddress);
       }
       emit(Bound(
         address: existingAddress,
