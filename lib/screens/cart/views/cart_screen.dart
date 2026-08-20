@@ -249,9 +249,11 @@ class _CartScreenState extends State<CartScreen> {
                             ),
                             elevation: 0,
                           ),
-                          child: const Text(
-                            "Checkout",
-                            style: TextStyle(
+                          child: Text(
+                            state.deliveryAddress == null
+                                ? "Continue to Address"
+                                : "Checkout",
+                            style: const TextStyle(
                                 fontSize: 18,
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold),

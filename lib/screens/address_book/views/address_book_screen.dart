@@ -48,6 +48,14 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   // Confirming and let the pin be adjusted rather than auto-confirming.
   Future<void> _useCurrentLocation() async {
     final cubit = context.read<LocationCubit>();
+    // Captured before this exploratory GPS/pin-adjust flow can move the
+    // cubit off of it — restored below if it's abandoned without landing
+    // on a new Bound, so backing out doesn't leave this screen (or
+    // MainWrapper, underneath) stuck showing NotDeliverable/gate content
+    // for an address that never actually replaced the real bound one.
+    final priorState = cubit.state;
+    final priorBound = priorState is Bound ? priorState : null;
+
     await cubit.useCurrentLocation(autoConfirm: false);
     if (!mounted) return;
 
@@ -72,8 +80,14 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
       await LocationPickerSheet.show(context, precise: true);
     }
     if (!mounted) return;
+    // A restore means the exploration failed/was abandoned, not that a
+    // fresh address just got bound — don't let the pop-on-Bound below
+    // treat "we fell back to the old address" as a success that should
+    // close this screen.
+    final restored = cubit.state is! Bound && priorBound != null;
+    if (restored) cubit.restorePreviousBound(priorBound);
     _reload();
-    if (cubit.state is Bound) Navigator.of(context).pop();
+    if (!restored && cubit.state is Bound) Navigator.of(context).pop();
   }
 
   Future<void> _addNew() async {
@@ -86,11 +100,19 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   }
 
   Future<void> _edit(SavedAddressModel address) async {
+    final cubit = context.read<LocationCubit>();
+    // See _useCurrentLocation — captured so an edit that's abandoned (or
+    // that ends on a NotDeliverable candidate the user backs out of)
+    // doesn't leave this screen stuck showing that instead of the address
+    // list, when nothing about the real bound address actually changed.
+    final priorState = cubit.state;
+    final priorBound = priorState is Bound ? priorState : null;
+
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => BlocProvider.value(
-          value: context.read<LocationCubit>(),
+          value: cubit,
           child: MapPinPickerScreen(
             initialPosition: address.position,
             existingAddress: address,
@@ -99,6 +121,9 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
       ),
     );
     if (!mounted) return;
+    if (cubit.state is! Bound && priorBound != null) {
+      cubit.restorePreviousBound(priorBound);
+    }
     _reload();
   }
 
@@ -364,7 +389,7 @@ class _AddressCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    address.formattedAddress,
+                    address.primaryAddressText,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Color(0xFF6B6B6B)),

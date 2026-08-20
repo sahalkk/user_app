@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../shared/models/checkout_address_model.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../../location/cubit/location_cubit.dart';
+import '../../location/views/add_address_wizard/address_wizard_draft.dart';
 import '../../location/views/location_picker_sheet.dart';
 import '../../location/views/map_pin_picker_screen.dart';
 import '../../location/views/not_deliverable_view.dart';
@@ -74,6 +75,16 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   // let the pin be adjusted rather than auto-confirming past it.
   Future<void> _useCurrentLocation() async {
     final cubit = context.read<LocationCubit>();
+    // Captured before this exploratory GPS/pin-adjust flow can move the
+    // cubit off of it — restored below if it's abandoned without landing
+    // on a new Bound, so backing out of a direct MapPinPickerScreen push
+    // doesn't leave this screen stuck showing NotDeliverableView for an
+    // address that never actually replaced the real bound one. (The
+    // LocationPickerSheet.show() fallback branch already self-heals this
+    // internally, so this only matters for the direct-push branch below.)
+    final priorState = cubit.state;
+    final priorBound = priorState is Bound ? priorState : null;
+
     await cubit.useCurrentLocation(autoConfirm: false);
     if (!mounted) return;
 
@@ -95,6 +106,9 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       await LocationPickerSheet.show(context, precise: true);
     }
     if (!mounted) return;
+    if (cubit.state is! Bound && priorBound != null) {
+      cubit.restorePreviousBound(priorBound);
+    }
     _reloadAddresses();
     final bound = cubit.state;
     if (bound is Bound) setState(() => _selectedAddress = bound.address);
@@ -102,7 +116,15 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
 
   Future<void> _addNew() async {
     final cubit = context.read<LocationCubit>();
-    await LocationPickerSheet.show(context, precise: true);
+    // Checkout entry point: the wizard's Step 3 calls widget.onSave directly
+    // on success, so the whole wizard stack pops out together with this
+    // screen — no need to reload/select here the way the other paths do.
+    await LocationPickerSheet.show(
+      context,
+      precise: true,
+      entryPoint: AddressWizardEntryPoint.checkout,
+      onCheckoutSave: widget.onSave,
+    );
     if (!mounted) return;
     _reloadAddresses();
     final state = cubit.state;
@@ -398,7 +420,7 @@ class _SelectableAddressCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                           color: Colors.black87)),
                   const SizedBox(height: 2),
-                  Text(address.formattedAddress,
+                  Text(address.primaryAddressText,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

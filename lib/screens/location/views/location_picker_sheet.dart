@@ -7,8 +7,10 @@ import 'package:latlong2/latlong.dart';
 import '../../../blocs/auth_bloc/auth_bloc.dart';
 import '../../../blocs/auth_bloc/auth_state.dart';
 import '../../../data/repositories/location_repository.dart' show distanceMeters;
+import '../../../shared/models/checkout_address_model.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../cubit/location_cubit.dart';
+import 'add_address_wizard/address_wizard_draft.dart';
 import 'map_pin_picker_screen.dart';
 import 'not_deliverable_view.dart';
 
@@ -21,10 +23,34 @@ class LocationPickerSheet extends StatefulWidget {
   /// step, and "Add new address" (precise pin drop) stays available.
   final bool precise;
 
-  const LocationPickerSheet({super.key, this.precise = false});
+  /// Which flow this sheet was entered from — threaded through to whatever
+  /// MapPinPickerScreen it eventually pushes, and from there to the
+  /// add-address wizard.
+  final AddressWizardEntryPoint entryPoint;
 
-  static Future<void> show(BuildContext context, {bool precise = false}) {
+  /// Only meaningful for the checkout entry point — threaded through to the
+  /// wizard's [AddressWizardDraft.onCheckoutSave].
+  final void Function(CheckoutAddressModel)? onCheckoutSave;
+
+  const LocationPickerSheet({
+    super.key,
+    this.precise = false,
+    this.entryPoint = AddressWizardEntryPoint.addressBook,
+    this.onCheckoutSave,
+  });
+
+  static Future<void> show(
+    BuildContext context, {
+    bool precise = false,
+    AddressWizardEntryPoint entryPoint = AddressWizardEntryPoint.addressBook,
+    void Function(CheckoutAddressModel)? onCheckoutSave,
+  }) async {
     final cubit = context.read<LocationCubit>();
+    // Captured before anything below can move the cubit off of it — restored
+    // afterward if the sheet gets dismissed/abandoned without landing on a
+    // new Bound (see the check after the await below).
+    final priorState = cubit.state;
+    final priorBound = priorState is Bound ? priorState : null;
     // Opening the sheet while state is already NotDeliverable (carried over
     // from before it was opened — e.g. "Choose a different location" on
     // NotServiceableScreen, the header's "Not deliverable here" dropdown,
@@ -41,15 +67,30 @@ class LocationPickerSheet extends StatefulWidget {
     if (cubit.state is NotDeliverable) {
       cubit.pickDifferentLocation();
     }
-    return showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => BlocProvider.value(
         value: cubit,
-        child: LocationPickerSheet(precise: precise),
+        child: LocationPickerSheet(
+          precise: precise,
+          entryPoint: entryPoint,
+          onCheckoutSave: onCheckoutSave,
+        ),
       ),
     );
+    // Covers every dismissal path uniformly (drag-to-dismiss, tap-outside,
+    // back button, or reaching NotDeliverable/ManualEntry and just closing
+    // without finishing) — this await already spans the sheet's entire
+    // lifetime, including any MapPinPickerScreen pushed from within it
+    // (e.g. via "Adjust pin on map & save"), so by the time control gets
+    // here the whole exploration is over one way or another. Exploring a
+    // new location must not be destructive to an already-bound address
+    // until a new bind actually succeeds.
+    if (cubit.state is! Bound && priorBound != null) {
+      cubit.restorePreviousBound(priorBound);
+    }
   }
 
   @override
@@ -121,12 +162,35 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
             initialPosition: state.position,
             initialFormattedAddress: state.formattedAddress,
             ambientConfirm: ambientConfirm,
+            entryPoint: widget.entryPoint,
+            onCheckoutSave: widget.onCheckoutSave,
           ),
         ),
       ),
     );
-    if (mounted && cubit.state is Bound) {
-      Navigator.of(context).maybePop();
+    // onCheckoutSave == null guard: for the checkout entry point,
+    // ReviewLocationScreen's listener already pops this sheet itself as one
+    // of 4 explicit, deterministic pops before calling onCheckoutSave — an
+    // independent pop here (racing that sequence, or firing after it) could
+    // pop the CheckoutScreen onCheckoutSave's pushReplacement just pushed.
+    if (!mounted) return;
+    if (cubit.state is Bound) {
+      if (widget.onCheckoutSave == null) Navigator.of(context).maybePop();
+      return;
+    }
+    // Backed out of the map screen without binding. In ambient mode the
+    // builder's Confirming branch is only the "Loading map…" placeholder
+    // that exists to cover this push, so leaving the cubit on Confirming
+    // strands the sheet on that spinner permanently — the listener can't
+    // re-fire without a state change, so nothing re-pushes the map either,
+    // and drag-to-dismiss is the only way out. Reset to ManualEntry so
+    // backing out lands on the plain search view (with the user's previous
+    // query and results still in place). Precise mode is deliberately left
+    // alone: its Confirming branch renders the real _ConfirmAddressView,
+    // which is a usable place to come back to, and resetting there would
+    // throw away the pick the user just made.
+    if (ambientConfirm && cubit.state is Confirming) {
+      cubit.pickDifferentLocation();
     }
   }
 
@@ -184,10 +248,13 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 );
               }
               if (state is Confirming) {
-                // Ambient mode never renders this — the listener above
-                // already navigates away the instant this state arrives.
-                // A brief loader covers that one frame rather than flashing
-                // the precise flow's text preview first.
+                // Ambient mode never renders this for longer than the one
+                // frame before the listener above navigates away. A brief
+                // loader covers that frame rather than flashing the precise
+                // flow's text preview first. It's also never left standing
+                // after the map screen is dismissed — _pushMapConfirm resets
+                // the cubit to ManualEntry on a non-binding back-out, which
+                // falls this builder through to _MainPickerView.
                 if (!widget.precise) {
                   return const _CenteredLoader(label: "Loading map…");
                 }
@@ -207,6 +274,8 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 isResolving: state is Resolving || state is PermissionChecking,
                 precise: widget.precise,
                 currentPosition: _currentPosition,
+                entryPoint: widget.entryPoint,
+                onCheckoutSave: widget.onCheckoutSave,
               );
             },
           ),
@@ -400,6 +469,8 @@ class _MainPickerView extends StatelessWidget {
   final bool isResolving;
   final bool precise;
   final LatLng? currentPosition;
+  final AddressWizardEntryPoint entryPoint;
+  final void Function(CheckoutAddressModel)? onCheckoutSave;
 
   const _MainPickerView({
     required this.scrollController,
@@ -410,6 +481,8 @@ class _MainPickerView extends StatelessWidget {
     required this.isResolving,
     required this.precise,
     this.currentPosition,
+    required this.entryPoint,
+    this.onCheckoutSave,
   });
 
   @override
@@ -596,8 +669,11 @@ class _MainPickerView extends StatelessWidget {
                 MaterialPageRoute(
                   builder: (_) => BlocProvider.value(
                     value: context.read<LocationCubit>(),
-                    child: const MapPinPickerScreen(
-                      initialPosition: LatLng(8.5241, 76.9366), // Trivandrum
+                    child: MapPinPickerScreen(
+                      initialPosition:
+                          const LatLng(8.5241, 76.9366), // Trivandrum
+                      entryPoint: entryPoint,
+                      onCheckoutSave: onCheckoutSave,
                     ),
                   ),
                 ),
@@ -669,7 +745,7 @@ class _SavedAddressTile extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                           color: Colors.black87)),
                   const SizedBox(height: 4),
-                  Text(address.formattedAddress,
+                  Text(address.primaryAddressText,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

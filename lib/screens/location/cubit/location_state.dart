@@ -74,6 +74,26 @@ class CheckingServiceability extends LocationState {
   List<Object?> get props => [position, formattedAddress];
 }
 
+/// Serviceability couldn't be determined at all — network/timeout/backend
+/// unreachable — as opposed to [NotDeliverable], which is an authoritative
+/// "yes, we checked, and this address is outside every zone." Keeps
+/// [address] (rather than just position/formattedAddress) so
+/// [LocationCubit.retryServiceabilityCheck] can re-run the exact same
+/// check without losing label/landmark/pincode the user may have already
+/// filled in.
+class CheckFailed extends LocationState {
+  final SavedAddressModel address;
+  final bool persistAsSavedAddress;
+
+  const CheckFailed({
+    required this.address,
+    this.persistAsSavedAddress = true,
+  });
+
+  @override
+  List<Object?> get props => [address, persistAsSavedAddress];
+}
+
 class NotDeliverable extends LocationState {
   final LatLng position;
   final String formattedAddress;

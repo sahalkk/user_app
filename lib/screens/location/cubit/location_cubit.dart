@@ -278,6 +278,9 @@ class LocationCubit extends Cubit<LocationState> {
     String? customLabel,
     String? landmark,
     String? pincode,
+    String? addressLine,
+    String? googleMapsLink,
+    String? imageLocalPath,
     SavedAddressModel? editing,
     bool persistAsSavedAddress = true,
   }) async {
@@ -288,6 +291,9 @@ class LocationCubit extends Cubit<LocationState> {
       customLabel: customLabel,
       position: position,
       formattedAddress: formattedAddress,
+      addressLine: addressLine ?? formattedAddress,
+      googleMapsLink: googleMapsLink,
+      imageLocalPath: imageLocalPath,
       landmark: landmark,
       pincode: pincode,
       isDefault: editing?.isDefault ?? false,
@@ -330,11 +336,13 @@ class LocationCubit extends Cubit<LocationState> {
     } on ServiceabilityCheckFailed {
       // Couldn't get an authoritative answer (network/timeout) — don't
       // conflate that with the backend actually saying "not deliverable
-      // here". Fall back to ManualEntry so the user gets a retry-friendly
-      // prompt instead of a hard sorry screen for what might just be a
-      // flaky connection.
-      emit(const ManualEntry(
-          message: "Couldn't check delivery availability. Please try again."));
+      // here". CheckFailed gets its own dedicated screen (mirroring
+      // NotServiceableScreen) with a "Try again" action, rather than
+      // dumping the user on the generic, dead-end ManualEntry gate.
+      emit(CheckFailed(
+        address: existingAddress,
+        persistAsSavedAddress: persistAsSavedAddress,
+      ));
       return;
     }
 
@@ -366,6 +374,23 @@ class LocationCubit extends Cubit<LocationState> {
     }
   }
 
+  // ── Check-failed actions ─────────────────────────────────────────
+
+  /// Re-runs the exact serviceability check that failed, using the same
+  /// address that was already resolved — the user shouldn't have to
+  /// re-pick their location just because the last attempt hit a network
+  /// blip.
+  Future<void> retryServiceabilityCheck() async {
+    final current = state;
+    if (current is! CheckFailed) return;
+    await _runServiceabilityCheck(
+      position: current.address.position,
+      formattedAddress: current.address.formattedAddress,
+      existingAddress: current.address,
+      persistAsSavedAddress: current.persistAsSavedAddress,
+    );
+  }
+
   // ── Not-deliverable actions ──────────────────────────────────────
 
   Future<void> joinNotifyList() async {
@@ -376,6 +401,14 @@ class LocationCubit extends Cubit<LocationState> {
   }
 
   void pickDifferentLocation() => emit(const ManualEntry());
+
+  /// Restores a previously-bound address after an exploratory location
+  /// check (e.g. searching a candidate from the ambient picker sheet) was
+  /// abandoned without landing on a new [Bound] — guarded so it never
+  /// clobbers a legitimately fresh bind that did land in the meantime.
+  void restorePreviousBound(Bound previous) {
+    if (state is! Bound) emit(previous);
+  }
 
   // ── Saved addresses management ───────────────────────────────────
 

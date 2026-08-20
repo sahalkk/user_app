@@ -262,7 +262,7 @@ class LocationRepository {
     ].where((s) => s != null && s.trim().isNotEmpty).join(' ').trim();
 
     final body = jsonEncode({
-      'street': street.isNotEmpty ? street : address.formattedAddress,
+      'street': street.isNotEmpty ? street : address.primaryAddressText,
       'city': (placemark?.locality?.isNotEmpty ?? false)
           ? placemark!.locality
           : (placemark?.subAdministrativeArea ?? ''),

@@ -25,6 +25,14 @@ class SavedAddressModel extends Equatable {
   final String? customLabel; // used when label == AddressLabel.other
   final LatLng position;
   final String formattedAddress;
+  // Primary, user-typed address text collected in the add-address wizard's
+  // Step 1 — this is what's shown everywhere an address is displayed.
+  // formattedAddress (reverse-geocoded) stays as the short "Area, Street"
+  // label and geocoding anchor.
+  final String addressLine;
+  final String? googleMapsLink;
+  // Local file path only — not uploaded anywhere (yet).
+  final String? imageLocalPath;
   final String? landmark; // rider-facing: gate no., floor, instructions
   final String? pincode;
   final bool isDefault;
@@ -41,6 +49,9 @@ class SavedAddressModel extends Equatable {
     this.customLabel,
     required this.position,
     required this.formattedAddress,
+    this.addressLine = '',
+    this.googleMapsLink,
+    this.imageLocalPath,
     this.landmark,
     this.pincode,
     this.isDefault = false,
@@ -54,12 +65,18 @@ class SavedAddressModel extends Equatable {
           ? customLabel!
           : label.display;
 
+  String get primaryAddressText =>
+      addressLine.isNotEmpty ? addressLine : formattedAddress;
+
   SavedAddressModel copyWith({
     String? id,
     AddressLabel? label,
     String? customLabel,
     LatLng? position,
     String? formattedAddress,
+    String? addressLine,
+    String? googleMapsLink,
+    String? imageLocalPath,
     String? landmark,
     String? pincode,
     bool? isDefault,
@@ -73,6 +90,9 @@ class SavedAddressModel extends Equatable {
       customLabel: customLabel ?? this.customLabel,
       position: position ?? this.position,
       formattedAddress: formattedAddress ?? this.formattedAddress,
+      addressLine: addressLine ?? this.addressLine,
+      googleMapsLink: googleMapsLink ?? this.googleMapsLink,
+      imageLocalPath: imageLocalPath ?? this.imageLocalPath,
       landmark: landmark ?? this.landmark,
       pincode: pincode ?? this.pincode,
       isDefault: isDefault ?? this.isDefault,
@@ -89,6 +109,9 @@ class SavedAddressModel extends Equatable {
         'lat': position.latitude,
         'lng': position.longitude,
         'formattedAddress': formattedAddress,
+        'addressLine': addressLine,
+        'googleMapsLink': googleMapsLink,
+        'imageLocalPath': imageLocalPath,
         'landmark': landmark,
         'pincode': pincode,
         'isDefault': isDefault,
@@ -110,6 +133,11 @@ class SavedAddressModel extends Equatable {
         (json['lng'] as num).toDouble(),
       ),
       formattedAddress: json['formattedAddress'] as String? ?? '',
+      addressLine: json['addressLine'] as String? ??
+          json['formattedAddress'] as String? ??
+          '',
+      googleMapsLink: json['googleMapsLink'] as String?,
+      imageLocalPath: json['imageLocalPath'] as String?,
       landmark: json['landmark'] as String?,
       pincode: json['pincode'] as String?,
       isDefault: json['isDefault'] as bool? ?? false,
@@ -128,6 +156,9 @@ class SavedAddressModel extends Equatable {
         customLabel,
         position,
         formattedAddress,
+        addressLine,
+        googleMapsLink,
+        imageLocalPath,
         landmark,
         pincode,
         isDefault,

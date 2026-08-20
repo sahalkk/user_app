@@ -19,6 +19,7 @@ import '../../blocs/order_bloc/order_bloc.dart';
 import '../../blocs/order_bloc/order_event.dart';
 import '../shared/utils/bloc_ready.dart';
 import 'location/cubit/location_cubit.dart';
+import 'location/views/check_failed_screen.dart';
 import 'location/views/location_gate_screen.dart';
 import 'location/views/not_serviceable_screen.dart';
 
@@ -93,7 +94,9 @@ class _MainWrapperState extends State<MainWrapper> {
             Positioned.fill(
               child: locationState is NotDeliverable
                   ? const NotServiceableScreen()
-                  : const LocationGateScreen(),
+                  : locationState is CheckFailed
+                      ? const CheckFailedScreen()
+                      : const LocationGateScreen(),
             ),
 
           // Global Floating Cart Banner (Remains unchanged!)

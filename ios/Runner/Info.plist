@@ -47,5 +47,9 @@
 		<true/>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>Beeyo uses your location to show your delivery address and check whether we deliver to your area.</string>
+		<key>NSContactsUsageDescription</key>
+		<string>Beeyo uses your contacts to quickly fill in a recipient's name and phone number for a delivery address.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Beeyo uses your photo library to attach a reference image to a delivery address.</string>
 	</dict>
 </plist>

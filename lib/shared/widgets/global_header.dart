@@ -144,6 +144,9 @@ class _LocationDropdownRow extends StatelessWidget {
     if (state is NotDeliverable) {
       return ('Not deliverable here', true);
     }
+    if (state is CheckFailed) {
+      return ("Couldn't fetch location", true);
+    }
     return ('Select delivery location', false);
   }
 }

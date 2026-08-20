@@ -5,8 +5,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../shared/models/checkout_address_model.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../cubit/location_cubit.dart';
+import 'add_address_wizard/address_details_screen.dart';
+import 'add_address_wizard/address_wizard_draft.dart';
 
 typedef _SearchResult = ({String label, LatLng position});
 
@@ -37,12 +40,22 @@ class MapPinPickerScreen extends StatefulWidget {
   /// persistAsSavedAddress). [existingAddress] is never set alongside this.
   final bool ambientConfirm;
 
+  /// Which flow this screen was entered from — threaded through to the
+  /// add-address wizard it hands off to (non-ambient mode only).
+  final AddressWizardEntryPoint entryPoint;
+
+  /// Only meaningful for the checkout entry point — threaded through to the
+  /// wizard's [AddressWizardDraft.onCheckoutSave].
+  final void Function(CheckoutAddressModel)? onCheckoutSave;
+
   const MapPinPickerScreen({
     super.key,
     required this.initialPosition,
     this.existingAddress,
     this.initialFormattedAddress,
     this.ambientConfirm = false,
+    this.entryPoint = AddressWizardEntryPoint.addressBook,
+    this.onCheckoutSave,
   });
 
   @override
@@ -51,9 +64,6 @@ class MapPinPickerScreen extends StatefulWidget {
 
 class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
   late final MapController _mapController;
-  late AddressLabel _label;
-  late final TextEditingController _customLabelController;
-  late final TextEditingController _landmarkController;
   bool _isDragging = false;
 
   final TextEditingController _searchController = TextEditingController();
@@ -68,10 +78,6 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
     _mapController = MapController();
 
     final existing = widget.existingAddress;
-    _label = existing?.label ?? AddressLabel.home;
-    _customLabelController =
-        TextEditingController(text: existing?.customLabel ?? '');
-    _landmarkController = TextEditingController(text: existing?.landmark ?? '');
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final cubit = context.read<LocationCubit>();
@@ -92,8 +98,6 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
 
   @override
   void dispose() {
-    _customLabelController.dispose();
-    _landmarkController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     _searchDebounce?.cancel();
@@ -155,8 +159,15 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
       // bouncing back to the underlying LocationPickerSheet. Precise mode
       // keeps today's behavior (stays put, pin still adjustable via the
       // disabled-button + drag message) — deliberately not touched here.
+      //
+      // onCheckoutSave == null guard: the checkout entry point's final
+      // hand-off (ReviewLocationScreen's listener) pops this screen itself,
+      // deterministically, as one of 4 explicit pops before calling
+      // onCheckoutSave — an independent pop here firing at an uncoordinated
+      // time would race that sequence and could pop the CheckoutScreen that
+      // onCheckoutSave's pushReplacement just pushed.
       listener: (context, state) {
-        if (state is Bound) {
+        if (state is Bound && widget.onCheckoutSave == null) {
           Navigator.of(context).pop();
         }
       },
@@ -360,12 +371,10 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
               alignment: Alignment.bottomCenter,
               child: _ConfirmSheet(
                 isDragging: _isDragging,
-                label: _label,
-                onLabelChanged: (l) => setState(() => _label = l),
-                customLabelController: _customLabelController,
-                landmarkController: _landmarkController,
                 existingAddress: widget.existingAddress,
                 ambientConfirm: widget.ambientConfirm,
+                entryPoint: widget.entryPoint,
+                onCheckoutSave: widget.onCheckoutSave,
               ),
             ),
           ],
@@ -405,21 +414,17 @@ class _RoundIconButton extends StatelessWidget {
 
 class _ConfirmSheet extends StatelessWidget {
   final bool isDragging;
-  final AddressLabel label;
-  final ValueChanged<AddressLabel> onLabelChanged;
-  final TextEditingController customLabelController;
-  final TextEditingController landmarkController;
   final SavedAddressModel? existingAddress;
   final bool ambientConfirm;
+  final AddressWizardEntryPoint entryPoint;
+  final void Function(CheckoutAddressModel)? onCheckoutSave;
 
   const _ConfirmSheet({
     required this.isDragging,
-    required this.label,
-    required this.onLabelChanged,
-    required this.customLabelController,
-    required this.landmarkController,
     this.existingAddress,
     required this.ambientConfirm,
+    required this.entryPoint,
+    this.onCheckoutSave,
   });
 
   @override
@@ -508,53 +513,6 @@ class _ConfirmSheet extends StatelessWidget {
             },
           ),
           const SizedBox(height: 16),
-
-          // Label chips, custom label, and the landmark field are Address
-          // Book framing (Home/Work/Other + rider instructions) — meaningless
-          // for the ambient "just checking this area" flow, whose pick never
-          // joins the saved-address list, so skip straight to the button.
-          if (!ambientConfirm) ...[
-            Wrap(
-              spacing: 8,
-              children: AddressLabel.values.map((l) {
-                final selected = l == label;
-                return ChoiceChip(
-                  label: Text(l.display),
-                  selected: selected,
-                  onSelected: (_) => onLabelChanged(l),
-                  selectedColor: const Color(0xFF3DAA5C),
-                  backgroundColor: const Color(0xFFF0F0F0),
-                  labelStyle: TextStyle(
-                    color: selected ? Colors.white : Colors.black87,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    side: BorderSide(
-                        color: selected
-                            ? const Color(0xFF3DAA5C)
-                            : const Color(0xFFE0E0E0)),
-                  ),
-                );
-              }).toList(),
-            ),
-            if (label == AddressLabel.other) ...[
-              const SizedBox(height: 12),
-              _InputField(
-                controller: customLabelController,
-                hint: "Label (e.g. Friend's place)",
-              ),
-            ],
-            const SizedBox(height: 12),
-            _InputField(
-              controller: landmarkController,
-              hint: "Landmark / floor / gate instructions (helps riders)",
-              maxLines: 2,
-            ),
-          ],
-
-          const SizedBox(height: 16),
           BlocBuilder<LocationCubit, LocationState>(
             builder: (context, state) {
               // Ambient-only inline "oops" state: replaces the confirm
@@ -636,10 +594,6 @@ class _ConfirmSheet extends StatelessWidget {
               final canConfirm = state is Confirming && !isDragging;
               final cubit = context.read<LocationCubit>();
               final editing = existingAddress;
-              // Editing a saved address that ISN'T the one currently
-              // bound should just persist the change, not rebind it.
-              final isInactiveEdit =
-                  editing != null && editing.id != cubit.boundAddressId;
 
               return SizedBox(
                 width: double.infinity,
@@ -647,7 +601,7 @@ class _ConfirmSheet extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: !canConfirm || isChecking
                       ? null
-                      : () async {
+                      : () {
                           if (ambientConfirm) {
                             // No label/landmark collected in this mode, and
                             // it must never silently grow the user's real
@@ -662,24 +616,32 @@ class _ConfirmSheet extends StatelessWidget {
                             );
                             return;
                           }
-                          if (isInactiveEdit) {
-                            await cubit.editSavedAddress(editing.copyWith(
-                              label: label,
-                              customLabel: customLabelController.text.trim(),
-                              position: state.position,
-                              formattedAddress: state.formattedAddress,
-                              landmark: landmarkController.text.trim(),
-                            ));
-                            if (context.mounted) Navigator.pop(context);
-                            return;
-                          }
-                          cubit.confirmAddress(
+
+                          // Serviceability is no longer checked the instant
+                          // the pin is confirmed — the wizard checks it at
+                          // the very end (Step 3's Save). This screen's job
+                          // now is just handing off position + area label to
+                          // the wizard, seeded from existingAddress when
+                          // editing.
+                          final draft = AddressWizardDraft(
                             position: state.position,
-                            formattedAddress: state.formattedAddress,
-                            label: label,
-                            customLabel: customLabelController.text.trim(),
-                            landmark: landmarkController.text.trim(),
+                            areaLabel: state.formattedAddress,
+                            addressLine: editing?.addressLine ?? '',
+                            googleMapsLink: editing?.googleMapsLink,
+                            imageLocalPath: editing?.imageLocalPath,
+                            landmark: editing?.landmark,
+                            label: editing?.label ?? AddressLabel.home,
+                            customLabel: editing?.customLabel,
                             editing: editing,
+                            entryPoint: entryPoint,
+                            onCheckoutSave: onCheckoutSave,
+                          );
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  AddressDetailsScreen(draft: draft),
+                            ),
                           );
                         },
                   style: ElevatedButton.styleFrom(
@@ -697,11 +659,7 @@ class _ConfirmSheet extends StatelessWidget {
                               strokeWidth: 2, color: Colors.white),
                         )
                       : Text(
-                          ambientConfirm
-                              ? "Confirm Location"
-                              : (editing != null
-                                  ? "Save Changes"
-                                  : "Confirm & Save"),
+                          ambientConfirm ? "Confirm Location" : "Continue",
                           style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
@@ -712,42 +670,6 @@ class _ConfirmSheet extends StatelessWidget {
             },
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _InputField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final int maxLines;
-
-  const _InputField({
-    required this.controller,
-    required this.hint,
-    this.maxLines = 1,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
-      ),
-      child: TextField(
-        controller: controller,
-        maxLines: maxLines,
-        style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(
-              fontFamily: 'Poppins', fontSize: 13, color: Color(0xFF9E9E9E)),
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        ),
       ),
     );
   }
