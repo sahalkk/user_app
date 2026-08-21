@@ -6,7 +6,8 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../blocs/auth_bloc/auth_bloc.dart';
 import '../../../blocs/auth_bloc/auth_state.dart';
-import '../../../data/repositories/location_repository.dart' show distanceMeters;
+import '../../../data/repositories/location_repository.dart'
+    show AddressSearchFailed, distanceMeters;
 import '../../../shared/models/checkout_address_model.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../cubit/location_cubit.dart';
@@ -102,6 +103,10 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   Timer? _debounce;
   List<({String label, LatLng position})> _results = [];
   bool _isSearching = false;
+  // True when the last search attempt couldn't complete at all (network/
+  // backend unreachable) — distinct from it completing and genuinely
+  // finding nothing, which is just an empty [_results] with this false.
+  bool _searchFailed = false;
 
   // Best-effort, non-blocking — powers the "X km away" badges on saved
   // addresses. Never gates the sheet's own usability: null just means the
@@ -126,18 +131,35 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   void _onSearchChanged(String query) {
     _debounce?.cancel();
     if (query.trim().length < 3) {
-      setState(() => _results = []);
+      setState(() {
+        _results = [];
+        _searchFailed = false;
+      });
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 400), () async {
-      setState(() => _isSearching = true);
+    _debounce = Timer(const Duration(milliseconds: 400), () => _runSearch(query));
+  }
+
+  Future<void> _runSearch(String query) async {
+    setState(() {
+      _isSearching = true;
+      _searchFailed = false;
+    });
+    try {
       final results = await context.read<LocationCubit>().searchAddress(query);
       if (!mounted) return;
       setState(() {
         _results = results;
         _isSearching = false;
       });
-    });
+    } on AddressSearchFailed {
+      if (!mounted) return;
+      setState(() {
+        _results = [];
+        _isSearching = false;
+        _searchFailed = true;
+      });
+    }
   }
 
   /// Pushes the map screen and, once it returns, closes this sheet if the
@@ -269,8 +291,10 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 scrollController: scrollController,
                 searchController: _searchController,
                 onSearchChanged: _onSearchChanged,
+                onRetrySearch: () => _runSearch(_searchController.text),
                 results: _results,
                 isSearching: _isSearching,
+                searchFailed: _searchFailed,
                 isResolving: state is Resolving || state is PermissionChecking,
                 precise: widget.precise,
                 currentPosition: _currentPosition,
@@ -464,8 +488,10 @@ class _MainPickerView extends StatelessWidget {
   final ScrollController scrollController;
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
+  final VoidCallback onRetrySearch;
   final List<({String label, LatLng position})> results;
   final bool isSearching;
+  final bool searchFailed;
   final bool isResolving;
   final bool precise;
   final LatLng? currentPosition;
@@ -476,8 +502,10 @@ class _MainPickerView extends StatelessWidget {
     required this.scrollController,
     required this.searchController,
     required this.onSearchChanged,
+    required this.onRetrySearch,
     required this.results,
     required this.isSearching,
+    required this.searchFailed,
     required this.isResolving,
     required this.precise,
     this.currentPosition,
@@ -488,6 +516,14 @@ class _MainPickerView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isGuest = context.watch<AuthBloc>().state is! AuthAuthenticated;
+    // A search that ran and came back empty (found nothing, or couldn't
+    // reach the geocoder at all) must not silently fall through to the
+    // "Use my current location" / saved-addresses block below — that would
+    // look exactly like the search box was never touched. Only collapse to
+    // that default view while there's no active query.
+    final hasActiveQuery = searchController.text.trim().length >= 3;
+    final showSearchEmptyState =
+        hasActiveQuery && !isSearching && results.isEmpty;
 
     return ListView(
       controller: scrollController,
@@ -582,6 +618,13 @@ class _MainPickerView extends StatelessWidget {
                     .read<LocationCubit>()
                     .selectSearchResult(r.label, r.position),
               )),
+        ] else if (showSearchEmptyState) ...[
+          const SizedBox(height: 8),
+          _SearchEmptyState(
+            query: searchController.text.trim(),
+            failed: searchFailed,
+            onRetry: onRetrySearch,
+          ),
         ] else ...[
           const SizedBox(height: 8),
           // Use current location
@@ -681,6 +724,70 @@ class _MainPickerView extends StatelessWidget {
             ),
         ],
       ],
+    );
+  }
+}
+
+// ── Search ran and came back empty — either genuinely no matches, or the
+// lookup itself couldn't complete (e.g. no network / backend unreachable).
+// Rendered in place of the search results list so it never gets confused
+// with the unrelated "Use my current location" / saved-addresses default. ──
+class _SearchEmptyState extends StatelessWidget {
+  final String query;
+  final bool failed;
+  final VoidCallback onRetry;
+  const _SearchEmptyState({
+    required this.query,
+    required this.failed,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            failed ? Icons.wifi_off_rounded : Icons.search_off_rounded,
+            color: failed ? const Color(0xFFF57C00) : const Color(0xFF9E9E9E),
+            size: 28,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            failed
+                ? "Couldn't search right now"
+                : 'No results for "$query"',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            failed
+                ? "Check your connection and try again, or drop a pin on the map instead."
+                : "Try a different area, street, or landmark.",
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontFamily: 'Poppins', fontSize: 12, color: Color(0xFF6B6B6B)),
+          ),
+          if (failed) ...[
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: onRetry,
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF3DAA5C),
+              ),
+              child: const Text("Try again",
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

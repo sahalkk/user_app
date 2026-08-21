@@ -36,6 +36,15 @@ class ServiceabilityCheckFailed implements Exception {
   const ServiceabilityCheckFailed();
 }
 
+/// Thrown by [LocationRepository.searchAddress] when the lookup itself
+/// couldn't complete (network/timeout/service unreachable) — distinct from
+/// the geocoder genuinely finding zero matches for the query (which just
+/// returns an empty list), so callers can tell "nothing found" apart from
+/// "couldn't search right now" and message each one appropriately.
+class AddressSearchFailed implements Exception {
+  const AddressSearchFailed();
+}
+
 class LocationRepository {
   final AuthRepository authRepository;
 
@@ -158,8 +167,14 @@ class LocationRepository {
         results.add((label: label, position: pos));
       }
       return results;
-    } catch (_) {
+    } on geocoding.NoResultFoundException {
+      // Genuinely zero matches for this query — not a failure.
       return [];
+    } catch (_) {
+      // Network/timeout/service unreachable — we don't actually know
+      // whether there are matches, so this must not be conflated with the
+      // "searched and found nothing" case above.
+      throw const AddressSearchFailed();
     }
   }
 

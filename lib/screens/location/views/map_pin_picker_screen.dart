@@ -463,7 +463,9 @@ class _ConfirmSheet extends StatelessWidget {
                       ? state.formattedAddress
                       : state is NotDeliverable
                           ? state.formattedAddress
-                          : "…";
+                          : state is CheckFailed
+                              ? state.address.formattedAddress
+                              : "…";
               return Row(
                 children: [
                   Icon(
@@ -569,6 +571,84 @@ class _ConfirmSheet extends StatelessWidget {
                           // _MainPickerView (the plain search sheet) rather
                           // than NotDeliverableView — the user is choosing
                           // to search fresh here, not being told no again.
+                          cubit.pickDifferentLocation();
+                          Navigator.pop(context);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFE0E0E0)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text(
+                          "Select another location",
+                          style: TextStyle(
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              // Ambient-only inline "couldn't check" state — mirrors the
+              // NotDeliverable branch above but for when checkServiceability
+              // itself couldn't complete (network/backend unreachable)
+              // rather than authoritatively saying "not deliverable". Without
+              // this, CheckFailed falls through to the generic button branch
+              // below, whose canConfirm requires Confirming — leaving a
+              // permanently disabled button and no explanation (see
+              // CheckFailedScreen for the equivalent full-page treatment on
+              // the bootstrap path).
+              if (ambientConfirm && state is CheckFailed) {
+                final cubit = context.read<LocationCubit>();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Couldn't check delivery availability",
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFE53935)),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      "Check your connection and try again.",
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          color: Color(0xFF6B6B6B)),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: () => cubit.retryServiceabilityCheck(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3DAA5C),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          "Try again",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: OutlinedButton(
+                        onPressed: () {
                           cubit.pickDifferentLocation();
                           Navigator.pop(context);
                         },

@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../shared/widgets/global_header.dart';
 import '../cubit/location_cubit.dart';
 import 'location_picker_sheet.dart';
 
-/// Covers the shopping tabs for every [LocationState] that isn't [Bound] or
-/// [NotDeliverable] (which get their own dedicated screens) — i.e. still
-/// detecting, needs a permission decision, or nothing picked yet. Product
-/// data should never render before we actually know delivery works, so
-/// this is the "in between" placeholder rather than letting MainWrapper
-/// fall through to real content by default.
+/// Covers the shopping tabs for every [LocationState] that isn't [Bound],
+/// [NotDeliverable], or [CheckFailed] (which get their own dedicated
+/// screens) — i.e. still detecting, needs a permission decision, or nothing
+/// picked yet. Product data should never render before we actually know
+/// delivery works, so this is the "in between" placeholder rather than
+/// letting MainWrapper fall through to real content by default.
+///
+/// Keeps the same [LocationHeader] the other gate screens (Not deliverable,
+/// Check failed) use, rather than a bare centered page with no way back to
+/// the "beeyo" shell — the location bar itself is a second, always-visible
+/// way to open the picker alongside whatever action is offered below.
 ///
 /// [PermissionPrimer] gets its own direct "Allow location access" action
 /// here (wired straight to [LocationCubit.acknowledgePrimer]) rather than
@@ -34,18 +40,25 @@ class LocationGateScreen extends StatelessWidget {
         return Scaffold(
           backgroundColor: Colors.white,
           body: SafeArea(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: isBusy
-                      ? _busyContent(state)
-                      : state is PermissionPrimer
-                          ? _primerContent(context)
-                          : _manualEntryContent(context, state),
+            child: Column(
+              children: [
+                const LocationHeader(title: "Select delivery location"),
+                Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: isBusy
+                            ? _busyContent(state)
+                            : state is PermissionPrimer
+                                ? _primerContent(context)
+                                : _manualEntryContent(context, state),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         );
