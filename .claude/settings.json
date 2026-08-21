@@ -75,7 +75,15 @@
       "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 shell screencap -p /sdcard/regress4.png)",
       "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 pull /sdcard/regress4.png \"C:\\\\Users\\\\Sahal\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Sahal-Delivery-App-rider-app\\\\d1a5f47b-3b0a-49ad-b4ba-1545dd654e32\\\\scratchpad\\\\regress4.png\")",
       "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 shell screencap -p /sdcard/regress5.png)",
-      "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 pull /sdcard/regress5.png \"C:\\\\Users\\\\Sahal\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Sahal-Delivery-App-rider-app\\\\d1a5f47b-3b0a-49ad-b4ba-1545dd654e32\\\\scratchpad\\\\regress5.png\")"
+      "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 pull /sdcard/regress5.png \"C:\\\\Users\\\\Sahal\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Sahal-Delivery-App-rider-app\\\\d1a5f47b-3b0a-49ad-b4ba-1545dd654e32\\\\scratchpad\\\\regress5.png\")",
+      "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 shell input tap 356 992)",
+      "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 pull /sdcard/screen.png \"C:\\\\Users\\\\Sahal\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Sahal-Delivery-App-rider-app\\\\51237b29-58fa-4c75-9d57-e60a1b809d69\\\\scratchpad\\\\screen4.png\")",
+      "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 pull /sdcard/screen.png \"C:\\\\Users\\\\Sahal\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Sahal-Delivery-App-rider-app\\\\51237b29-58fa-4c75-9d57-e60a1b809d69\\\\scratchpad\\\\screen5.png\")",
+      "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 shell input tap 348 1270)",
+      "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 pull /sdcard/screen.png \"C:\\\\Users\\\\Sahal\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Sahal-Delivery-App-rider-app\\\\51237b29-58fa-4c75-9d57-e60a1b809d69\\\\scratchpad\\\\screen6.png\")",
+      "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 shell input tap 720 1730)",
+      "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 pull /sdcard/screen.png \"C:\\\\Users\\\\Sahal\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Sahal-Delivery-App-rider-app\\\\51237b29-58fa-4c75-9d57-e60a1b809d69\\\\scratchpad\\\\screen7.png\")",
+      "Bash(MSYS_NO_PATHCONV=1 adb -s emulator-5554 shell input tap 1030 2474)"
     ]
   }
 }

@@ -233,8 +233,37 @@ class LocationRepository {
   Future<List<SavedAddressModel>> getSavedAddresses() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_savedAddressesKey) ?? [];
-    return raw.map((s) => SavedAddressModel.fromJson(jsonDecode(s))).toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final addresses =
+        raw.map((s) => SavedAddressModel.fromJson(jsonDecode(s))).toList();
+
+    // One-time backfill: addresses saved before recipientName/recipientPhone
+    // existed decode with those fields empty (see SavedAddressModel.fromJson).
+    // Fill them from the account's own contact and persist it directly here
+    // so this only runs once per address, not via saveAddress() (which would
+    // call back into getSavedAddresses() and recurse).
+    final needsBackfill =
+        addresses.any((a) => a.recipientName.isEmpty || a.recipientPhone.isEmpty);
+    if (needsBackfill) {
+      final accountName = await authRepository.getUserName();
+      final accountPhone = await authRepository.getUserPhone();
+      if ((accountName?.isNotEmpty ?? false) || (accountPhone?.isNotEmpty ?? false)) {
+        for (var i = 0; i < addresses.length; i++) {
+          final a = addresses[i];
+          if (a.recipientName.isEmpty || a.recipientPhone.isEmpty) {
+            addresses[i] = a.copyWith(
+              recipientName: a.recipientName.isEmpty ? accountName ?? '' : a.recipientName,
+              recipientPhone: a.recipientPhone.isEmpty ? accountPhone ?? '' : a.recipientPhone,
+            );
+          }
+        }
+        await prefs.setStringList(
+          _savedAddressesKey,
+          addresses.map((a) => jsonEncode(a.toJson())).toList(),
+        );
+      }
+    }
+
+    return addresses..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
   Future<void> saveAddress(SavedAddressModel address) async {

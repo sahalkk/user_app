@@ -42,6 +42,12 @@ class SavedAddressModel extends Equatable {
   // been synced there (lazily, the first time it's needed for an order —
   // see LocationRepository.syncAddressToBackend). Null until then.
   final String? backendId;
+  // Recipient contact for deliveries to this address — one fixed contact
+  // per address, editable via the add-address wizard's Step 2. Empty on
+  // addresses saved before this field existed until LocationRepository's
+  // one-time backfill (or an edit) fills it in.
+  final String recipientName;
+  final String recipientPhone;
 
   const SavedAddressModel({
     required this.id,
@@ -58,6 +64,8 @@ class SavedAddressModel extends Equatable {
     required this.createdAt,
     required this.updatedAt,
     this.backendId,
+    this.recipientName = '',
+    this.recipientPhone = '',
   });
 
   String get displayLabel =>
@@ -83,6 +91,8 @@ class SavedAddressModel extends Equatable {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? backendId,
+    String? recipientName,
+    String? recipientPhone,
   }) {
     return SavedAddressModel(
       id: id ?? this.id,
@@ -99,6 +109,8 @@ class SavedAddressModel extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       backendId: backendId ?? this.backendId,
+      recipientName: recipientName ?? this.recipientName,
+      recipientPhone: recipientPhone ?? this.recipientPhone,
     );
   }
 
@@ -118,6 +130,8 @@ class SavedAddressModel extends Equatable {
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
         'backendId': backendId,
+        'recipientName': recipientName,
+        'recipientPhone': recipientPhone,
       };
 
   factory SavedAddressModel.fromJson(Map<String, dynamic> json) {
@@ -146,6 +160,8 @@ class SavedAddressModel extends Equatable {
       updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
           DateTime.now(),
       backendId: json['backendId'] as String?,
+      recipientName: json['recipientName'] as String? ?? '',
+      recipientPhone: json['recipientPhone'] as String? ?? '',
     );
   }
 
@@ -164,5 +180,7 @@ class SavedAddressModel extends Equatable {
         isDefault,
         updatedAt,
         backendId,
+        recipientName,
+        recipientPhone,
       ];
 }

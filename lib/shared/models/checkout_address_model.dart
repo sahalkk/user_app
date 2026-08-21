@@ -2,9 +2,10 @@ import 'package:equatable/equatable.dart';
 import 'saved_address_model.dart';
 
 /// The delivery address + recipient contact info bound to the current
-/// order. Kept separate from [SavedAddressModel] because recipient
-/// name/phone are order-specific contact details, not address-book data —
-/// the same saved address can be used with a different contact each time.
+/// order. [SavedAddressModel] is the source of truth for recipient
+/// name/phone (one fixed contact per saved address, edited via the
+/// add-address wizard) — this just carries that contact through checkout
+/// alongside the address for display.
 class CheckoutAddressModel extends Equatable {
   final String recipientName;
   final String recipientPhone;

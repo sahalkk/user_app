@@ -213,6 +213,8 @@ class ReviewLocationScreen extends StatelessWidget {
         createdAt: editing.createdAt,
         updatedAt: DateTime.now(),
         backendId: editing.backendId,
+        recipientName: draft.recipientName,
+        recipientPhone: draft.recipientPhone,
       );
       await cubit.editSavedAddress(updated);
       if (!context.mounted) return;
@@ -242,6 +244,8 @@ class ReviewLocationScreen extends StatelessWidget {
       addressLine: draft.addressLine,
       googleMapsLink: draft.googleMapsLink,
       imageLocalPath: draft.imageLocalPath,
+      recipientName: draft.recipientName,
+      recipientPhone: draft.recipientPhone,
       editing: editing,
     );
   }

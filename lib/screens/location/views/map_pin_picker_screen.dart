@@ -712,6 +712,8 @@ class _ConfirmSheet extends StatelessWidget {
                             landmark: editing?.landmark,
                             label: editing?.label ?? AddressLabel.home,
                             customLabel: editing?.customLabel,
+                            recipientName: editing?.recipientName ?? '',
+                            recipientPhone: editing?.recipientPhone ?? '',
                             editing: editing,
                             entryPoint: entryPoint,
                             onCheckoutSave: onCheckoutSave,

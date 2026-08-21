@@ -43,58 +43,21 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     // no pop, so the user can immediately pick something else.
   }
 
-  // Precise mode throughout this screen: Address Book manages real,
-  // named delivery addresses, so GPS/search picks should land on
-  // Confirming and let the pin be adjusted rather than auto-confirming.
-  Future<void> _useCurrentLocation() async {
-    final cubit = context.read<LocationCubit>();
-    // Captured before this exploratory GPS/pin-adjust flow can move the
-    // cubit off of it — restored below if it's abandoned without landing
-    // on a new Bound, so backing out doesn't leave this screen (or
-    // MainWrapper, underneath) stuck showing NotDeliverable/gate content
-    // for an address that never actually replaced the real bound one.
-    final priorState = cubit.state;
-    final priorBound = priorState is Bound ? priorState : null;
-
-    await cubit.useCurrentLocation(autoConfirm: false);
-    if (!mounted) return;
-
-    final state = cubit.state;
-    if (state is Confirming) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BlocProvider.value(
-            value: cubit,
-            child: MapPinPickerScreen(
-              initialPosition: state.position,
-              initialFormattedAddress: state.formattedAddress,
-            ),
-          ),
-        ),
-      );
-    } else {
-      // Permission primer / manual-entry fallback needed — the full
-      // picker sheet already knows how to handle every one of those
-      // sub-states, no need to duplicate that UI here.
-      await LocationPickerSheet.show(context, precise: true);
-    }
-    if (!mounted) return;
-    // A restore means the exploration failed/was abandoned, not that a
-    // fresh address just got bound — don't let the pop-on-Bound below
-    // treat "we fell back to the old address" as a success that should
-    // close this screen.
-    final restored = cubit.state is! Bound && priorBound != null;
-    if (restored) cubit.restorePreviousBound(priorBound);
-    _reload();
-    if (!restored && cubit.state is Bound) Navigator.of(context).pop();
-  }
-
   Future<void> _addNew() async {
+    final cubit = context.read<LocationCubit>();
+    // Address Book is reached while an address is already bound (it's the
+    // one showing "Delivering here"), so the sheet's dismissal alone can't
+    // tell "a new address was picked" apart from "the user just closed the
+    // sheet" — both leave the cubit Bound. Only pop this screen when the
+    // bound address actually changed to something new.
+    final priorBoundId =
+        cubit.state is Bound ? (cubit.state as Bound).address.id : null;
+
     await LocationPickerSheet.show(context, precise: true);
     if (!mounted) return;
     _reload();
-    if (context.read<LocationCubit>().state is Bound) {
+    final state = cubit.state;
+    if (state is Bound && state.address.id != priorBoundId) {
       Navigator.of(context).pop();
     }
   }
@@ -224,8 +187,6 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                   return ListView(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                     children: [
-                      _QuickActionCard(onTap: _useCurrentLocation),
-                      const SizedBox(height: 22),
                       const Text(
                         "Saved Addresses",
                         style: TextStyle(
@@ -258,49 +219,6 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-// ── Quick action: "Use current location" ─────────────────────────────
-class _QuickActionCard extends StatelessWidget {
-  final VoidCallback onTap;
-  const _QuickActionCard({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4)),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(color: Color(0xFFE8F5E9), shape: BoxShape.circle),
-              child: const Icon(Icons.my_location_rounded, color: Color(0xFF3DAA5C), size: 20),
-            ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Text(
-                "Use current location",
-                style: TextStyle(
-                    fontFamily: 'Poppins', fontSize: 14, fontWeight: FontWeight.w700, color: Colors.black87),
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF6B6B6B)),
-          ],
-        ),
       ),
     );
   }
@@ -394,6 +312,15 @@ class _AddressCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Color(0xFF6B6B6B)),
                   ),
+                  if (address.recipientName.isNotEmpty || address.recipientPhone.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      "${address.recipientName} · ${address.recipientPhone}",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, color: Color(0xFF9E9E9E)),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,

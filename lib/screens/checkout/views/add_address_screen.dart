@@ -21,10 +21,6 @@ class AddAddressScreen extends StatefulWidget {
 }
 
 class _AddAddressScreenState extends State<AddAddressScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
-
   late Future<List<SavedAddressModel>> _addressesFuture;
   SavedAddressModel? _selectedAddress;
   bool _isBusy = false;
@@ -38,13 +34,6 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     // are already scoped to, so it's the sane default for checkout too.
     final state = cubit.state;
     if (state is Bound) _selectedAddress = state.address;
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    super.dispose();
   }
 
   void _reloadAddresses() {
@@ -132,17 +121,17 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   }
 
   void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedAddress == null) {
+    final selected = _selectedAddress;
+    if (selected == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Select a delivery address to continue")),
       );
       return;
     }
     widget.onSave(CheckoutAddressModel(
-      recipientName: _nameController.text.trim(),
-      recipientPhone: _phoneController.text.trim(),
-      address: _selectedAddress!,
+      recipientName: selected.recipientName,
+      recipientPhone: selected.recipientPhone,
+      address: selected,
     ));
   }
 
@@ -164,87 +153,70 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         builder: (context, locState) {
           return Stack(
             children: [
-              Form(
-                key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-                  children: [
-                    const Text("Contact details",
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF6B6B6B))),
-                    const SizedBox(height: 10),
-                    _buildTextField("Full Name", _nameController),
+              ListView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+                children: [
+                  const Text("Delivery address",
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF6B6B6B))),
+                  const SizedBox(height: 10),
+                  if (locState is NotDeliverable)
+                    const NotDeliverableView()
+                  else ...[
+                    _QuickActionCard(onTap: _useCurrentLocation),
                     const SizedBox(height: 12),
-                    _buildTextField("Phone Number", _phoneController,
-                        isNumber: true),
-
-                    const SizedBox(height: 24),
-                    const Text("Delivery address",
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF6B6B6B))),
-                    const SizedBox(height: 10),
-
-                    if (locState is NotDeliverable)
-                      const NotDeliverableView()
-                    else ...[
-                      _QuickActionCard(onTap: _useCurrentLocation),
-                      const SizedBox(height: 12),
-                      FutureBuilder<List<SavedAddressModel>>(
-                        future: _addressesFuture,
-                        builder: (context, snapshot) {
-                          final addresses = snapshot.data ?? [];
-                          if (!snapshot.hasData) {
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(
-                                  child: CircularProgressIndicator(
-                                      color: Color(0xFF3DAA5C))),
-                            );
-                          }
-                          if (addresses.isEmpty) {
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              child: Text("No saved addresses yet",
-                                  style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 13,
-                                      color: Color(0xFF9E9E9E))),
-                            );
-                          }
-                          return Column(
-                            children: addresses
-                                .map((a) => Padding(
-                                      padding: const EdgeInsets.only(bottom: 10),
-                                      child: _SelectableAddressCard(
-                                        address: a,
-                                        isSelected: a.id == _selectedAddress?.id,
-                                        onTap: () => _selectSavedAddress(a),
-                                      ),
-                                    ))
-                                .toList(),
+                    FutureBuilder<List<SavedAddressModel>>(
+                      future: _addressesFuture,
+                      builder: (context, snapshot) {
+                        final addresses = snapshot.data ?? [];
+                        if (!snapshot.hasData) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Center(
+                                child: CircularProgressIndicator(
+                                    color: Color(0xFF3DAA5C))),
                           );
-                        },
-                      ),
-                      const SizedBox(height: 4),
-                      TextButton.icon(
-                        onPressed: _addNew,
-                        icon: const Icon(Icons.add_rounded,
-                            color: Color(0xFF3DAA5C), size: 18),
-                        label: const Text("Add new address",
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                color: Color(0xFF3DAA5C),
-                                fontWeight: FontWeight.w700)),
-                      ),
-                    ],
+                        }
+                        if (addresses.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Text("No saved addresses yet",
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 13,
+                                    color: Color(0xFF9E9E9E))),
+                          );
+                        }
+                        return Column(
+                          children: addresses
+                              .map((a) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: _SelectableAddressCard(
+                                      address: a,
+                                      isSelected: a.id == _selectedAddress?.id,
+                                      onTap: () => _selectSavedAddress(a),
+                                    ),
+                                  ))
+                              .toList(),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 4),
+                    TextButton.icon(
+                      onPressed: _addNew,
+                      icon: const Icon(Icons.add_rounded,
+                          color: Color(0xFF3DAA5C), size: 18),
+                      label: const Text("Add new address",
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              color: Color(0xFF3DAA5C),
+                              fontWeight: FontWeight.w700)),
+                    ),
                   ],
-                ),
+                ],
               ),
               if (locState is CheckingServiceability || _isBusy)
                 Container(
@@ -275,7 +247,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         elevation: 0,
                       ),
                       child: const Text(
-                        "Save Address",
+                        "Continue",
                         style: TextStyle(
                             fontSize: 18,
                             color: Colors.white,
@@ -289,35 +261,6 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           );
         },
       ),
-    );
-  }
-
-  Widget _buildTextField(String label, TextEditingController controller,
-      {bool isNumber = false}) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: isNumber ? TextInputType.phone : TextInputType.text,
-      style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(fontFamily: 'Poppins', color: Color(0xFF9E9E9E)),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
-        ),
-        filled: true,
-        fillColor: Colors.white,
-      ),
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return "This field is required";
-        }
-        return null;
-      },
     );
   }
 }
@@ -425,6 +368,15 @@ class _SelectableAddressCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontFamily: 'Poppins', fontSize: 12, color: Color(0xFF6B6B6B))),
+                  if (address.recipientName.isNotEmpty ||
+                      address.recipientPhone.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text("${address.recipientName} · ${address.recipientPhone}",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontFamily: 'Poppins', fontSize: 11, color: Color(0xFF9E9E9E))),
+                  ],
                 ],
               ),
             ),

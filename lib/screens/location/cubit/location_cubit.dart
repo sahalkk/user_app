@@ -281,6 +281,8 @@ class LocationCubit extends Cubit<LocationState> {
     String? addressLine,
     String? googleMapsLink,
     String? imageLocalPath,
+    String recipientName = '',
+    String recipientPhone = '',
     SavedAddressModel? editing,
     bool persistAsSavedAddress = true,
   }) async {
@@ -299,6 +301,8 @@ class LocationCubit extends Cubit<LocationState> {
       isDefault: editing?.isDefault ?? false,
       createdAt: editing?.createdAt ?? now,
       updatedAt: now,
+      recipientName: recipientName,
+      recipientPhone: recipientPhone,
     );
 
     await _runServiceabilityCheck(

@@ -10,6 +10,7 @@ import '../../../data/repositories/location_repository.dart'
     show AddressSearchFailed, distanceMeters;
 import '../../../shared/models/checkout_address_model.dart';
 import '../../../shared/models/saved_address_model.dart';
+import '../../address_book/views/address_book_screen.dart';
 import '../cubit/location_cubit.dart';
 import 'add_address_wizard/address_wizard_draft.dart';
 import 'map_pin_picker_screen.dart';
@@ -169,9 +170,9 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   /// disposing its context before the awaited Navigator.push future even
   /// resolves, which silently no-ops any pop attempted from it.
   ///
-  /// Shared by both entry modes: the precise flow's explicit "Adjust pin on
-  /// map & save" button, and the ambient flow's auto-navigation the instant
-  /// a search result lands on [Confirming] (see the listener in [build]).
+  /// Shared by both entry modes: the listener in [build] pushes this the
+  /// instant GPS or a search result lands on [Confirming] — neither mode
+  /// stops at an intermediate text preview first.
   Future<void> _pushMapConfirm(Confirming state,
       {required bool ambientConfirm}) async {
     final cubit = context.read<LocationCubit>();
@@ -200,18 +201,15 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       if (widget.onCheckoutSave == null) Navigator.of(context).maybePop();
       return;
     }
-    // Backed out of the map screen without binding. In ambient mode the
-    // builder's Confirming branch is only the "Loading map…" placeholder
-    // that exists to cover this push, so leaving the cubit on Confirming
-    // strands the sheet on that spinner permanently — the listener can't
-    // re-fire without a state change, so nothing re-pushes the map either,
-    // and drag-to-dismiss is the only way out. Reset to ManualEntry so
-    // backing out lands on the plain search view (with the user's previous
-    // query and results still in place). Precise mode is deliberately left
-    // alone: its Confirming branch renders the real _ConfirmAddressView,
-    // which is a usable place to come back to, and resetting there would
-    // throw away the pick the user just made.
-    if (ambientConfirm && cubit.state is Confirming) {
+    // Backed out of the map screen without binding. The builder's Confirming
+    // branch is only the "Loading map…" placeholder that exists to cover
+    // this push, so leaving the cubit on Confirming strands the sheet on
+    // that spinner permanently — the listener can't re-fire without a state
+    // change, so nothing re-pushes the map either, and drag-to-dismiss would
+    // be the only way out. Reset to ManualEntry so backing out lands on the
+    // plain search view instead (with the user's previous query and results
+    // still in place).
+    if (cubit.state is Confirming) {
       cubit.pickDifferentLocation();
     }
   }
@@ -241,19 +239,20 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
               final isTopmost = route == null || route.isCurrent;
               if (state is Bound) {
                 if (isTopmost) Navigator.of(context).maybePop();
-              } else if (state is Confirming && !widget.precise && isTopmost) {
-                // Ambient mode: a search result should land straight on the
-                // map+pin confirm step, not the precise flow's intermediate
-                // text preview — see the builder's own Confirming branch
-                // below, which is only reachable in precise mode. Gated on
-                // isTopmost for the same reason as the Bound case above:
-                // once MapPinPickerScreen is pushed, IT keeps re-emitting
-                // Confirming as its own normal operation (initState seeding,
-                // dragging the pin, its own search box) — without this
-                // guard, every one of those would push ANOTHER map screen
-                // on top, since this listener stays subscribed the whole
-                // time the sheet is merely buried, not disposed.
-                _pushMapConfirm(state, ambientConfirm: true);
+              } else if (state is Confirming && isTopmost) {
+                // Both modes land straight on the map+pin confirm step
+                // instead of stopping at an intermediate text preview —
+                // ambientConfirm controls only the chrome MapPinPickerScreen
+                // shows once there (trimmed for ambient, full label/landmark
+                // UI for precise). Gated on isTopmost for the same reason as
+                // the Bound case above: once MapPinPickerScreen is pushed, IT
+                // keeps re-emitting Confirming as its own normal operation
+                // (initState seeding, dragging the pin, its own search box)
+                // — without this guard, every one of those would push
+                // ANOTHER map screen on top, since this listener stays
+                // subscribed the whole time the sheet is merely buried, not
+                // disposed.
+                _pushMapConfirm(state, ambientConfirm: !widget.precise);
               }
             },
             builder: (context, state) {
@@ -270,22 +269,15 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 );
               }
               if (state is Confirming) {
-                // Ambient mode never renders this for longer than the one
-                // frame before the listener above navigates away. A brief
-                // loader covers that frame rather than flashing the precise
-                // flow's text preview first. It's also never left standing
-                // after the map screen is dismissed — _pushMapConfirm resets
-                // the cubit to ManualEntry on a non-binding back-out, which
-                // falls this builder through to _MainPickerView.
-                if (!widget.precise) {
-                  return const _CenteredLoader(label: "Loading map…");
-                }
-                return _ConfirmAddressView(
-                  state: state,
-                  scrollController: scrollController,
-                  onAdjustPin: () =>
-                      _pushMapConfirm(state, ambientConfirm: false),
-                );
+                // Both modes auto-navigate straight to the map/pin confirm
+                // step (see the listener above) — this never renders for
+                // longer than the one frame before that push happens. A
+                // brief loader covers that frame. It's also never left
+                // standing after the map screen is dismissed —
+                // _pushMapConfirm resets the cubit to ManualEntry on a
+                // non-binding back-out, which falls this builder through to
+                // _MainPickerView.
+                return const _CenteredLoader(label: "Loading map…");
               }
               return _MainPickerView(
                 scrollController: scrollController,
@@ -396,85 +388,6 @@ class _PermissionPrimerView extends StatelessWidget {
           TextButton(
             onPressed: () => context.read<LocationCubit>().declinePrimer(),
             child: const Text("Enter address manually",
-                style: TextStyle(color: Color(0xFF6B6B6B), fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Confirm a resolved/searched address before checking serviceability ──
-class _ConfirmAddressView extends StatelessWidget {
-  final Confirming state;
-  final ScrollController scrollController;
-  final VoidCallback onAdjustPin;
-  const _ConfirmAddressView({
-    required this.state,
-    required this.scrollController,
-    required this.onAdjustPin,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      controller: scrollController,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("Confirm your location",
-              style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.black87)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE0E0E0)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.location_on_rounded,
-                    color: Color(0xFF3DAA5C)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    state.formattedAddress,
-                    style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: onAdjustPin,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3DAA5C),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 0,
-              ),
-              child: const Text("Adjust pin on map & save",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () => context.read<LocationCubit>().enterManualMode(),
-            child: const Text("Back",
                 style: TextStyle(color: Color(0xFF6B6B6B), fontWeight: FontWeight.w600)),
           ),
         ],
@@ -655,12 +568,30 @@ class _MainPickerView extends StatelessWidget {
           // only lives for the session (see LocationCubit._runServiceabilityCheck),
           // so showing an always-empty "Saved addresses" list is just noise.
           if (!isGuest) ...[
-            const Text("Saved addresses",
-                style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF6B6B6B))),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Saved addresses",
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6B6B6B))),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BlocProvider.value(
+                        value: context.read<LocationCubit>(),
+                        child: const AddressBookScreen(),
+                      ),
+                    ),
+                  ),
+                  child: const Icon(Icons.settings_outlined,
+                      size: 18, color: Color(0xFF6B6B6B)),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             FutureBuilder<List<SavedAddressModel>>(
               future: context.read<LocationCubit>().getSavedAddresses(),
