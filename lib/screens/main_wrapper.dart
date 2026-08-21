@@ -18,6 +18,7 @@ import '../../blocs/cart_bloc/cart_bloc.dart';
 import '../../blocs/order_bloc/order_bloc.dart';
 import '../../blocs/order_bloc/order_event.dart';
 import '../shared/utils/bloc_ready.dart';
+import 'home/blocs/home_bloc.dart';
 import 'location/cubit/location_cubit.dart';
 import 'location/views/check_failed_screen.dart';
 import 'location/views/location_gate_screen.dart';
@@ -82,8 +83,24 @@ class _MainWrapperState extends State<MainWrapper> {
     final locationState = context.watch<LocationCubit>().state;
     final isBound = locationState is Bound;
 
-    return Scaffold(
-      body: Stack(
+    return BlocListener<LocationCubit, LocationState>(
+      // The initial product fetch fires once at splash (see
+      // SplashScreen.initState), completely independent of whether the
+      // backend was actually reachable yet — if it failed then, nothing
+      // else ever retries it, leaving Home stuck on a stale error even
+      // after the backend recovers and a serviceable location is bound.
+      // Landing on Bound is a reliable "we're online now" signal, so use it
+      // to recover automatically instead of relying on the user finding
+      // Home's own manual Retry button.
+      listenWhen: (previous, current) => previous is! Bound && current is Bound,
+      listener: (context, state) {
+        final homeBloc = context.read<HomeBloc>();
+        if (homeBloc.state is HomeError) {
+          homeBloc.add(LoadHomeData());
+        }
+      },
+      child: Scaffold(
+        body: Stack(
         children: [
           IndexedStack(
             index: _currentIndex,
@@ -200,6 +217,7 @@ class _MainWrapperState extends State<MainWrapper> {
               currentIndex: _currentIndex,
               onTap: _onTabTapped,
             ),
+      ),
     );
   }
 }
