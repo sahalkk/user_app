@@ -51,5 +51,9 @@
 		<string>Beeyo uses your contacts to quickly fill in a recipient's name and phone number for a delivery address.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Beeyo uses your photo library to attach a reference image to a delivery address.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>Beeyo uses your microphone for voice search.</string>
+		<key>NSSpeechRecognitionUsageDescription</key>
+		<string>Beeyo uses speech recognition to turn your voice into a search query.</string>
 	</dict>
 </plist>
