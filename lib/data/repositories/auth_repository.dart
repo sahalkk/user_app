@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:beeyo_customer/shared/constants/api_constants.dart';
 import 'package:flutter/foundation.dart';
@@ -14,6 +15,16 @@ class LoginResult {
   const LoginResult({required this.isNewUser, this.name});
 }
 
+/// Thrown by any repository after an authenticated request comes back 401.
+/// By the time this is thrown, [AuthRepository.handleUnauthorized] has
+/// already cleared the stale session — callers should treat this as "log
+/// in again", not a generic network failure.
+class SessionExpiredException implements Exception {
+  const SessionExpiredException();
+  @override
+  String toString() => 'Session expired. Please log in again.';
+}
+
 class AuthRepository {
   // Added 'https://' so the app knows how to connect to it securely
   final String loginUrl = '${ApiConstants.baseUrl}/api/v1/auth/signin';
@@ -24,6 +35,23 @@ class AuthRepository {
   static const String _userIdKey = 'user_id';
   static const String _userNameKey = 'user_name';
   static const String _fallbackToken = 'success_fallback_token';
+
+  // Broadcasts once whenever any repository hits a 401 on an authenticated
+  // endpoint. AuthBloc subscribes to this to flip the whole app back to
+  // "logged out" and route to LoginScreen, without every repo needing its
+  // own reference to AuthBloc/Navigator.
+  final _unauthorizedController = StreamController<void>.broadcast();
+  Stream<void> get onUnauthorized => _unauthorizedController.stream;
+
+  /// Call this the moment any authenticated request comes back 401. Clears
+  /// the now-invalid session and notifies [onUnauthorized] listeners.
+  /// Idempotent — a burst of 401s from several in-flight requests only
+  /// clears/notifies once.
+  Future<void> handleUnauthorized() async {
+    if (!await isLoggedIn()) return;
+    await logout();
+    _unauthorizedController.add(null);
+  }
 
   // Check if user is already logged in
   Future<bool> isLoggedIn() async {
@@ -160,6 +188,11 @@ class AuthRepository {
           body: jsonEncode({'name': name}),
         )
         .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 401) {
+      await handleUnauthorized();
+      throw const SessionExpiredException();
+    }
 
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception('Failed to save name (${response.statusCode})');

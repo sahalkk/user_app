@@ -444,6 +444,10 @@ class LocationRepository {
       }
       return id.toString();
     }
+    if (response.statusCode == 401) {
+      await authRepository.handleUnauthorized();
+      throw const SessionExpiredException();
+    }
     throw Exception(
         'Failed to save address to backend (${response.statusCode})');
   }

@@ -37,6 +37,13 @@ class AuthAuthenticated extends AuthState {
 // User is guest or logout complete
 class AuthUnauthenticated extends AuthState {}
 
+// Session was force-cleared after a 401 from the backend (expired/invalid
+// token), as opposed to the user tapping "Log out" themselves. Still an
+// AuthUnauthenticated, so every existing `is AuthAuthenticated ? ... : ...`
+// guest-view check keeps working unchanged — this only adds a signal that
+// app_view.dart's BlocListener can key off of to route back to LoginScreen.
+class SessionExpired extends AuthUnauthenticated {}
+
 // Optional: specific error state
 class AuthFailure extends AuthState {
   final String message;

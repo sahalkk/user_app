@@ -1,10 +1,12 @@
 import 'package:beeyo_customer/blocs/auth_bloc/auth_bloc.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_event.dart';
+import 'package:beeyo_customer/blocs/auth_bloc/auth_state.dart';
 import 'package:beeyo_customer/blocs/order_bloc/order_bloc.dart';
 import 'package:beeyo_customer/blocs/wishlist_bloc/wishlist_bloc.dart';
 import 'package:beeyo_customer/data/repositories/auth_repository.dart';
 import 'package:beeyo_customer/data/repositories/location_repository.dart';
 import 'package:beeyo_customer/data/repositories/order_repository.dart';
+import 'package:beeyo_customer/screens/auth/views/login_screen.dart';
 import 'package:beeyo_customer/screens/location/cubit/location_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -14,6 +16,10 @@ import 'data/repositories/product_repository.dart';
 import 'data/repositories/category_repository.dart';
 import 'screens/categories/blocs/categories_bloc.dart';
 import 'screens/splash/splash_screen.dart';
+
+// Lets the SessionExpired listener below push LoginScreen from outside any
+// screen's own BuildContext — a 401 can happen while any screen is on top.
+final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 class MyAppView extends StatelessWidget {
   const MyAppView({super.key});
@@ -67,31 +73,40 @@ class MyAppView extends StatelessWidget {
                 LocationCubit(context.read<LocationRepository>())..bootstrap(),
           ),
         ],
-        child: MaterialApp(
-          title: 'Beeyo App',
-          debugShowCheckedModeBanner: false,
-          themeMode: ThemeMode.light,
-          theme: ThemeData(
-            brightness: Brightness.light,
-            scaffoldBackgroundColor: Colors.white,
-            colorScheme: const ColorScheme.light(
-              surface: Colors.white,
-              onSurface: Colors.black,
-              primary: Color(0xFF3DAA5C),
-              onPrimary: Colors.white,
-              secondary: Color(0xFF3DAA5C),
+        child: BlocListener<AuthBloc, AuthState>(
+          listenWhen: (previous, current) => current is SessionExpired,
+          listener: (context, state) {
+            rootNavigatorKey.currentState?.push(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            );
+          },
+          child: MaterialApp(
+            navigatorKey: rootNavigatorKey,
+            title: 'Beeyo App',
+            debugShowCheckedModeBanner: false,
+            themeMode: ThemeMode.light,
+            theme: ThemeData(
+              brightness: Brightness.light,
+              scaffoldBackgroundColor: Colors.white,
+              colorScheme: const ColorScheme.light(
+                surface: Colors.white,
+                onSurface: Colors.black,
+                primary: Color(0xFF3DAA5C),
+                onPrimary: Colors.white,
+                secondary: Color(0xFF3DAA5C),
+              ),
+              fontFamily: 'Poppins',
+              dividerColor: const Color(0xFFE0E0E0),
+              snackBarTheme: const SnackBarThemeData(
+                backgroundColor: Color(0xFF333333),
+                contentTextStyle: TextStyle(color: Colors.white),
+              ),
+              progressIndicatorTheme: const ProgressIndicatorThemeData(
+                color: Color(0xFF3DAA5C),
+              ),
             ),
-            fontFamily: 'Poppins',
-            dividerColor: const Color(0xFFE0E0E0),
-            snackBarTheme: const SnackBarThemeData(
-              backgroundColor: Color(0xFF333333),
-              contentTextStyle: TextStyle(color: Colors.white),
-            ),
-            progressIndicatorTheme: const ProgressIndicatorThemeData(
-              color: Color(0xFF3DAA5C),
-            ),
+            home: const SplashScreen(),
           ),
-          home: const SplashScreen(),
         ),
       ),
     );

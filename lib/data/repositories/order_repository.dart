@@ -64,6 +64,10 @@ class OrderRepository {
           : decoded as Map<String, dynamic>;
       return OrderModel.fromJson(data, fallbackItems: items);
     }
+    if (response.statusCode == 401) {
+      await authRepository.handleUnauthorized();
+      throw const SessionExpiredException();
+    }
     throw Exception('Failed to place order (${response.statusCode})');
   }
 
@@ -86,6 +90,10 @@ class OrderRepository {
       return list
           .map((json) => OrderModel.fromJson(json as Map<String, dynamic>))
           .toList();
+    }
+    if (response.statusCode == 401) {
+      await authRepository.handleUnauthorized();
+      throw const SessionExpiredException();
     }
     throw Exception('Failed to load orders (${response.statusCode})');
   }

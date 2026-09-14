@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/repositories/auth_repository.dart';
 import 'auth_event.dart';
@@ -5,6 +7,7 @@ import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository authRepository;
+  StreamSubscription<void>? _unauthorizedSub;
 
   AuthBloc({required this.authRepository}) : super(AuthInitial()) {
     // 1. Check Login Status on App Start
@@ -15,6 +18,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     // 3. Handle Logout
     on<LogoutRequested>(_onLogoutRequested);
+
+    // 4. A repository hit a 401 — the session is already cleared by the
+    // time this fires (see AuthRepository.handleUnauthorized).
+    on<SessionExpiredEvent>((event, emit) => emit(SessionExpired()));
+
+    _unauthorizedSub =
+        authRepository.onUnauthorized.listen((_) => add(SessionExpiredEvent()));
+  }
+
+  @override
+  Future<void> close() {
+    _unauthorizedSub?.cancel();
+    return super.close();
   }
 
   Future<void> _onAppStarted(AppStarted event, Emitter<AuthState> emit) async {
