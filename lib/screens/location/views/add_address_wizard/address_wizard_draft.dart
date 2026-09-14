@@ -7,9 +7,9 @@ import '../../../../shared/models/saved_address_model.dart';
 /// successful save at the end (see [AddressWizardDraft.onCheckoutSave]).
 enum AddressWizardEntryPoint { addressBook, checkout }
 
-/// Mutable state threaded by reference through all 3 wizard screens
-/// (AddressDetailsScreen -> ContactDetailsScreen -> ReviewLocationScreen),
-/// mirroring how `existingAddress` is already threaded as one object through
+/// Mutable state threaded by reference through both wizard screens
+/// (AddressDetailsScreen -> ReviewLocationScreen), mirroring how
+/// `existingAddress` is already threaded as one object through
 /// MapPinPickerScreen. Not a bloc state / not Equatable — this is scratch
 /// space for an in-progress form, not something anything reacts to.
 class AddressWizardDraft {

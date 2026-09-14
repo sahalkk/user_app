@@ -43,9 +43,9 @@ class SavedAddressModel extends Equatable {
   // see LocationRepository.syncAddressToBackend). Null until then.
   final String? backendId;
   // Recipient contact for deliveries to this address — one fixed contact
-  // per address, editable via the add-address wizard's Step 2. Empty on
-  // addresses saved before this field existed until LocationRepository's
-  // one-time backfill (or an edit) fills it in.
+  // per address, editable via the add-address wizard's Contact Details
+  // section. Empty on addresses saved before this field existed until
+  // LocationRepository's one-time backfill (or an edit) fills it in.
   final String recipientName;
   final String recipientPhone;
 

@@ -1,18 +1,24 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_contacts/flutter_contacts.dart' hide AddressLabel;
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../blocs/auth_bloc/auth_bloc.dart';
+import '../../../../blocs/auth_bloc/auth_state.dart';
 import '../../../../shared/models/saved_address_model.dart';
 import '../../cubit/location_cubit.dart';
 import 'address_wizard_draft.dart';
-import 'contact_details_screen.dart';
 import 'review_location_screen.dart';
 
-/// Step 1 of the add-address wizard. Pushed on top of MapPinPickerScreen
-/// (never replacing it) — "Change" just pops back to reveal the still-fully
-/// -interactive map screen underneath, no special signaling needed.
+/// Step 1 (of 2) of the add-address wizard. Pushed on top of
+/// MapPinPickerScreen (never replacing it) — "Change" just pops back to
+/// reveal the still-fully-interactive map screen underneath, no special
+/// signaling needed. Contact details + the Home/Work/Other label — Step 2
+/// until it was folded in here — are an inline expandable section rather
+/// than a separate screen, so the whole address can be filled in one pass.
 class AddressDetailsScreen extends StatefulWidget {
   final AddressWizardDraft draft;
   const AddressDetailsScreen({super.key, required this.draft});
@@ -26,7 +32,17 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
   late final TextEditingController _mapsLinkController;
   late final TextEditingController _landmarkController;
   String? _addressError;
+
+  late bool _forSelf;
+  late final TextEditingController _nameController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _customLabelController;
+  late AddressLabel _label;
   String? _contactError;
+  // Expanded by default: when contact info is already prefilled from the
+  // account, a collapsed card would let the user tap "Next" straight
+  // through without ever noticing the "For someone else" option exists.
+  bool _contactExpanded = true;
 
   @override
   void initState() {
@@ -35,6 +51,19 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
     _addressController = TextEditingController(text: draft.addressLine);
     _mapsLinkController = TextEditingController(text: draft.googleMapsLink ?? '');
     _landmarkController = TextEditingController(text: draft.landmark ?? '');
+
+    _forSelf = draft.forSelf;
+    _label = draft.label;
+    _customLabelController =
+        TextEditingController(text: draft.customLabel ?? '');
+    _nameController = TextEditingController(text: draft.recipientName);
+    _phoneController = TextEditingController(text: draft.recipientPhone);
+
+    if (_forSelf &&
+        draft.recipientName.isEmpty &&
+        draft.recipientPhone.isEmpty) {
+      _prefillFromAccount();
+    }
   }
 
   @override
@@ -42,6 +71,9 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
     _addressController.dispose();
     _mapsLinkController.dispose();
     _landmarkController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
+    _customLabelController.dispose();
     super.dispose();
   }
 
@@ -51,16 +83,61 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
     setState(() => widget.draft.imageLocalPath = file.path);
   }
 
-  Future<void> _openContactDetails() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ContactDetailsScreen(draft: widget.draft),
-      ),
-    );
-    if (!mounted) return;
-    setState(() => _contactError = null);
+  // Guests can never reach this flow — cart and Address Book both require
+  // login first — so this cast is always safe here.
+  void _prefillFromAccount() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated) {
+      _nameController.text = authState.name ?? '';
+      _phoneController.text = authState.phone ?? '';
+    }
   }
+
+  void _setForSelf(bool value) {
+    setState(() {
+      _forSelf = value;
+      if (value) {
+        _prefillFromAccount();
+        _label = AddressLabel.home;
+      } else {
+        _nameController.clear();
+        _phoneController.clear();
+        // No Home/Work/Other chips for someone else's address — it's saved
+        // under whatever free-text name is typed below instead.
+        _label = AddressLabel.other;
+      }
+    });
+  }
+
+  Future<void> _pickContact() async {
+    final status =
+        await FlutterContacts.permissions.request(PermissionType.read);
+    if (status != PermissionStatus.granted &&
+        status != PermissionStatus.limited) {
+      return;
+    }
+    final contact = await FlutterContacts.native
+        .showPicker(properties: {ContactProperty.phone});
+    if (contact == null || !mounted) return;
+    if (contact.phones.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("That contact has no phone number")),
+      );
+      return;
+    }
+    setState(() {
+      if ((contact.displayName ?? '').isNotEmpty) {
+        _nameController.text = contact.displayName!;
+      }
+      _phoneController.text = contact.phones.first.number;
+    });
+  }
+
+  String get _contactLabel =>
+      _label == AddressLabel.other &&
+              _customLabelController.text.trim().isNotEmpty
+          ? _customLabelController.text.trim()
+          : _label.display;
 
   void _onNext() {
     final draft = widget.draft;
@@ -73,11 +150,22 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
     }
     setState(() => _addressError = null);
 
-    if (draft.recipientName.isEmpty || draft.recipientPhone.isEmpty) {
-      setState(() => _contactError = "Add contact details to continue");
-      _openContactDetails();
+    final name = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
+    if (name.isEmpty || phone.isEmpty) {
+      setState(() {
+        _contactError = "Add recipient name & phone to continue";
+        _contactExpanded = true;
+      });
       return;
     }
+    setState(() => _contactError = null);
+
+    draft.forSelf = _forSelf;
+    draft.recipientName = name;
+    draft.recipientPhone = phone;
+    draft.label = _label;
+    draft.customLabel = _customLabelController.text.trim();
 
     Navigator.push(
       context,
@@ -187,12 +275,23 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
               child: draft.imageLocalPath != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        File(draft.imageLocalPath!),
-                        height: 140,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
+                      // image_picker returns a blob: URL on web (no real
+                      // filesystem path, and dart:io's File isn't usable
+                      // there anyway) — Image.network reads that URL
+                      // directly, where Image.file would just throw.
+                      child: kIsWeb
+                          ? Image.network(
+                              draft.imageLocalPath!,
+                              height: 140,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            )
+                          : Image.file(
+                              File(draft.imageLocalPath!),
+                              height: 140,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
                     )
                   : Container(
                       height: 90,
@@ -219,79 +318,205 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
                     ),
             ),
             const SizedBox(height: 20),
-            GestureDetector(
-              onTap: _openContactDetails,
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                      color: _contactError != null
-                          ? const Color(0xFFE53935)
-                          : const Color(0xFFE0E0E0)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.person_outline_rounded,
-                        color: Color(0xFF3DAA5C)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text("Contact Details",
-                              style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.black87)),
-                          const SizedBox(height: 2),
-                          if (draft.recipientName.isEmpty)
-                            Text(
-                              _contactError ?? "Add recipient name & phone",
-                              style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 12,
-                                  color: _contactError != null
-                                      ? const Color(0xFFE53935)
-                                      : const Color(0xFF9E9E9E)),
-                            )
-                          else
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(draft.recipientName,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 12,
-                                          color: Color(0xFF6B6B6B))),
-                                ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFE8F5E9),
-                                    borderRadius: BorderRadius.circular(8),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: _contactError != null
+                        ? const Color(0xFFE53935)
+                        : const Color(0xFFE0E0E0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () =>
+                        setState(() => _contactExpanded = !_contactExpanded),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person_outline_rounded,
+                            color: Color(0xFF3DAA5C)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text("Contact Details",
+                                  style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.black87)),
+                              // Collapsed-only preview — once expanded the
+                              // fields below already show this, so skip the
+                              // redundant line to save vertical space.
+                              if (!_contactExpanded) ...[
+                                const SizedBox(height: 2),
+                                if (_nameController.text.trim().isEmpty)
+                                  Text(
+                                    _contactError ?? "Add recipient name & phone",
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 12,
+                                        color: _contactError != null
+                                            ? const Color(0xFFE53935)
+                                            : const Color(0xFF9E9E9E)),
+                                  )
+                                else
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(_nameController.text.trim(),
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 12,
+                                                color: Color(0xFF6B6B6B))),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE8F5E9),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(_contactLabel,
+                                            style: const TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF3DAA5C))),
+                                      ),
+                                    ],
                                   ),
-                                  child: Text(draft.displayLabel,
-                                      style: const TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFF3DAA5C))),
-                                ),
                               ],
-                            ),
-                        ],
-                      ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          _contactExpanded
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
+                          color: const Color(0xFF6B6B6B),
+                        ),
+                      ],
                     ),
-                    const Icon(Icons.chevron_right_rounded,
-                        color: Color(0xFF6B6B6B)),
+                  ),
+                  if (_contactExpanded) ...[
+                    const Divider(height: 16, color: Color(0xFFE0E0E0)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ToggleButton(
+                            label: "For me",
+                            selected: _forSelf,
+                            onTap: () => _setForSelf(true),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _ToggleButton(
+                            label: "For someone else",
+                            selected: !_forSelf,
+                            onTap: () => _setForSelf(false),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _WizardField(
+                            controller: _nameController,
+                            label: "Name",
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _WizardField(
+                            controller: _phoneController,
+                            label: "Phone",
+                            keyboardType: TextInputType.phone,
+                            // Picking from contacts only makes sense when
+                            // filling in someone else's number — "For me"
+                            // is already the account's own number.
+                            // flutter_contacts has no web implementation
+                            // at all, so the picker is hidden there too.
+                            trailing: (_forSelf || kIsWeb)
+                                ? null
+                                : IconButton(
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    icon: const Icon(Icons.contacts_rounded,
+                                        size: 18, color: Color(0xFF3DAA5C)),
+                                    onPressed: _pickContact,
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    if (_forSelf) ...[
+                      const Text("Save address as",
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF6B6B6B))),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        children: AddressLabel.values.map((l) {
+                          final selected = l == _label;
+                          return ChoiceChip(
+                            label: Text(l.display),
+                            selected: selected,
+                            onSelected: (_) => setState(() => _label = l),
+                            selectedColor: const Color(0xFF3DAA5C),
+                            backgroundColor: Colors.white,
+                            labelStyle: TextStyle(
+                              color: selected ? Colors.white : Colors.black87,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(
+                                  color: selected
+                                      ? const Color(0xFF3DAA5C)
+                                      : const Color(0xFFE0E0E0)),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      if (_label == AddressLabel.other) ...[
+                        const SizedBox(height: 10),
+                        _WizardField(
+                          controller: _customLabelController,
+                          hint: "Label (e.g. Friend's place)",
+                        ),
+                      ],
+                    ] else ...[
+                      const Text("Save address as (optional)",
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF6B6B6B))),
+                      const SizedBox(height: 6),
+                      _WizardField(
+                        controller: _customLabelController,
+                        hint: "e.g. Mom's place, Office reception",
+                      ),
+                    ],
                   ],
-                ),
+                ],
               ),
             ),
             const SizedBox(height: 28),
@@ -320,11 +545,40 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
   }
 }
 
-extension on AddressWizardDraft {
-  String get displayLabel =>
-      label.name == 'other' && (customLabel?.isNotEmpty ?? false)
-          ? customLabel!
-          : label.display;
+class _ToggleButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _ToggleButton(
+      {required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF3DAA5C) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: selected
+                  ? const Color(0xFF3DAA5C)
+                  : const Color(0xFFE0E0E0)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : Colors.black87,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _FieldLabel extends StatelessWidget {
@@ -344,14 +598,24 @@ class _FieldLabel extends StatelessWidget {
 
 class _WizardField extends StatelessWidget {
   final TextEditingController controller;
-  final String hint;
+  // Either a plain placeholder (hint, paired with a _FieldLabel above) or a
+  // compact floating label (label) that doubles as its own placeholder —
+  // the latter skips the separate label row, used where vertical space is
+  // tight (e.g. the Contact Details section).
+  final String? hint;
+  final String? label;
   final int maxLines;
+  final TextInputType? keyboardType;
+  final Widget? trailing;
   final ValueChanged<String>? onChanged;
 
   const _WizardField({
     required this.controller,
-    required this.hint,
+    this.hint,
+    this.label,
     this.maxLines = 1,
+    this.keyboardType,
+    this.trailing,
     this.onChanged,
   });
 
@@ -366,15 +630,23 @@ class _WizardField extends StatelessWidget {
       child: TextField(
         controller: controller,
         maxLines: maxLines,
+        keyboardType: keyboardType,
         onChanged: onChanged,
         style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(
               fontFamily: 'Poppins', fontSize: 13, color: Color(0xFF9E9E9E)),
+          labelText: label,
+          labelStyle: const TextStyle(
+              fontFamily: 'Poppins', fontSize: 13, color: Color(0xFF9E9E9E)),
+          floatingLabelStyle: const TextStyle(
+              fontFamily: 'Poppins', fontSize: 12, color: Color(0xFF3DAA5C)),
           border: InputBorder.none,
+          isDense: true,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          suffixIcon: trailing,
         ),
       ),
     );

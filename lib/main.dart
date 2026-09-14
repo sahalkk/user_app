@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -8,7 +9,11 @@ import 'simple_bloc_observer.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  HttpOverrides.global = MyHttpOverrides();
+  // dart:io's HttpOverrides has no meaning on web (the browser owns TLS) —
+  // skip it there rather than relying on the web stub to no-op safely.
+  if (!kIsWeb) {
+    HttpOverrides.global = MyHttpOverrides();
+  }
 
   await dotenv.load(fileName: '.env');
 

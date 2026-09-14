@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:geocoding/geocoding.dart' as geocoding;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -122,10 +123,52 @@ class LocationRepository {
 
   // ── Reverse geocoding ────────────────────────────────────────────
 
+  // The `geocoding` package has no web implementation at all (calls throw
+  // MissingPluginException there), so web routes through OpenStreetMap's
+  // Nominatim HTTP API instead. Nominatim's usage policy caps this at ~1
+  // request/sec and asks for identification — browsers won't let JS set a
+  // custom User-Agent (it's a forbidden header) so this relies on the
+  // Referer they send automatically instead. Fine for low-volume use;
+  // swap for a backend-proxied geocoder if this needs to scale.
+  static const _nominatimUserAgent = 'BeeyoCustomerWeb/1.0';
+
+  Future<Map<String, dynamic>?> _webReverseGeocodeRaw(LatLng position) async {
+    try {
+      final uri = Uri.parse(
+          'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${position.latitude}&lon=${position.longitude}&addressdetails=1');
+      final response = await http
+          .get(uri, headers: {'User-Agent': _nominatimUserAgent})
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return null;
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _webReverseGeocode(LatLng position) async {
+    final data = await _webReverseGeocodeRaw(position);
+    if (data == null) return null;
+    final address = data['address'] as Map<String, dynamic>?;
+    final parts = [
+      address?['road'],
+      address?['suburb'],
+      address?['city'] ?? address?['town'] ?? address?['village'],
+      address?['postcode'],
+    ]
+        .whereType<String>()
+        .where((s) => s.trim().isNotEmpty)
+        .toSet()
+        .toList();
+    if (parts.isNotEmpty) return parts.join(', ');
+    return data['display_name'] as String?;
+  }
+
   /// Resolves coordinates to a human-readable address using the device's
   /// native geocoder. Returns null (not a throw) on failure — callers
   /// should fall back to showing the raw coordinates rather than blocking.
   Future<String?> reverseGeocode(LatLng position) async {
+    if (kIsWeb) return _webReverseGeocode(position);
     try {
       // The native geocoder can hang instead of throwing promptly (no
       // network, flaky Play Services, etc.) — without this timeout that
@@ -153,9 +196,36 @@ class LocationRepository {
   /// Places Autocomplete API — it geocodes the whole query on every call
   /// rather than offering live suggestions. Swap for a Places API-backed
   /// implementation when one is wired up server-side.
+  Future<List<({String label, LatLng position})>> _webSearchAddress(
+      String query) async {
+    try {
+      final uri = Uri.parse(
+          'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${Uri.encodeQueryComponent(query)}');
+      final response = await http
+          .get(uri, headers: {'User-Agent': _nominatimUserAgent})
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) throw const AddressSearchFailed();
+      final list = jsonDecode(response.body) as List;
+      return list
+          .map((e) => (
+                label: (e['display_name'] as String?) ?? query,
+                position: LatLng(
+                  double.parse(e['lat'] as String),
+                  double.parse(e['lon'] as String),
+                ),
+              ))
+          .toList();
+    } on AddressSearchFailed {
+      rethrow;
+    } catch (_) {
+      throw const AddressSearchFailed();
+    }
+  }
+
   Future<List<({String label, LatLng position})>> searchAddress(
       String query) async {
     if (query.trim().length < 3) return [];
+    if (kIsWeb) return _webSearchAddress(query);
     try {
       final locations = await geocoding
           .locationFromAddress(query)
@@ -288,31 +358,59 @@ class LocationRepository {
   /// the saved position to recover those components rather than guessing
   /// by splitting the formatted string.
   Future<String> syncAddressToBackend(SavedAddressModel address) async {
-    geocoding.Placemark? placemark;
-    try {
-      final placemarks = await geocoding
-          .placemarkFromCoordinates(
-              address.position.latitude, address.position.longitude)
-          .timeout(const Duration(seconds: 8));
-      if (placemarks.isNotEmpty) placemark = placemarks.first;
-    } catch (_) {
-      // Fall through — we still have formattedAddress/pincode as a fallback.
-    }
+    var street = '';
+    var city = '';
+    var state = '';
+    var postalCode = '';
+    var country = 'India';
 
-    final street = [
-      placemark?.subThoroughfare,
-      placemark?.thoroughfare,
-      placemark?.subLocality,
-    ].where((s) => s != null && s.trim().isNotEmpty).join(' ').trim();
+    if (kIsWeb) {
+      final data = await _webReverseGeocodeRaw(address.position);
+      final a = data?['address'] as Map<String, dynamic>?;
+      if (a != null) {
+        street = [a['house_number'], a['road'], a['suburb']]
+            .whereType<String>()
+            .where((s) => s.trim().isNotEmpty)
+            .join(' ')
+            .trim();
+        city = (a['city'] ?? a['town'] ?? a['village'] ?? '') as String;
+        state = (a['state'] ?? '') as String;
+        postalCode = (a['postcode'] ?? '') as String;
+        if ((a['country'] as String?)?.isNotEmpty ?? false) {
+          country = a['country'] as String;
+        }
+      }
+    } else {
+      geocoding.Placemark? placemark;
+      try {
+        final placemarks = await geocoding
+            .placemarkFromCoordinates(
+                address.position.latitude, address.position.longitude)
+            .timeout(const Duration(seconds: 8));
+        if (placemarks.isNotEmpty) placemark = placemarks.first;
+      } catch (_) {
+        // Fall through — we still have formattedAddress/pincode as a fallback.
+      }
+
+      street = [
+        placemark?.subThoroughfare,
+        placemark?.thoroughfare,
+        placemark?.subLocality,
+      ].where((s) => s != null && s.trim().isNotEmpty).join(' ').trim();
+      city = (placemark?.locality?.isNotEmpty ?? false)
+          ? placemark!.locality!
+          : (placemark?.subAdministrativeArea ?? '');
+      state = placemark?.administrativeArea ?? '';
+      postalCode = placemark?.postalCode ?? '';
+      country = placemark?.country ?? 'India';
+    }
 
     final body = jsonEncode({
       'street': street.isNotEmpty ? street : address.primaryAddressText,
-      'city': (placemark?.locality?.isNotEmpty ?? false)
-          ? placemark!.locality
-          : (placemark?.subAdministrativeArea ?? ''),
-      'state': placemark?.administrativeArea ?? '',
-      'postalCode': address.pincode ?? placemark?.postalCode ?? '',
-      'country': placemark?.country ?? 'India',
+      'city': city,
+      'state': state,
+      'postalCode': address.pincode ?? postalCode,
+      'country': country,
       'addressType': address.label.name.toUpperCase(),
       'isDefault': address.isDefault,
     });

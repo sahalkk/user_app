@@ -8,7 +8,7 @@ import '../../cubit/location_cubit.dart';
 import '../not_deliverable_view.dart';
 import 'address_wizard_draft.dart';
 
-/// Step 3 (final) of the add-address wizard — a non-interactive map preview
+/// Step 2 (final) of the add-address wizard — a non-interactive map preview
 /// + summary, and the actual persistence trigger.
 class ReviewLocationScreen extends StatelessWidget {
   final AddressWizardDraft draft;
