@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:beeyo_customer/blocs/order_bloc/order_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,11 +14,47 @@ class OrdersScreen extends StatefulWidget {
   State<OrdersScreen> createState() => _OrdersScreenState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen> {
+class _OrdersScreenState extends State<OrdersScreen> with WidgetsBindingObserver {
+  // No push infra (no WebSocket/notification channel) behind order status
+  // yet, so this is a short poll instead — good enough for a status tag
+  // that only changes a few times over an order's life. Paused whenever the
+  // app isn't in the foreground so it doesn't spend battery/data unseen.
+  static const _pollInterval = Duration(seconds: 12);
+  Timer? _pollTimer;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     context.read<OrderBloc>().add(LoadOrders());
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(_pollInterval, (_) {
+      if (!mounted) return;
+      context.read<OrderBloc>().add(const LoadOrders(silent: true));
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Catch up on anything that changed while backgrounded, then resume
+      // the regular poll cadence.
+      context.read<OrderBloc>().add(const LoadOrders(silent: true));
+      _startPolling();
+    } else {
+      _pollTimer?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override

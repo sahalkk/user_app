@@ -20,7 +20,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
   }
 
   Future<void> _onLoadOrders(LoadOrders event, Emitter<OrderState> emit) async {
-    emit(OrderLoading());
+    if (!event.silent) emit(OrderLoading());
     try {
       final userId = await authRepository.getUserId();
       if (userId == null) {
@@ -29,7 +29,11 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
       final orders = await orderRepository.getOrders(userId);
       emit(OrderLoaded(orders));
     } catch (e) {
-      emit(OrderLoadError(e.toString().replaceFirst('Exception: ', '')));
+      // A silent (polling) refresh that fails leaves the last good state
+      // on screen rather than replacing it with an error.
+      if (!event.silent) {
+        emit(OrderLoadError(e.toString().replaceFirst('Exception: ', '')));
+      }
     }
   }
 
