@@ -214,6 +214,26 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     }
   }
 
+  /// Opens the Address Book and, once it returns, refreshes this sheet's
+  /// own saved-addresses list — edits/deletes made there (e.g. tapping the
+  /// gear icon and deleting an address) otherwise leave the stale list
+  /// showing here, since nothing else tells [_MainPickerView]'s FutureBuilder
+  /// to re-fetch (popping back to this route doesn't itself trigger a
+  /// LocationCubit state change to rebuild off of).
+  Future<void> _openAddressBook() async {
+    final cubit = context.read<LocationCubit>();
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: cubit,
+          child: const AddressBookScreen(),
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -292,6 +312,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 currentPosition: _currentPosition,
                 entryPoint: widget.entryPoint,
                 onCheckoutSave: widget.onCheckoutSave,
+                onOpenAddressBook: _openAddressBook,
               );
             },
           ),
@@ -410,6 +431,7 @@ class _MainPickerView extends StatelessWidget {
   final LatLng? currentPosition;
   final AddressWizardEntryPoint entryPoint;
   final void Function(CheckoutAddressModel)? onCheckoutSave;
+  final VoidCallback onOpenAddressBook;
 
   const _MainPickerView({
     required this.scrollController,
@@ -424,6 +446,7 @@ class _MainPickerView extends StatelessWidget {
     this.currentPosition,
     required this.entryPoint,
     this.onCheckoutSave,
+    required this.onOpenAddressBook,
   });
 
   @override
@@ -578,15 +601,7 @@ class _MainPickerView extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF6B6B6B))),
                 GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => BlocProvider.value(
-                        value: context.read<LocationCubit>(),
-                        child: const AddressBookScreen(),
-                      ),
-                    ),
-                  ),
+                  onTap: onOpenAddressBook,
                   child: const Icon(Icons.settings_outlined,
                       size: 18, color: Color(0xFF6B6B6B)),
                 ),
@@ -742,8 +757,17 @@ class _SavedAddressTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pos = currentPosition;
-    final distanceLabel =
-        pos == null ? null : _formatDistance(distanceMeters(pos, address.position));
+    // A saved address with no real fix (backend returned null lat/lng —
+    // e.g. addresses created before those columns existed) is stored as
+    // LatLng(0, 0), the same "unknown position" sentinel used elsewhere
+    // (see delivery_zone_model.dart). Showing a distance against Null
+    // Island would always read as a bogus ~8,000+ km, so skip the badge
+    // instead, same as when there's no current-position fix at all.
+    final hasRealPosition =
+        address.position.latitude != 0 || address.position.longitude != 0;
+    final distanceLabel = (pos == null || !hasRealPosition)
+        ? null
+        : _formatDistance(distanceMeters(pos, address.position));
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

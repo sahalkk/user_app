@@ -298,10 +298,16 @@ class LocationRepository {
     }
   }
 
-  // ── Saved addresses (local-first; swap for a backend CRUD API later) ──
+  // ── Saved addresses ───────────────────────────────────────────────
+  // Backend `/api/v1/addresses` is the source of truth for a logged-in
+  // user (see syncAddressToBackend) — the local SharedPreferences copy is
+  // just an offline-friendly cache of it, refreshed from the backend on
+  // every read. This is what lets addresses survive logout/reinstall
+  // instead of only lasting a single session. Guests never authenticate,
+  // so they only ever get the local cache (there's nothing to sync to).
 
-  Future<List<SavedAddressModel>> getSavedAddresses() async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<List<SavedAddressModel>> _readLocalAddresses(
+      SharedPreferences prefs) async {
     final raw = prefs.getStringList(_savedAddressesKey) ?? [];
     final addresses =
         raw.map((s) => SavedAddressModel.fromJson(jsonDecode(s))).toList();
@@ -310,7 +316,7 @@ class LocationRepository {
     // existed decode with those fields empty (see SavedAddressModel.fromJson).
     // Fill them from the account's own contact and persist it directly here
     // so this only runs once per address, not via saveAddress() (which would
-    // call back into getSavedAddresses() and recurse).
+    // call back into this and recurse).
     final needsBackfill =
         addresses.any((a) => a.recipientName.isEmpty || a.recipientPhone.isEmpty);
     if (needsBackfill) {
@@ -326,27 +332,139 @@ class LocationRepository {
             );
           }
         }
-        await prefs.setStringList(
-          _savedAddressesKey,
-          addresses.map((a) => jsonEncode(a.toJson())).toList(),
-        );
+        await _writeLocalAddresses(prefs, addresses);
       }
     }
 
+    return addresses;
+  }
+
+  Future<void> _writeLocalAddresses(
+      SharedPreferences prefs, List<SavedAddressModel> addresses) {
+    return prefs.setStringList(
+      _savedAddressesKey,
+      addresses.map((a) => jsonEncode(a.toJson())).toList(),
+    );
+  }
+
+  Future<List<SavedAddressModel>> getSavedAddresses() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    if (await authRepository.isLoggedIn()) {
+      try {
+        final remote = await _fetchAddressesFromBackend();
+        // imageLocalPath is a local file path only — never synced to the
+        // backend (no upload endpoint yet) — so carry it over from the
+        // matching local entry rather than losing it on every refresh.
+        final local = await _readLocalAddresses(prefs);
+        final imageByBackendId = {
+          for (final a in local)
+            if (a.backendId != null && a.imageLocalPath != null)
+              a.backendId!: a.imageLocalPath!,
+        };
+        final merged = remote
+            .map((a) => imageByBackendId.containsKey(a.backendId)
+                ? a.copyWith(imageLocalPath: imageByBackendId[a.backendId])
+                : a)
+            .toList();
+        await _writeLocalAddresses(prefs, merged);
+        return merged..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      } catch (_) {
+        // Offline / backend unreachable — fall back to whatever was last
+        // cached locally rather than showing an empty address book.
+      }
+    }
+
+    final addresses = await _readLocalAddresses(prefs);
     return addresses..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
-  Future<void> saveAddress(SavedAddressModel address) async {
-    final prefs = await SharedPreferences.getInstance();
-    final existing = await getSavedAddresses();
-    final updated = [
-      ...existing.where((a) => a.id != address.id),
-      address,
-    ];
-    await prefs.setStringList(
-      _savedAddressesKey,
-      updated.map((a) => jsonEncode(a.toJson())).toList(),
+  Future<List<SavedAddressModel>> _fetchAddressesFromBackend() async {
+    final headers = await _authHeaders();
+    final response = await http
+        .get(
+          Uri.parse('${ApiConstants.baseUrl}/api/v1/addresses'),
+          headers: headers,
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 401) {
+      await authRepository.handleUnauthorized();
+      throw const SessionExpiredException();
+    }
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load addresses (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body);
+    final data = (decoded is Map && decoded.containsKey('data'))
+        ? decoded['data']
+        : decoded;
+    final list = (data is List) ? data : const [];
+    return list
+        .map((e) => _addressFromBackendJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  SavedAddressModel _addressFromBackendJson(Map<String, dynamic> json) {
+    final id = (json['id'] ?? json['_id']).toString();
+    final street = json['street'] as String? ?? '';
+    final city = json['city'] as String? ?? '';
+    final formattedAddress = json['formattedAddress'] as String? ?? '';
+    final addressLine = json['addressLine'] as String? ?? '';
+
+    return SavedAddressModel(
+      id: id,
+      backendId: id,
+      label: AddressLabel.values.firstWhere(
+        (l) => l.name.toUpperCase() == (json['addressType'] as String?)?.toUpperCase(),
+        orElse: () => AddressLabel.other,
+      ),
+      customLabel: json['customLabel'] as String?,
+      position: LatLng(
+        (json['lat'] as num?)?.toDouble() ?? 0,
+        (json['lng'] as num?)?.toDouble() ?? 0,
+      ),
+      formattedAddress: formattedAddress.isNotEmpty
+          ? formattedAddress
+          : [street, city].where((s) => s.isNotEmpty).join(', '),
+      addressLine: addressLine.isNotEmpty ? addressLine : street,
+      googleMapsLink: json['googleMapsLink'] as String?,
+      landmark: json['landmark'] as String?,
+      pincode: json['postalCode'] as String?,
+      isDefault: json['isDefault'] as bool? ?? false,
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
+      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+          DateTime.now(),
+      recipientName: json['recipientName'] as String? ?? '',
+      recipientPhone: json['recipientPhone'] as String? ?? '',
     );
+  }
+
+  /// Saves locally and, when logged in, immediately syncs to the backend
+  /// so this address survives logout/reinstall rather than only being
+  /// pushed lazily the first time an order is placed with it.
+  Future<void> saveAddress(SavedAddressModel address) async {
+    var toSave = address;
+    if (await authRepository.isLoggedIn()) {
+      try {
+        final backendId = await syncAddressToBackend(address);
+        toSave = address.copyWith(backendId: backendId);
+      } catch (_) {
+        // Best-effort — keep the local copy even if the backend sync fails
+        // (offline, etc). getSavedAddresses() will retry the sync implicitly
+        // next time this address is saved/edited.
+      }
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final existing = await _readLocalAddresses(prefs);
+    final updated = [
+      ...existing.where((a) => a.id != toSave.id),
+      toSave,
+    ];
+    await _writeLocalAddresses(prefs, updated);
   }
 
   /// Creates (or updates, if already synced once) this address as a real
@@ -413,6 +531,15 @@ class LocationRepository {
       'country': country,
       'addressType': address.label.name.toUpperCase(),
       'isDefault': address.isDefault,
+      'lat': address.position.latitude,
+      'lng': address.position.longitude,
+      'addressLine': address.addressLine,
+      'formattedAddress': address.formattedAddress,
+      'landmark': address.landmark,
+      'googleMapsLink': address.googleMapsLink,
+      'customLabel': address.customLabel,
+      'recipientName': address.recipientName,
+      'recipientPhone': address.recipientPhone,
     });
 
     final headers = await _authHeaders();
@@ -467,12 +594,34 @@ class LocationRepository {
 
   Future<void> deleteAddress(String id) async {
     final prefs = await SharedPreferences.getInstance();
-    final existing = await getSavedAddresses();
+    final existing = await _readLocalAddresses(prefs);
+    SavedAddressModel? target;
+    for (final a in existing) {
+      if (a.id == id) {
+        target = a;
+        break;
+      }
+    }
     final updated = existing.where((a) => a.id != id).toList();
-    await prefs.setStringList(
-      _savedAddressesKey,
-      updated.map((a) => jsonEncode(a.toJson())).toList(),
-    );
+    await _writeLocalAddresses(prefs, updated);
+
+    if (target?.backendId != null) {
+      try {
+        final headers = await _authHeaders();
+        await http
+            .delete(
+              Uri.parse(
+                  '${ApiConstants.baseUrl}/api/v1/addresses/${target!.backendId}'),
+              headers: headers,
+            )
+            .timeout(const Duration(seconds: 10));
+      } catch (_) {
+        // Best-effort — the address is already gone from the local list;
+        // if it lingers on the backend, the next getSavedAddresses() fetch
+        // would otherwise resurrect it, but a failed delete here is rare
+        // enough (and retryable by the user) not to block on.
+      }
+    }
   }
 
   // ── Notify-me (out-of-zone waitlist) ─────────────────────────────

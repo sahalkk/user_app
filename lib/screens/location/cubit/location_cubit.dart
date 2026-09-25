@@ -153,10 +153,19 @@ class LocationCubit extends Cubit<LocationState> {
         // at Confirming. The label is never shown for this path — it only
         // matters once/if the user later edits this into a real saved
         // address from the Address Book.
+        //
+        // Every current caller of autoConfirm:true (bootstrap, the permission
+        // primer, the default "Use my current location" row, and the
+        // ambient "Use current location" retry on an unserviceable-area
+        // screen) is the ambient "just checking this area" flow, never an
+        // explicit add/edit — so this must not get written into the user's
+        // real saved-address list (see persistAsSavedAddress's doc comment
+        // on confirmAddress below).
         await confirmAddress(
           position: position,
           formattedAddress: address,
           label: AddressLabel.home,
+          persistAsSavedAddress: false,
         );
         return;
       }
