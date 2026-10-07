@@ -90,7 +90,7 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
   // AuthAuthenticated was emitted before it existed (e.g. a new account).
   Future<void> _prefillFromAccount() async {
     final authRepository = context.read<AuthRepository>();
-    final name = await authRepository.getUserName();
+    final name = await authRepository.fetchUserName();
     final phone = await authRepository.getUserPhone();
     // Bail if the user toggled "For someone else" (or started typing)
     // while this was loading — don't overwrite what they've entered.

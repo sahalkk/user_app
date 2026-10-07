@@ -107,6 +107,17 @@ class AuthRepository {
     return prefs.getString(_userNameKey);
   }
 
+  /// Cached name if we have one, otherwise asks the backend — covers
+  /// sessions where the name was set on another device, or before it was
+  /// cached locally.
+  Future<String?> fetchUserName() async {
+    final cached = await getUserName();
+    if (cached != null && cached.trim().isNotEmpty) return cached;
+    final token = await getToken();
+    if (token == null) return null;
+    return _fetchAndStoreProfile(token);
+  }
+
   /// Asks the backend to SMS a login OTP to [phone] (10 digits, no +91).
   /// Returns how many seconds to wait before the user may request another.
   Future<int> sendOtp(String phone) async {
@@ -186,15 +197,16 @@ class AuthRepository {
   /// locally. Used both by the first-login "what should we call you?"
   /// prompt and any later "edit name" flow.
   Future<void> updateUserName(String name) async {
-    final userId = await getUserId();
     final token = await getToken();
-    if (userId == null || token == null) {
+    if (token == null) {
       throw Exception('Not logged in');
     }
 
+    // Self-service endpoint — PUT /users/:id is admin-only and 403s for
+    // customers.
     final response = await http
         .put(
-          Uri.parse('${ApiConstants.baseUrl}/api/v1/users/$userId'),
+          Uri.parse(profileUrl),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
