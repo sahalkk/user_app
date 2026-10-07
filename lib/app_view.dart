@@ -6,6 +6,7 @@ import 'package:beeyo_customer/blocs/wishlist_bloc/wishlist_bloc.dart';
 import 'package:beeyo_customer/data/repositories/auth_repository.dart';
 import 'package:beeyo_customer/data/repositories/location_repository.dart';
 import 'package:beeyo_customer/data/repositories/order_repository.dart';
+import 'package:beeyo_customer/data/repositories/recent_searches_repository.dart';
 import 'package:beeyo_customer/screens/auth/views/login_screen.dart';
 import 'package:beeyo_customer/screens/location/cubit/location_cubit.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +44,9 @@ class MyAppView extends StatelessWidget {
         ),
         RepositoryProvider<OrderRepository>(
           create: (context) => OrderRepository(authRepository),
+        ),
+        RepositoryProvider<RecentSearchesRepository>(
+          create: (context) => RecentSearchesRepository(),
         ),
       ],
       // USE MULTI-BLOC PROVIDER HERE

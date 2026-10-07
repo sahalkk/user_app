@@ -47,23 +47,4 @@ class ProductRepository {
       throw Exception("Error fetching products");
     }
   }
-
-  Future<List<ProductModel>> searchProducts(String query) async {
-    try {
-      final allProducts = await getProducts(); 
-
-      if (query.isEmpty) return allProducts; 
-
-      return allProducts.where((product) {
-        final titleLower = product.title.toLowerCase();
-        final searchLower = query.toLowerCase();
-        return titleLower.contains(searchLower);
-      }).toList();
-
-    } catch (e) {
-      throw Exception("Error searching products");
-    }
-  }
-
 }
-

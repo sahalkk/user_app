@@ -1,42 +1,43 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rxdart/rxdart.dart'; // Optional: for debounce if you have it
-import '../../../../data/repositories/product_repository.dart'; // Import Repo
+import 'package:rxdart/rxdart.dart';
 import '../../../../shared/models/product_model.dart';
+import '../../../../shared/utils/product_search.dart';
 
 part 'search_event.dart';
 part 'search_state.dart';
 
 class SearchBloc extends Bloc<SearchEvent, SearchState> {
-  // 1. Inject the Repository
-  final ProductRepository productRepository;
+  ProductSearchIndex _index;
+  String _query = '';
 
-  SearchBloc(this.productRepository) : super(SearchInitial()) {
-    // 2. Add debounce (wait 300ms after typing stops) to prevent API spam
+  SearchBloc(this._index) : super(SearchInitial()) {
+    // Searching is in-memory, so the debounce only saves rebuilds while the
+    // user is mid-word. switchMap drops a pending query as soon as a newer
+    // one arrives, so stale results can never land after fresh ones.
     on<SearchQueryChanged>(_onQueryChanged, transformer: (events, mapper) {
       return events
-          .debounceTime(const Duration(milliseconds: 300))
-          .asyncExpand(mapper);
+          .debounceTime(const Duration(milliseconds: 150))
+          .switchMap(mapper);
     });
+    on<SearchIndexUpdated>(_onIndexUpdated);
   }
 
-  Future<void> _onQueryChanged(
-      SearchQueryChanged event, Emitter<SearchState> emit) async {
-    if (event.query.isEmpty) {
-      emit(SearchInitial()); // Or SearchEmpty
+  void _onQueryChanged(SearchQueryChanged event, Emitter<SearchState> emit) {
+    _query = event.query;
+    _emitResults(emit);
+  }
+
+  // Home reloaded the catalog — re-run the current query against it.
+  void _onIndexUpdated(SearchIndexUpdated event, Emitter<SearchState> emit) {
+    _index = event.index;
+    _emitResults(emit);
+  }
+
+  void _emitResults(Emitter<SearchState> emit) {
+    if (_query.trim().isEmpty) {
+      emit(SearchInitial());
       return;
     }
-
-    emit(SearchLoading());
-
-    try {
-      // 3. Call the Real API via Repository
-      final results = await productRepository.searchProducts(event.query);
-      emit(SearchLoaded(results, event.query));
-    } catch (e) {
-      debugPrint("Search Error: $e");
-      // Fallback to empty or error state
-      emit(SearchLoaded(const [], event.query));
-    }
+    emit(SearchLoaded(_index.search(_query), _query.trim()));
   }
 }
