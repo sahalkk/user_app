@@ -115,9 +115,30 @@ class LocationRepository {
       ).timeout(const Duration(seconds: 14));
       return LatLng(position.latitude, position.longitude);
     } on TimeoutException catch (_) {
+      // No fresh fix in time (indoors, cold GPS, or an emulator that only
+      // emits a fix when its location is changed) — the OS's cached fix is
+      // still far better than making the user type an address.
+      final lastKnown = await _lastKnownPosition();
+      if (lastKnown != null) return lastKnown;
       throw const LocationFailure(LocationFailureReason.timeout);
     } catch (_) {
+      final lastKnown = await _lastKnownPosition();
+      if (lastKnown != null) return lastKnown;
       throw const LocationFailure(LocationFailureReason.unknown);
+    }
+  }
+
+  /// Best-effort read of the OS's cached fix. Not supported on web, and
+  /// can return null on a device that has never had a fix.
+  Future<LatLng?> _lastKnownPosition() async {
+    if (kIsWeb) return null;
+    try {
+      final position = await Geolocator.getLastKnownPosition()
+          .timeout(const Duration(seconds: 3));
+      if (position == null) return null;
+      return LatLng(position.latitude, position.longitude);
+    } catch (_) {
+      return null;
     }
   }
 
