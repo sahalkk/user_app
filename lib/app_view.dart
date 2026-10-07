@@ -9,6 +9,7 @@ import 'package:beeyo_customer/data/repositories/order_repository.dart';
 import 'package:beeyo_customer/screens/auth/views/login_screen.dart';
 import 'package:beeyo_customer/screens/location/cubit/location_cubit.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'blocs/cart_bloc/cart_bloc.dart';
 import 'screens/home/blocs/home_bloc.dart';
@@ -26,7 +27,6 @@ class MyAppView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     final authRepository = AuthRepository();
 
     return MultiRepositoryProvider(
@@ -49,7 +49,8 @@ class MyAppView extends StatelessWidget {
       child: MultiBlocProvider(
         providers: [
           BlocProvider(
-            create: (context) => AuthBloc(authRepository: authRepository)..add(AppStarted()),
+            create: (context) =>
+                AuthBloc(authRepository: authRepository)..add(AppStarted()),
           ),
           BlocProvider(create: (context) => WishlistBloc()),
           BlocProvider(create: (context) => CartBloc()),
@@ -59,7 +60,9 @@ class MyAppView extends StatelessWidget {
                     context.read<CategoryRepository>(),
                   )),
           BlocProvider(
-            create: (context) => CategoriesBloc(context.read<CategoryRepository>())..add(LoadCategories()),
+            create: (context) =>
+                CategoriesBloc(context.read<CategoryRepository>())
+                  ..add(LoadCategories()),
           ),
           BlocProvider(
             create: (context) => OrderBloc(
@@ -104,6 +107,22 @@ class MyAppView extends StatelessWidget {
               progressIndicatorTheme: const ProgressIndicatorThemeData(
                 color: Color(0xFF3DAA5C),
               ),
+            ),
+            // App-wide status/nav bar style. Most screens are a bare white
+            // Scaffold with no AppBar, so nothing else tells Android which
+            // icon colour to use — with the phone in dark mode it falls
+            // back to white icons, invisible against our white UI. Dark
+            // icons by default; AppBars and the green splash/login screens
+            // set their own AnnotatedRegion, which takes precedence.
+            builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+              value: const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.dark, // Android
+                statusBarBrightness: Brightness.light, // iOS
+                systemNavigationBarColor: Colors.white,
+                systemNavigationBarIconBrightness: Brightness.dark,
+              ),
+              child: child!,
             ),
             home: const SplashScreen(),
           ),

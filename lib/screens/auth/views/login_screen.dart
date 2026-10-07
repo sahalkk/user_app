@@ -50,39 +50,45 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F3D26), // Deep brand green
-      body: BlocListener<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is AuthAuthenticated) {
-            if (state.isNewUser) {
-              // Replaces LoginScreen in the stack — when SetNameScreen pops,
-              // it lands back on whoever originally pushed LoginScreen.
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const SetNameScreen()),
+    // Dark green background — white status bar icons here, overriding the
+    // app-wide dark-icon default set in MaterialApp.builder.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light
+          .copyWith(statusBarColor: Colors.transparent),
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F3D26), // Deep brand green
+        body: BlocListener<AuthBloc, AuthState>(
+          listener: (context, state) {
+            if (state is AuthAuthenticated) {
+              if (state.isNewUser) {
+                // Replaces LoginScreen in the stack — when SetNameScreen pops,
+                // it lands back on whoever originally pushed LoginScreen.
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SetNameScreen()),
+                );
+              } else {
+                Navigator.pop(context, true);
+              }
+            } else if (state is AuthFailure) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: Colors.redAccent,
+                  behavior: SnackBarBehavior.floating,
+                ),
               );
-            } else {
-              Navigator.pop(context, true);
             }
-          } else if (state is AuthFailure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.redAccent,
-                behavior: SnackBarBehavior.floating,
+          },
+          child: SafeArea(
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              // Smooth transition between Phone and OTP steps
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: !_isOtpSent ? _buildPhoneStep() : _buildOtpStep(),
               ),
-            );
-          }
-        },
-        child: SafeArea(
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-            // Smooth transition between Phone and OTP steps
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: !_isOtpSent ? _buildPhoneStep() : _buildOtpStep(),
             ),
           ),
         ),
@@ -261,7 +267,8 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1), shape: BoxShape.circle),
+                color: Colors.white.withValues(alpha: 0.1),
+                shape: BoxShape.circle),
             child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
           ),
         ),

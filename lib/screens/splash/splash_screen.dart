@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart'; // 1. Import this
 import '../../blocs/auth_bloc/auth_bloc.dart';
@@ -70,55 +71,61 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      backgroundColor: colorScheme.primary,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // 3. Animated "Breathing" Logo
-            ScaleTransition(
-              scale: _scaleAnimation,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
+    // Brand-green background — white status bar icons here, overriding
+    // the app-wide dark-icon default set in MaterialApp.builder.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light
+          .copyWith(statusBarColor: Colors.transparent),
+      child: Scaffold(
+        backgroundColor: colorScheme.primary,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // 3. Animated "Breathing" Logo
+              ScaleTransition(
+                scale: _scaleAnimation,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(25), // Softer curves
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      )
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.shopping_bag_rounded,
+                    size: 64, // Slightly larger
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              const Text(
+                "Beeyo",
+                style: TextStyle(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(25), // Softer curves
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    )
-                  ],
-                ),
-                child: Icon(
-                  Icons.shopping_bag_rounded,
-                  size: 64, // Slightly larger
-                  color: colorScheme.primary,
+                  fontSize: 42,
+                  fontWeight: FontWeight.w800, // Thicker font
+                  letterSpacing: 1.2,
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
 
-            const Text(
-              "Beeyo",
-              style: TextStyle(
+              const SizedBox(height: 80), // More space at bottom
+
+              // 4. MODERN LOADER (Three Bouncing Dots)
+              const SpinKitThreeBounce(
                 color: Colors.white,
-                fontSize: 42,
-                fontWeight: FontWeight.w800, // Thicker font
-                letterSpacing: 1.2,
+                size: 30.0,
               ),
-            ),
-
-            const SizedBox(height: 80), // More space at bottom
-
-            // 4. MODERN LOADER (Three Bouncing Dots)
-            const SpinKitThreeBounce(
-              color: Colors.white,
-              size: 30.0,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
