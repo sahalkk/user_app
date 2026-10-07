@@ -14,14 +14,6 @@ import '../cubit/location_cubit.dart';
 import 'map_pin_picker_screen.dart';
 import 'not_deliverable_view.dart';
 
-/// Saved addresses + a best-effort current-position fix, fetched together —
-/// see [_LocationPickerSheetState._loadMainPickerData] for why these are
-/// combined into a single future rather than two independent ones.
-typedef MainPickerData = ({
-  List<SavedAddressModel> addresses,
-  LatLng? currentPosition,
-});
-
 class LocationPickerSheet extends StatefulWidget {
   /// False (default): the ambient "is my area serviceable" flow — GPS/search
   /// picks skip straight to the answer, and "Add new address" is hidden
@@ -91,42 +83,33 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   // finding nothing, which is just an empty [_results] with this false.
   bool _searchFailed = false;
 
-  // Saved addresses + the best-effort current-position fix (for "X km away"
-  // badges) are fetched together as ONE future, computed once here rather
-  // than inline in _MainPickerView.build() — a future built inline is
-  // re-created (and re-fetched from the backend) on every rebuild of that
-  // widget, which is exactly what used to happen the instant the GPS fix
-  // landed: that arrival triggered a rebuild, which re-ran the inline
-  // getSavedAddresses() call, which reset the list back to its loading
-  // state right as the badges should have appeared. Fetching both
-  // concurrently and caching the combined future means the list and its
-  // distance badges always render together, in one pass, the first time.
-  late Future<MainPickerData> _mainPickerDataFuture;
+  // Saved addresses and the best-effort current-position fix (only used for
+  // the "X km away" badges) are two independent futures, both started once
+  // here, concurrently. The list renders as soon as the addresses arrive —
+  // a GPS fix can take many seconds (indoors, cold GPS, emulators) and must
+  // not hold the list back; each badge shows a small placeholder until the
+  // position resolves. Both are cached here rather than created inline in
+  // _MainPickerView.build(): an inline future is re-created (re-fetching
+  // from the backend) on every rebuild, which would reset the list to its
+  // loading state the moment anything rebuilt it.
+  late Future<List<SavedAddressModel>> _addressesFuture;
+  late final Future<LatLng?> _positionFuture;
 
   @override
   void initState() {
     super.initState();
-    _mainPickerDataFuture = _loadMainPickerData();
-  }
-
-  Future<MainPickerData> _loadMainPickerData() async {
     final cubit = context.read<LocationCubit>();
-    // Both calls are started here, before either is awaited below, so the
-    // network fetch and the GPS fix resolve concurrently rather than one
-    // after the other.
-    final addressesFuture = cubit.getSavedAddresses();
-    final positionFuture = cubit.tryGetCurrentPosition();
-    return (
-      addresses: await addressesFuture,
-      currentPosition: await positionFuture,
-    );
+    _addressesFuture = cubit.getSavedAddresses();
+    _positionFuture = cubit.tryGetCurrentPosition();
   }
 
-  /// Re-runs the combined fetch above — called after returning from the
+  /// Re-fetches the saved addresses — called after returning from the
   /// Address Book so edits/deletes made there are reflected here (see
-  /// [_openAddressBook]).
-  void _refreshMainPickerData() {
-    setState(() => _mainPickerDataFuture = _loadMainPickerData());
+  /// [_openAddressBook]). The position fix is still valid, so it's kept.
+  void _refreshSavedAddresses() {
+    setState(() {
+      _addressesFuture = context.read<LocationCubit>().getSavedAddresses();
+    });
   }
 
   @override
@@ -237,7 +220,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
         ),
       ),
     );
-    if (mounted) _refreshMainPickerData();
+    if (mounted) _refreshSavedAddresses();
   }
 
   @override
@@ -316,7 +299,8 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 isResolving: state is Resolving || state is PermissionChecking,
                 notice: state is ManualEntry ? state.message : null,
                 precise: widget.precise,
-                mainPickerDataFuture: _mainPickerDataFuture,
+                addressesFuture: _addressesFuture,
+                positionFuture: _positionFuture,
                 onAddNewAddress: _addNewAddress,
                 onOpenAddressBook: _openAddressBook,
               );
@@ -439,7 +423,8 @@ class _MainPickerView extends StatelessWidget {
   // user on the search view with no hint why nothing happened.
   final String? notice;
   final bool precise;
-  final Future<MainPickerData> mainPickerDataFuture;
+  final Future<List<SavedAddressModel>> addressesFuture;
+  final Future<LatLng?> positionFuture;
   final VoidCallback onAddNewAddress;
   final VoidCallback onOpenAddressBook;
 
@@ -454,7 +439,8 @@ class _MainPickerView extends StatelessWidget {
     required this.isResolving,
     this.notice,
     required this.precise,
-    required this.mainPickerDataFuture,
+    required this.addressesFuture,
+    required this.positionFuture,
     required this.onAddNewAddress,
     required this.onOpenAddressBook,
   });
@@ -644,8 +630,8 @@ class _MainPickerView extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            FutureBuilder<MainPickerData>(
-              future: mainPickerDataFuture,
+            FutureBuilder<List<SavedAddressModel>>(
+              future: addressesFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Padding(
@@ -654,13 +640,7 @@ class _MainPickerView extends StatelessWidget {
                         color: Color(0xFF3DAA5C), backgroundColor: Color(0xFFF0F0F0)),
                   );
                 }
-                // Addresses and the current-position fix arrive together
-                // (see MainPickerData) — a saved-address tile is never
-                // shown before it already knows whether it can render a
-                // distance badge, so there's no separate pass where the
-                // list appears first and badges pop in a moment later.
-                final addresses = snapshot.data?.addresses ?? [];
-                final currentPosition = snapshot.data?.currentPosition;
+                final addresses = snapshot.data ?? [];
                 if (addresses.isEmpty) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
@@ -672,7 +652,7 @@ class _MainPickerView extends StatelessWidget {
                 return Column(
                   children: addresses
                       .map((a) => _SavedAddressTile(
-                          address: a, currentPosition: currentPosition))
+                          address: a, positionFuture: positionFuture))
                       .toList(),
                 );
               },
@@ -769,8 +749,8 @@ class _SearchEmptyState extends StatelessWidget {
 
 class _SavedAddressTile extends StatelessWidget {
   final SavedAddressModel address;
-  final LatLng? currentPosition;
-  const _SavedAddressTile({required this.address, this.currentPosition});
+  final Future<LatLng?> positionFuture;
+  const _SavedAddressTile({required this.address, required this.positionFuture});
 
   IconData get _icon {
     switch (address.label) {
@@ -785,18 +765,14 @@ class _SavedAddressTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pos = currentPosition;
     // A saved address with no real fix (backend returned null lat/lng —
     // e.g. addresses created before those columns existed) is stored as
     // LatLng(0, 0), the same "unknown position" sentinel used elsewhere
     // (see delivery_zone_model.dart). Showing a distance against Null
-    // Island would always read as a bogus ~8,000+ km, so skip the badge
-    // instead, same as when there's no current-position fix at all.
+    // Island would always read as a bogus ~8,000+ km — and since that's
+    // known up front, such a tile never shows a badge placeholder either.
     final hasRealPosition =
         address.position.latitude != 0 || address.position.longitude != 0;
-    final distanceLabel = (pos == null || !hasRealPosition)
-        ? null
-        : _formatDistance(distanceMeters(pos, address.position));
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -843,10 +819,11 @@ class _SavedAddressTile extends StatelessWidget {
                           fontFamily: 'Poppins',
                           fontSize: 12,
                           color: Color(0xFF6B6B6B))),
-                  if (distanceLabel != null) ...[
-                    const SizedBox(height: 8),
-                    _DistanceBadge(label: distanceLabel),
-                  ],
+                  if (hasRealPosition)
+                    _AsyncDistanceBadge(
+                      target: address.position,
+                      positionFuture: positionFuture,
+                    ),
                 ],
               ),
             ),
@@ -862,12 +839,74 @@ String _formatDistance(double meters) {
   return "${(meters / 1000).toStringAsFixed(1)} km away";
 }
 
-class _DistanceBadge extends StatelessWidget {
-  final String label;
-  const _DistanceBadge({required this.label});
+/// "X km away" badge that doesn't hold up its card: shows a same-sized
+/// placeholder while the position fix is pending, cross-fades to the real
+/// distance once it lands, and smoothly collapses if no fix is available
+/// (permission off, GPS timeout) — the card is usable throughout.
+class _AsyncDistanceBadge extends StatelessWidget {
+  final LatLng target;
+  final Future<LatLng?> positionFuture;
+  const _AsyncDistanceBadge({
+    required this.target,
+    required this.positionFuture,
+  });
 
   @override
   Widget build(BuildContext context) {
+    return FutureBuilder<LatLng?>(
+      future: positionFuture,
+      builder: (context, snapshot) {
+        final isLoading = snapshot.connectionState != ConnectionState.done;
+        final position = snapshot.data;
+
+        final Widget child;
+        if (isLoading) {
+          child = const Padding(
+            key: ValueKey('loading'),
+            padding: EdgeInsets.only(top: 8),
+            child: _DistanceBadge(),
+          );
+        } else if (position != null) {
+          child = Padding(
+            key: const ValueKey('distance'),
+            padding: const EdgeInsets.only(top: 8),
+            child: _DistanceBadge(
+                label: _formatDistance(distanceMeters(position, target))),
+          );
+        } else {
+          child = const SizedBox.shrink(key: ValueKey('none'));
+        }
+
+        // AnimatedSize smooths the one case that changes height (no fix →
+        // the placeholder collapses away); placeholder → distance is the
+        // same pill, so that's a pure cross-fade.
+        return AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          alignment: Alignment.topLeft,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            layoutBuilder: (current, previous) => Stack(
+              alignment: Alignment.topLeft,
+              children: [...previous, if (current != null) current],
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// [label] null renders the loading placeholder — same pill, with a small
+/// spinner in place of the distance, so nothing shifts when it resolves.
+class _DistanceBadge extends StatelessWidget {
+  final String? label;
+  const _DistanceBadge({this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = this.label;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -879,12 +918,23 @@ class _DistanceBadge extends StatelessWidget {
         children: [
           const Icon(Icons.near_me_rounded, size: 11, color: Color(0xFF6B6B6B)),
           const SizedBox(width: 4),
-          Text(label,
-              style: const TextStyle(
+          if (label == null) ...[
+            const SizedBox(
+              width: 9,
+              height: 9,
+              child: CircularProgressIndicator(
+                  strokeWidth: 1.5, color: Color(0xFF9E9E9E)),
+            ),
+            const SizedBox(width: 4),
+          ],
+          Text(label ?? "km away",
+              style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF6B6B6B))),
+                  color: label == null
+                      ? const Color(0xFFBDBDBD)
+                      : const Color(0xFF6B6B6B))),
         ],
       ),
     );
