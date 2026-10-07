@@ -341,6 +341,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 isSearching: _isSearching,
                 searchFailed: _searchFailed,
                 isResolving: state is Resolving || state is PermissionChecking,
+                notice: state is ManualEntry ? state.message : null,
                 precise: widget.precise,
                 mainPickerDataFuture: _mainPickerDataFuture,
                 entryPoint: widget.entryPoint,
@@ -460,6 +461,11 @@ class _MainPickerView extends StatelessWidget {
   final bool isSearching;
   final bool searchFailed;
   final bool isResolving;
+  // ManualEntry's reason (permission denied, location services off, GPS
+  // timeout…). Without it, a failed "Use my current location" tap — or a
+  // denied OS dialog right before this sheet auto-opened — would leave the
+  // user on the search view with no hint why nothing happened.
+  final String? notice;
   final bool precise;
   final Future<MainPickerData> mainPickerDataFuture;
   final AddressWizardEntryPoint entryPoint;
@@ -475,6 +481,7 @@ class _MainPickerView extends StatelessWidget {
     required this.isSearching,
     required this.searchFailed,
     required this.isResolving,
+    this.notice,
     required this.precise,
     required this.mainPickerDataFuture,
     required this.entryPoint,
@@ -534,6 +541,32 @@ class _MainPickerView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
+
+        if (notice != null) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline_rounded,
+                    size: 18, color: Color(0xFFF57C00)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(notice!,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          color: Color(0xFF6B6B6B))),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
 
         // Search field
         Container(

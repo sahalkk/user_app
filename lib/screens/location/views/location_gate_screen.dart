@@ -24,12 +24,30 @@ import 'location_picker_sheet.dart';
 /// little friction as possible. Only the leftover "I declined / permission
 /// is permanently denied / want to search instead" case falls back to
 /// opening [LocationPickerSheet].
+///
+/// Leaving the primer for manual entry — tapping "Enter address manually",
+/// or tapping "Allow" and then denying the OS dialog — opens the picker
+/// sheet straight away (see the listener below). Otherwise the user lands
+/// on the "Where should we deliver?" placeholder and has to tap a second
+/// button just to reach the search box they already asked for.
 class LocationGateScreen extends StatelessWidget {
   const LocationGateScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<LocationCubit, LocationState>(
+    return BlocConsumer<LocationCubit, LocationState>(
+      listenWhen: (previous, current) =>
+          current is ManualEntry &&
+          (previous is PermissionPrimer || previous is PermissionRequesting),
+      listener: (context, state) {
+        // Only when the gate itself is on top — the picker sheet can also
+        // pass through PermissionPrimer -> ManualEntry (its own "Use my
+        // current location" row) while this gate sits behind it, and
+        // opening a second sheet over the first would be wrong.
+        final route = ModalRoute.of(context);
+        if (route != null && !route.isCurrent) return;
+        LocationPickerSheet.show(context);
+      },
       builder: (context, state) {
         final isBusy = state is PermissionChecking ||
             state is PermissionRequesting ||
