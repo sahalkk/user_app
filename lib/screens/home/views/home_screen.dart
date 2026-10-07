@@ -10,6 +10,7 @@ import '../../../shared/models/category_model.dart';
 import '../../../shared/widgets/floating_cart_banner.dart';
 import '../../../shared/widgets/product_grid.dart';
 import '../../../shared/widgets/product_row.dart';
+import '../../../shared/widgets/section_header.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -245,7 +246,7 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(height: 6),
 
                         // ── FESTIVE OFFERS section header ──
-                        _SectionHeader(title: "Festive Offers"),
+                        SectionHeader(title: "Festive Offers"),
                         const SizedBox(height: 14),
 
                         // Horizontal scroll of first 5 products
@@ -263,7 +264,7 @@ class HomeScreen extends StatelessWidget {
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _SectionHeader(title: "Your Wishlist"),
+                                  SectionHeader(title: "Your Wishlist"),
                                   const SizedBox(height: 14),
                                   ProductRow(
                                     products: wishlistState.wishlistItems,
@@ -277,7 +278,7 @@ class HomeScreen extends StatelessWidget {
                         ),
 
                         // ── ALL PRODUCTS section header ──
-                        _SectionHeader(title: "All Products"),
+                        SectionHeader(title: "All Products"),
                         const SizedBox(height: 14),
 
                         // 3-column grid
@@ -431,46 +432,6 @@ class _SubcategoryTile extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-//  Reusable Section Header with green accent dot
-// ─────────────────────────────────────────────
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Green accent dot
-          Container(
-            width: 4,
-            height: 18,
-            decoration: BoxDecoration(
-              color: const Color(0xFF3DAA5C),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            title,
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Colors.black87,
-              letterSpacing: -0.3,
-            ),
-          ),
-        ],
       ),
     );
   }
