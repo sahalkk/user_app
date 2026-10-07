@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_state.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_event.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_bloc.dart';
 
@@ -158,6 +159,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: TextField(
                   controller: _phoneController,
                   keyboardType: TextInputType.number,
+                  maxLength: 10,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -167,6 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     hintStyle: TextStyle(
                         color: Colors.grey, fontWeight: FontWeight.normal),
                     border: InputBorder.none,
+                    counterText: '',
                   ),
                 ),
               ),

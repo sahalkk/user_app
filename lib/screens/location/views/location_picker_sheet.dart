@@ -16,6 +16,14 @@ import 'add_address_wizard/address_wizard_draft.dart';
 import 'map_pin_picker_screen.dart';
 import 'not_deliverable_view.dart';
 
+/// Saved addresses + a best-effort current-position fix, fetched together —
+/// see [_LocationPickerSheetState._loadMainPickerData] for why these are
+/// combined into a single future rather than two independent ones.
+typedef MainPickerData = ({
+  List<SavedAddressModel> addresses,
+  LatLng? currentPosition,
+});
+
 class LocationPickerSheet extends StatefulWidget {
   /// False (default): the ambient "is my area serviceable" flow — GPS/search
   /// picks skip straight to the answer, and "Add new address" is hidden
@@ -109,17 +117,42 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   // finding nothing, which is just an empty [_results] with this false.
   bool _searchFailed = false;
 
-  // Best-effort, non-blocking — powers the "X km away" badges on saved
-  // addresses. Never gates the sheet's own usability: null just means the
-  // badges are omitted (see LocationCubit.tryGetCurrentPosition).
-  LatLng? _currentPosition;
+  // Saved addresses + the best-effort current-position fix (for "X km away"
+  // badges) are fetched together as ONE future, computed once here rather
+  // than inline in _MainPickerView.build() — a future built inline is
+  // re-created (and re-fetched from the backend) on every rebuild of that
+  // widget, which is exactly what used to happen the instant the GPS fix
+  // landed: that arrival triggered a rebuild, which re-ran the inline
+  // getSavedAddresses() call, which reset the list back to its loading
+  // state right as the badges should have appeared. Fetching both
+  // concurrently and caching the combined future means the list and its
+  // distance badges always render together, in one pass, the first time.
+  late Future<MainPickerData> _mainPickerDataFuture;
 
   @override
   void initState() {
     super.initState();
-    context.read<LocationCubit>().tryGetCurrentPosition().then((pos) {
-      if (mounted) setState(() => _currentPosition = pos);
-    });
+    _mainPickerDataFuture = _loadMainPickerData();
+  }
+
+  Future<MainPickerData> _loadMainPickerData() async {
+    final cubit = context.read<LocationCubit>();
+    // Both calls are started here, before either is awaited below, so the
+    // network fetch and the GPS fix resolve concurrently rather than one
+    // after the other.
+    final addressesFuture = cubit.getSavedAddresses();
+    final positionFuture = cubit.tryGetCurrentPosition();
+    return (
+      addresses: await addressesFuture,
+      currentPosition: await positionFuture,
+    );
+  }
+
+  /// Re-runs the combined fetch above — called after returning from the
+  /// Address Book so edits/deletes made there are reflected here (see
+  /// [_openAddressBook]).
+  void _refreshMainPickerData() {
+    setState(() => _mainPickerDataFuture = _loadMainPickerData());
   }
 
   @override
@@ -231,7 +264,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
         ),
       ),
     );
-    if (mounted) setState(() {});
+    if (mounted) _refreshMainPickerData();
   }
 
   @override
@@ -309,7 +342,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 searchFailed: _searchFailed,
                 isResolving: state is Resolving || state is PermissionChecking,
                 precise: widget.precise,
-                currentPosition: _currentPosition,
+                mainPickerDataFuture: _mainPickerDataFuture,
                 entryPoint: widget.entryPoint,
                 onCheckoutSave: widget.onCheckoutSave,
                 onOpenAddressBook: _openAddressBook,
@@ -428,7 +461,7 @@ class _MainPickerView extends StatelessWidget {
   final bool searchFailed;
   final bool isResolving;
   final bool precise;
-  final LatLng? currentPosition;
+  final Future<MainPickerData> mainPickerDataFuture;
   final AddressWizardEntryPoint entryPoint;
   final void Function(CheckoutAddressModel)? onCheckoutSave;
   final VoidCallback onOpenAddressBook;
@@ -443,7 +476,7 @@ class _MainPickerView extends StatelessWidget {
     required this.searchFailed,
     required this.isResolving,
     required this.precise,
-    this.currentPosition,
+    required this.mainPickerDataFuture,
     required this.entryPoint,
     this.onCheckoutSave,
     required this.onOpenAddressBook,
@@ -608,10 +641,9 @@ class _MainPickerView extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            FutureBuilder<List<SavedAddressModel>>(
-              future: context.read<LocationCubit>().getSavedAddresses(),
+            FutureBuilder<MainPickerData>(
+              future: mainPickerDataFuture,
               builder: (context, snapshot) {
-                final addresses = snapshot.data ?? [];
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
@@ -619,6 +651,13 @@ class _MainPickerView extends StatelessWidget {
                         color: Color(0xFF3DAA5C), backgroundColor: Color(0xFFF0F0F0)),
                   );
                 }
+                // Addresses and the current-position fix arrive together
+                // (see MainPickerData) — a saved-address tile is never
+                // shown before it already knows whether it can render a
+                // distance badge, so there's no separate pass where the
+                // list appears first and badges pop in a moment later.
+                final addresses = snapshot.data?.addresses ?? [];
+                final currentPosition = snapshot.data?.currentPosition;
                 if (addresses.isEmpty) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),

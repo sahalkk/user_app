@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_contacts/flutter_contacts.dart' hide AddressLabel;
 import 'package:image_picker/image_picker.dart';
@@ -129,7 +130,13 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
       if ((contact.displayName ?? '').isNotEmpty) {
         _nameController.text = contact.displayName!;
       }
-      _phoneController.text = contact.phones.first.number;
+      // Contact numbers can carry a country code, spaces, or dashes (e.g.
+      // "+91 98765 43210") — the field itself only accepts 10 bare digits,
+      // so strip everything else and keep just the local number.
+      final digits =
+          contact.phones.first.number.replaceAll(RegExp(r'[^0-9]'), '');
+      _phoneController.text =
+          digits.length > 10 ? digits.substring(digits.length - 10) : digits;
     });
   }
 
@@ -443,6 +450,11 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
                             controller: _phoneController,
                             label: "Phone",
                             keyboardType: TextInputType.phone,
+                            maxLength: 10,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
+                            prefixText: "+91 ",
                             // Picking from contacts only makes sense when
                             // filling in someone else's number — "For me"
                             // is already the account's own number.
@@ -606,6 +618,9 @@ class _WizardField extends StatelessWidget {
   final String? label;
   final int maxLines;
   final TextInputType? keyboardType;
+  final int? maxLength;
+  final List<TextInputFormatter>? inputFormatters;
+  final String? prefixText;
   final Widget? trailing;
   final ValueChanged<String>? onChanged;
 
@@ -615,6 +630,9 @@ class _WizardField extends StatelessWidget {
     this.label,
     this.maxLines = 1,
     this.keyboardType,
+    this.maxLength,
+    this.inputFormatters,
+    this.prefixText,
     this.trailing,
     this.onChanged,
   });
@@ -631,6 +649,8 @@ class _WizardField extends StatelessWidget {
         controller: controller,
         maxLines: maxLines,
         keyboardType: keyboardType,
+        maxLength: maxLength,
+        inputFormatters: inputFormatters,
         onChanged: onChanged,
         style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
         decoration: InputDecoration(
@@ -642,10 +662,19 @@ class _WizardField extends StatelessWidget {
               fontFamily: 'Poppins', fontSize: 13, color: Color(0xFF9E9E9E)),
           floatingLabelStyle: const TextStyle(
               fontFamily: 'Poppins', fontSize: 12, color: Color(0xFF3DAA5C)),
+          floatingLabelBehavior:
+              prefixText != null ? FloatingLabelBehavior.always : null,
+          prefixText: prefixText,
+          prefixStyle: const TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87),
           border: InputBorder.none,
           isDense: true,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          counterText: maxLength != null ? '' : null,
           suffixIcon: trailing,
         ),
       ),
