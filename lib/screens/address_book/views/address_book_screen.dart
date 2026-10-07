@@ -73,14 +73,10 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => BlocProvider.value(
-          value: cubit,
-          child: MapPinPickerScreen(
-            initialPosition: address.position,
-            existingAddress: address,
-          ),
-        ),
+      MapPinPickerScreen.route(
+        cubit: cubit,
+        initialPosition: address.position,
+        existingAddress: address,
       ),
     );
     if (!mounted) return;

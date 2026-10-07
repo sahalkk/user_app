@@ -1,11 +1,12 @@
 import 'package:latlong2/latlong.dart';
 
-import '../../../../shared/models/checkout_address_model.dart';
 import '../../../../shared/models/saved_address_model.dart';
 
-/// Which flow launched the add-address wizard — controls what happens on a
-/// successful save at the end (see [AddressWizardDraft.onCheckoutSave]).
-enum AddressWizardEntryPoint { addressBook, checkout }
+/// Route name MapPinPickerScreen is always pushed under (see
+/// MapPinPickerScreen.route) — the wizard's final step pops back down to
+/// it and then pops it with `true`, so whoever pushed the map just awaits
+/// that result instead of counting pops.
+const kAddressMapRouteName = 'address-map-pin-picker';
 
 /// Mutable state threaded by reference through both wizard screens
 /// (AddressDetailsScreen -> ReviewLocationScreen), mirroring how
@@ -25,12 +26,6 @@ class AddressWizardDraft {
   AddressLabel label;
   String? customLabel;
   final SavedAddressModel? editing;
-  final AddressWizardEntryPoint entryPoint;
-
-  /// Only set by the checkout entry point — called with the saved address
-  /// (wrapped as a [CheckoutAddressModel]) once the wizard's final save
-  /// succeeds, so checkout can bind it without re-deriving it from state.
-  final void Function(CheckoutAddressModel)? onCheckoutSave;
 
   AddressWizardDraft({
     required this.position,
@@ -45,7 +40,5 @@ class AddressWizardDraft {
     this.label = AddressLabel.home,
     this.customLabel,
     this.editing,
-    this.entryPoint = AddressWizardEntryPoint.addressBook,
-    this.onCheckoutSave,
   });
 }

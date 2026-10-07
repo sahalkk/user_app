@@ -466,7 +466,12 @@ class LocationRepository {
   /// Saves locally and, when logged in, immediately syncs to the backend
   /// so this address survives logout/reinstall rather than only being
   /// pushed lazily the first time an order is placed with it.
-  Future<void> saveAddress(SavedAddressModel address) async {
+  ///
+  /// Returns the address as stored — carrying its [backendId] when the sync
+  /// succeeded. Callers that keep the address around (e.g. binding it) must
+  /// use this rather than their pre-save copy, or the next order would sync
+  /// it again and create a duplicate backend record.
+  Future<SavedAddressModel> saveAddress(SavedAddressModel address) async {
     var toSave = address;
     if (await authRepository.isLoggedIn()) {
       try {
@@ -486,6 +491,7 @@ class LocationRepository {
       toSave,
     ];
     await _writeLocalAddresses(prefs, updated);
+    return toSave;
   }
 
   /// Creates (or updates, if already synced once) this address as a real

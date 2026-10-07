@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../shared/models/checkout_address_model.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../cubit/location_cubit.dart';
 import 'add_address_wizard/address_details_screen.dart';
@@ -40,13 +39,10 @@ class MapPinPickerScreen extends StatefulWidget {
   /// persistAsSavedAddress). [existingAddress] is never set alongside this.
   final bool ambientConfirm;
 
-  /// Which flow this screen was entered from — threaded through to the
-  /// add-address wizard it hands off to (non-ambient mode only).
-  final AddressWizardEntryPoint entryPoint;
-
-  /// Only meaningful for the checkout entry point — threaded through to the
-  /// wizard's [AddressWizardDraft.onCheckoutSave].
-  final void Function(CheckoutAddressModel)? onCheckoutSave;
+  /// Shows an "Is this your exact delivery location?" prompt above the
+  /// address — set when the pin starts on a location we inferred (the
+  /// bound area, GPS) rather than one the user just dropped themselves.
+  final bool askToConfirmPin;
 
   const MapPinPickerScreen({
     super.key,
@@ -54,9 +50,61 @@ class MapPinPickerScreen extends StatefulWidget {
     this.existingAddress,
     this.initialFormattedAddress,
     this.ambientConfirm = false,
-    this.entryPoint = AddressWizardEntryPoint.addressBook,
-    this.onCheckoutSave,
+    this.askToConfirmPin = false,
   });
+
+  /// The only way this screen should be pushed: names the route
+  /// [kAddressMapRouteName] so the wizard can pop back to it on save, and
+  /// re-provides [cubit] for the new route. Resolves to `true` once the
+  /// wizard saved (or, in [ambientConfirm] mode, once a location was bound).
+  static Route<bool> route({
+    required LocationCubit cubit,
+    required LatLng initialPosition,
+    SavedAddressModel? existingAddress,
+    String? initialFormattedAddress,
+    bool ambientConfirm = false,
+    bool askToConfirmPin = false,
+  }) {
+    return MaterialPageRoute<bool>(
+      settings: const RouteSettings(name: kAddressMapRouteName),
+      builder: (_) => BlocProvider.value(
+        value: cubit,
+        child: MapPinPickerScreen(
+          initialPosition: initialPosition,
+          existingAddress: existingAddress,
+          initialFormattedAddress: initialFormattedAddress,
+          ambientConfirm: ambientConfirm,
+          askToConfirmPin: askToConfirmPin,
+        ),
+      ),
+    );
+  }
+
+  /// Opens the add-address flow for a brand-new address, with the pin on
+  /// [LocationCubit.bestMapStart]. Returns true once it's saved and bound.
+  /// Backing out leaves the previously bound address in place — the map
+  /// moves the cubit to Confirming while the pin is being adjusted.
+  static Future<bool> openForNewAddress(BuildContext context) async {
+    final cubit = context.read<LocationCubit>();
+    final priorState = cubit.state;
+    final priorBound = priorState is Bound ? priorState : null;
+
+    final start = await cubit.bestMapStart();
+    if (!context.mounted) return false;
+    final saved = await Navigator.push(
+      context,
+      route(
+        cubit: cubit,
+        initialPosition: start.position,
+        initialFormattedAddress: start.formattedAddress,
+        askToConfirmPin: true,
+      ),
+    );
+    if (cubit.state is! Bound && priorBound != null) {
+      cubit.restorePreviousBound(priorBound);
+    }
+    return saved == true;
+  }
 
   @override
   State<MapPinPickerScreen> createState() => _MapPinPickerScreenState();
@@ -160,15 +208,13 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
       // keeps today's behavior (stays put, pin still adjustable via the
       // disabled-button + drag message) — deliberately not touched here.
       //
-      // onCheckoutSave == null guard: the checkout entry point's final
-      // hand-off (ReviewLocationScreen's listener) pops this screen itself,
-      // deterministically, as one of 4 explicit pops before calling
-      // onCheckoutSave — an independent pop here firing at an uncoordinated
-      // time would race that sequence and could pop the CheckoutScreen that
-      // onCheckoutSave's pushReplacement just pushed.
+      // Ambient mode only: in precise mode a bind only ever comes from the
+      // wizard's final step, which pops this screen itself (with `true`)
+      // after unwinding the wizard screens above it.
       listener: (context, state) {
-        if (state is Bound && widget.onCheckoutSave == null) {
-          Navigator.of(context).pop();
+        final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
+        if (state is Bound && widget.ambientConfirm && isCurrent) {
+          Navigator.of(context).pop(true);
         }
       },
       child: Scaffold(
@@ -373,8 +419,7 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                 isDragging: _isDragging,
                 existingAddress: widget.existingAddress,
                 ambientConfirm: widget.ambientConfirm,
-                entryPoint: widget.entryPoint,
-                onCheckoutSave: widget.onCheckoutSave,
+                askToConfirmPin: widget.askToConfirmPin,
               ),
             ),
           ],
@@ -416,15 +461,13 @@ class _ConfirmSheet extends StatelessWidget {
   final bool isDragging;
   final SavedAddressModel? existingAddress;
   final bool ambientConfirm;
-  final AddressWizardEntryPoint entryPoint;
-  final void Function(CheckoutAddressModel)? onCheckoutSave;
+  final bool askToConfirmPin;
 
   const _ConfirmSheet({
     required this.isDragging,
     this.existingAddress,
     required this.ambientConfirm,
-    required this.entryPoint,
-    this.onCheckoutSave,
+    required this.askToConfirmPin,
   });
 
   @override
@@ -453,6 +496,25 @@ class _ConfirmSheet extends StatelessWidget {
                   color: Color(0xFF6B6B6B)),
             ),
             const SizedBox(height: 4),
+          ],
+          if (askToConfirmPin) ...[
+            const Text(
+              "Is this your exact delivery location?",
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black87),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              "Move the pin to adjust",
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: Color(0xFF6B6B6B)),
+            ),
+            const SizedBox(height: 12),
           ],
           BlocBuilder<LocationCubit, LocationState>(
             builder: (context, state) {
@@ -715,8 +777,6 @@ class _ConfirmSheet extends StatelessWidget {
                             recipientName: editing?.recipientName ?? '',
                             recipientPhone: editing?.recipientPhone ?? '',
                             editing: editing,
-                            entryPoint: entryPoint,
-                            onCheckoutSave: onCheckoutSave,
                           );
                           Navigator.push(
                             context,

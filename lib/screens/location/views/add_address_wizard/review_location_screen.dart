@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 
-import '../../../../shared/models/checkout_address_model.dart';
 import '../../../../shared/models/saved_address_model.dart';
 import '../../cubit/location_cubit.dart';
 import '../not_deliverable_view.dart';
@@ -17,38 +16,16 @@ class ReviewLocationScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocListener<LocationCubit, LocationState>(
-      // Same independently-popping pattern as MapPinPickerScreen and Step 1
-      // — each buried screen popping itself off on this single Bound
-      // emission is what cascades the whole wizard stack closed. Also where
-      // the checkout entry point's onCheckoutSave actually fires, since
-      // Bound.address is the real, persisted SavedAddressModel (with its
-      // final id/createdAt), not the draft.
+      // The single Bound emission at the end of a save is what closes the
+      // whole wizard (this screen, Step 1, and MapPinPickerScreen) in one
+      // go — see [_closeWizard]. Only while this route is current: once the
+      // wizard is closing, this screen stays mounted for its exit
+      // animation, and a caller restoring its previous Bound in the
+      // meantime (e.g. Address Book after an inactive edit) must not
+      // trigger a second close.
       listener: (context, state) {
-        if (state is! Bound) return;
-        final onCheckoutSave = draft.onCheckoutSave;
-        if (onCheckoutSave != null) {
-          // Checkout entry point: MapPinPickerScreen's and Step 1's own
-          // Bound listeners deliberately stay out of this (see their
-          // onCheckoutSave == null guards) so exactly these 4 explicit pops
-          // — this screen, Step 1, MapPinPickerScreen, and the modal sheet
-          // that launched it — run deterministically before onCheckoutSave
-          // fires. onCheckoutSave's pushReplacement (cart_screen.dart)
-          // replaces whatever is currently on top with CheckoutScreen; it
-          // must land on AddAddressScreen, not race an unrelated bare pop
-          // that would immediately undo it.
-          final navigator = Navigator.of(context);
-          navigator.pop();
-          navigator.pop();
-          navigator.pop();
-          navigator.pop();
-          onCheckoutSave(CheckoutAddressModel(
-            recipientName: draft.recipientName,
-            recipientPhone: draft.recipientPhone,
-            address: state.address,
-          ));
-          return;
-        }
-        Navigator.of(context).pop();
+        final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
+        if (state is Bound && isCurrent) _closeWizard(context);
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F5F5),
@@ -189,6 +166,21 @@ class ReviewLocationScreen extends StatelessWidget {
     );
   }
 
+  /// Unwinds back to the MapPinPickerScreen this wizard was launched from
+  /// and pops it with `true`, so whoever pushed the map (checkout, Address
+  /// Book, the picker sheet) learns the save succeeded from the awaited
+  /// result rather than from a fixed number of pops.
+  void _closeWizard(BuildContext context) {
+    final navigator = Navigator.of(context);
+    var reachedMap = false;
+    navigator.popUntil((route) {
+      reachedMap = route.settings.name == kAddressMapRouteName;
+      // Never pop past the root, even if the map route is somehow missing.
+      return reachedMap || route.isFirst;
+    });
+    if (reachedMap) navigator.pop(true);
+  }
+
   Future<void> _save(BuildContext context) async {
     final cubit = context.read<LocationCubit>();
     final editing = draft.editing;
@@ -218,20 +210,9 @@ class ReviewLocationScreen extends StatelessWidget {
       );
       await cubit.editSavedAddress(updated);
       if (!context.mounted) return;
-      draft.onCheckoutSave?.call(CheckoutAddressModel(
-        recipientName: draft.recipientName,
-        recipientPhone: draft.recipientPhone,
-        address: updated,
-      ));
-      // No Bound emission happens for an inactive edit, so nothing else in
-      // the wizard stack pops itself automatically — unwind all 3 screens
-      // (this one, Step 1, MapPinPickerScreen) back to whatever pushed
-      // MapPinPickerScreen (Address Book), same as the old single-screen
-      // flow's direct pop did.
-      final navigator = Navigator.of(context);
-      navigator.pop();
-      navigator.pop();
-      navigator.pop();
+      // No Bound emission happens for an inactive edit, so the listener
+      // above never fires — close the wizard directly instead.
+      _closeWizard(context);
       return;
     }
 

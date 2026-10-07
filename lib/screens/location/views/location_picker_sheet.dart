@@ -8,11 +8,9 @@ import '../../../blocs/auth_bloc/auth_bloc.dart';
 import '../../../blocs/auth_bloc/auth_state.dart';
 import '../../../data/repositories/location_repository.dart'
     show AddressSearchFailed, distanceMeters;
-import '../../../shared/models/checkout_address_model.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../../address_book/views/address_book_screen.dart';
 import '../cubit/location_cubit.dart';
-import 'add_address_wizard/address_wizard_draft.dart';
 import 'map_pin_picker_screen.dart';
 import 'not_deliverable_view.dart';
 
@@ -33,28 +31,9 @@ class LocationPickerSheet extends StatefulWidget {
   /// step, and "Add new address" (precise pin drop) stays available.
   final bool precise;
 
-  /// Which flow this sheet was entered from — threaded through to whatever
-  /// MapPinPickerScreen it eventually pushes, and from there to the
-  /// add-address wizard.
-  final AddressWizardEntryPoint entryPoint;
+  const LocationPickerSheet({super.key, this.precise = false});
 
-  /// Only meaningful for the checkout entry point — threaded through to the
-  /// wizard's [AddressWizardDraft.onCheckoutSave].
-  final void Function(CheckoutAddressModel)? onCheckoutSave;
-
-  const LocationPickerSheet({
-    super.key,
-    this.precise = false,
-    this.entryPoint = AddressWizardEntryPoint.addressBook,
-    this.onCheckoutSave,
-  });
-
-  static Future<void> show(
-    BuildContext context, {
-    bool precise = false,
-    AddressWizardEntryPoint entryPoint = AddressWizardEntryPoint.addressBook,
-    void Function(CheckoutAddressModel)? onCheckoutSave,
-  }) async {
+  static Future<void> show(BuildContext context, {bool precise = false}) async {
     final cubit = context.read<LocationCubit>();
     // Captured before anything below can move the cubit off of it — restored
     // afterward if the sheet gets dismissed/abandoned without landing on a
@@ -64,9 +43,8 @@ class LocationPickerSheet extends StatefulWidget {
     // Opening the sheet while state is already NotDeliverable (carried over
     // from before it was opened — e.g. "Choose a different location" on
     // NotServiceableScreen, the header's "Not deliverable here" dropdown,
-    // or Address Book/AddAddressScreen's own "Add new"/"Use current
-    // location" reached while their embedded NotDeliverableView is already
-    // showing) would otherwise render that exact same sorry message a
+    // or Address Book's own "Add new" reached while its embedded
+    // NotDeliverableView is already showing) would otherwise render that exact same sorry message a
     // second time, stacked on top of the one already visible behind it.
     // Reset to ManualEntry first so the sheet opens fresh on the actual
     // search view instead. Doesn't affect the legitimate case — reaching
@@ -83,11 +61,7 @@ class LocationPickerSheet extends StatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => BlocProvider.value(
         value: cubit,
-        child: LocationPickerSheet(
-          precise: precise,
-          entryPoint: entryPoint,
-          onCheckoutSave: onCheckoutSave,
-        ),
+        child: LocationPickerSheet(precise: precise),
       ),
     );
     // Covers every dismissal path uniformly (drag-to-dismiss, tap-outside,
@@ -211,27 +185,16 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     final cubit = context.read<LocationCubit>();
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => BlocProvider.value(
-          value: cubit,
-          child: MapPinPickerScreen(
-            initialPosition: state.position,
-            initialFormattedAddress: state.formattedAddress,
-            ambientConfirm: ambientConfirm,
-            entryPoint: widget.entryPoint,
-            onCheckoutSave: widget.onCheckoutSave,
-          ),
-        ),
+      MapPinPickerScreen.route(
+        cubit: cubit,
+        initialPosition: state.position,
+        initialFormattedAddress: state.formattedAddress,
+        ambientConfirm: ambientConfirm,
       ),
     );
-    // onCheckoutSave == null guard: for the checkout entry point,
-    // ReviewLocationScreen's listener already pops this sheet itself as one
-    // of 4 explicit, deterministic pops before calling onCheckoutSave — an
-    // independent pop here (racing that sequence, or firing after it) could
-    // pop the CheckoutScreen onCheckoutSave's pushReplacement just pushed.
     if (!mounted) return;
     if (cubit.state is Bound) {
-      if (widget.onCheckoutSave == null) Navigator.of(context).maybePop();
+      Navigator.of(context).maybePop();
       return;
     }
     // Backed out of the map screen without binding. The builder's Confirming
@@ -245,6 +208,16 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     if (cubit.state is Confirming) {
       cubit.pickDifferentLocation();
     }
+  }
+
+  /// Precise mode's "Add new address" row — the pin starts where the user
+  /// already is (see [LocationCubit.bestMapStart]) rather than a fixed
+  /// city. Awaited here, on the sheet's own long-lived State, for the same
+  /// reason as [_pushMapConfirm]: the sheet closes itself once the wizard
+  /// reports a successful save.
+  Future<void> _addNewAddress() async {
+    final saved = await MapPinPickerScreen.openForNewAddress(context);
+    if (mounted && saved) Navigator.of(context).maybePop();
   }
 
   /// Opens the Address Book and, once it returns, refreshes this sheet's
@@ -344,8 +317,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 notice: state is ManualEntry ? state.message : null,
                 precise: widget.precise,
                 mainPickerDataFuture: _mainPickerDataFuture,
-                entryPoint: widget.entryPoint,
-                onCheckoutSave: widget.onCheckoutSave,
+                onAddNewAddress: _addNewAddress,
                 onOpenAddressBook: _openAddressBook,
               );
             },
@@ -468,8 +440,7 @@ class _MainPickerView extends StatelessWidget {
   final String? notice;
   final bool precise;
   final Future<MainPickerData> mainPickerDataFuture;
-  final AddressWizardEntryPoint entryPoint;
-  final void Function(CheckoutAddressModel)? onCheckoutSave;
+  final VoidCallback onAddNewAddress;
   final VoidCallback onOpenAddressBook;
 
   const _MainPickerView({
@@ -484,8 +455,7 @@ class _MainPickerView extends StatelessWidget {
     this.notice,
     required this.precise,
     required this.mainPickerDataFuture,
-    required this.entryPoint,
-    this.onCheckoutSave,
+    required this.onAddNewAddress,
     required this.onOpenAddressBook,
   });
 
@@ -725,20 +695,7 @@ class _MainPickerView extends StatelessWidget {
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFF3DAA5C))),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => BlocProvider.value(
-                    value: context.read<LocationCubit>(),
-                    child: MapPinPickerScreen(
-                      initialPosition:
-                          const LatLng(8.5241, 76.9366), // Trivandrum
-                      entryPoint: entryPoint,
-                      onCheckoutSave: onCheckoutSave,
-                    ),
-                  ),
-                ),
-              ),
+              onTap: onAddNewAddress,
             ),
         ],
       ],

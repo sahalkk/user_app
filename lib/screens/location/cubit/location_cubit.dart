@@ -140,6 +140,35 @@ class LocationCubit extends Cubit<LocationState> {
     }
   }
 
+  // Last resort for [bestMapStart] when nothing better is known.
+  static const _fallbackMapStart = LatLng(8.5241, 76.9366); // Trivandrum
+
+  /// Where the pin should start when creating a NEW address: the location
+  /// the user already picked (bound, else the last ambient pick) beats a
+  /// fresh GPS fix, which beats a fixed fallback. [formattedAddress] is set
+  /// whenever it's already known, so MapPinPickerScreen can seed it instead
+  /// of firing a redundant reverse-geocode for the same point.
+  Future<({LatLng position, String? formattedAddress})> bestMapStart() async {
+    bool usable(SavedAddressModel? a) =>
+        a != null && (a.position.latitude != 0 || a.position.longitude != 0);
+    String? textOf(SavedAddressModel a) =>
+        a.formattedAddress.isEmpty ? null : a.formattedAddress;
+
+    final current = state;
+    if (current is Bound && usable(current.address)) {
+      return (
+        position: current.address.position,
+        formattedAddress: textOf(current.address),
+      );
+    }
+    final ambient = await _repository.getLastAmbientLocation();
+    if (usable(ambient)) {
+      return (position: ambient!.position, formattedAddress: textOf(ambient));
+    }
+    final gps = await tryGetCurrentPosition();
+    return (position: gps ?? _fallbackMapStart, formattedAddress: null);
+  }
+
   Future<void> _resolveCurrentLocation({bool autoConfirm = false}) async {
     emit(const Resolving());
     try {
@@ -369,13 +398,16 @@ class LocationCubit extends Cubit<LocationState> {
       // single-slot ambient cache instead, so they aren't dropped back to
       // square one on every relaunch (see bootstrap()) without silently
       // growing their real address book.
+      var bound = existingAddress;
       if (persistAsSavedAddress && await _repository.authRepository.isLoggedIn()) {
-        await _repository.saveAddress(existingAddress);
+        // Bind the stored copy — it carries the backendId from the sync, so
+        // placing an order doesn't POST this address a second time.
+        bound = await _repository.saveAddress(existingAddress);
       } else {
         await _repository.saveLastAmbientLocation(existingAddress);
       }
       emit(Bound(
-        address: existingAddress,
+        address: bound,
         zone: result.zone,
         darkStoreId: result.darkStoreId,
       ));

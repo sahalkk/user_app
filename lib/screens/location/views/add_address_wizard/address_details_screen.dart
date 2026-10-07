@@ -7,17 +7,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_contacts/flutter_contacts.dart' hide AddressLabel;
 import 'package:image_picker/image_picker.dart';
 
-import '../../../../blocs/auth_bloc/auth_bloc.dart';
-import '../../../../blocs/auth_bloc/auth_state.dart';
+import '../../../../data/repositories/auth_repository.dart';
 import '../../../../shared/models/saved_address_model.dart';
-import '../../cubit/location_cubit.dart';
 import 'address_wizard_draft.dart';
 import 'review_location_screen.dart';
 
 /// Step 1 (of 2) of the add-address wizard. Pushed on top of
 /// MapPinPickerScreen (never replacing it) — "Change" just pops back to
 /// reveal the still-fully-interactive map screen underneath, no special
-/// signaling needed. Contact details + the Home/Work/Other label — Step 2
+/// signaling needed. Closing the wizard after a save is handled entirely by
+/// ReviewLocationScreen. Contact details + the Home/Work/Other label — Step 2
 /// until it was folded in here — are an inline expandable section rather
 /// than a separate screen, so the whole address can be filled in one pass.
 class AddressDetailsScreen extends StatefulWidget {
@@ -50,7 +49,8 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
     super.initState();
     final draft = widget.draft;
     _addressController = TextEditingController(text: draft.addressLine);
-    _mapsLinkController = TextEditingController(text: draft.googleMapsLink ?? '');
+    _mapsLinkController =
+        TextEditingController(text: draft.googleMapsLink ?? '');
     _landmarkController = TextEditingController(text: draft.landmark ?? '');
 
     _forSelf = draft.forSelf;
@@ -85,13 +85,20 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
   }
 
   // Guests can never reach this flow — cart and Address Book both require
-  // login first — so this cast is always safe here.
-  void _prefillFromAccount() {
-    final authState = context.read<AuthBloc>().state;
-    if (authState is AuthAuthenticated) {
-      _nameController.text = authState.name ?? '';
-      _phoneController.text = authState.phone ?? '';
-    }
+  // login first. Read from AuthRepository rather than AuthBloc's state:
+  // the name is stored there as soon as it's set, even when the bloc's
+  // AuthAuthenticated was emitted before it existed (e.g. a new account).
+  Future<void> _prefillFromAccount() async {
+    final authRepository = context.read<AuthRepository>();
+    final name = await authRepository.getUserName();
+    final phone = await authRepository.getUserPhone();
+    // Bail if the user toggled "For someone else" (or started typing)
+    // while this was loading — don't overwrite what they've entered.
+    if (!mounted || !_forSelf) return;
+    setState(() {
+      if (_nameController.text.isEmpty) _nameController.text = name ?? '';
+      if (_phoneController.text.isEmpty) _phoneController.text = phone ?? '';
+    });
   }
 
   void _setForSelf(bool value) {
@@ -140,11 +147,10 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
     });
   }
 
-  String get _contactLabel =>
-      _label == AddressLabel.other &&
-              _customLabelController.text.trim().isNotEmpty
-          ? _customLabelController.text.trim()
-          : _label.display;
+  String get _contactLabel => _label == AddressLabel.other &&
+          _customLabelController.text.trim().isNotEmpty
+      ? _customLabelController.text.trim()
+      : _label.display;
 
   void _onNext() {
     final draft = widget.draft;
@@ -185,373 +191,360 @@ class _AddressDetailsScreenState extends State<AddressDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final draft = widget.draft;
-    return BlocListener<LocationCubit, LocationState>(
-      // Same pattern MapPinPickerScreen uses — each screen in the wizard
-      // stack independently pops itself on Bound, so the single Bound
-      // emission at the end unwinds the whole stack back to the caller.
-      //
-      // onCheckoutSave == null guard: see the matching guard in
-      // MapPinPickerScreen — the checkout entry point's ReviewLocationScreen
-      // listener handles popping this screen itself, deterministically,
-      // before calling onCheckoutSave.
-      listener: (context, state) {
-        if (state is Bound && draft.onCheckoutSave == null) {
-          Navigator.of(context).pop();
-        }
-      },
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: AppBar(
         backgroundColor: const Color(0xFFF5F5F5),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFFF5F5F5),
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.black87),
-          title: const Text(
-            "Address details",
-            style: TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w800,
-                color: Colors.black87,
-                fontSize: 17),
-          ),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black87),
+        title: const Text(
+          "Address details",
+          style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w800,
+              color: Colors.black87,
+              fontSize: 17),
         ),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    draft.areaLabel,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Change",
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          color: Color(0xFF3DAA5C),
-                          fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const _FieldLabel("Enter full address *"),
-            const SizedBox(height: 6),
-            _WizardField(
-              controller: _addressController,
-              hint: "House/flat no., building, street, area",
-              maxLines: 3,
-              onChanged: (_) => setState(() => _addressError = null),
-            ),
-            if (_addressError != null) ...[
-              const SizedBox(height: 6),
-              Text(_addressError!,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  draft.areaLabel,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                       fontFamily: 'Poppins',
-                      fontSize: 12,
-                      color: Color(0xFFE53935))),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Change",
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        color: Color(0xFF3DAA5C),
+                        fontWeight: FontWeight.w700)),
+              ),
             ],
-            const SizedBox(height: 14),
-            const _FieldLabel("Google maps link (optional)"),
+          ),
+          const SizedBox(height: 16),
+          const _FieldLabel("Enter full address *"),
+          const SizedBox(height: 6),
+          _WizardField(
+            controller: _addressController,
+            hint: "House/flat no., building, street, area",
+            maxLines: 3,
+            onChanged: (_) => setState(() => _addressError = null),
+          ),
+          if (_addressError != null) ...[
             const SizedBox(height: 6),
-            _WizardField(
-              controller: _mapsLinkController,
-              hint: "Paste a Google maps link",
-              onChanged: (v) => draft.googleMapsLink = v.trim().isEmpty ? null : v.trim(),
-            ),
-            const SizedBox(height: 14),
-            const _FieldLabel("Landmark (optional)"),
-            const SizedBox(height: 6),
-            _WizardField(
-              controller: _landmarkController,
-              hint: "Nearby landmark, floor, gate instructions",
-              onChanged: (v) => draft.landmark = v.trim().isEmpty ? null : v.trim(),
-            ),
-            const SizedBox(height: 14),
-            const _FieldLabel("Location image (optional)"),
-            const SizedBox(height: 6),
-            GestureDetector(
-              onTap: _pickImage,
-              child: draft.imageLocalPath != null
-                  ? ClipRRect(
+            Text(_addressError!,
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    color: Color(0xFFE53935))),
+          ],
+          const SizedBox(height: 14),
+          const _FieldLabel("Google maps link (optional)"),
+          const SizedBox(height: 6),
+          _WizardField(
+            controller: _mapsLinkController,
+            hint: "Paste a Google maps link",
+            onChanged: (v) =>
+                draft.googleMapsLink = v.trim().isEmpty ? null : v.trim(),
+          ),
+          const SizedBox(height: 14),
+          const _FieldLabel("Landmark (optional)"),
+          const SizedBox(height: 6),
+          _WizardField(
+            controller: _landmarkController,
+            hint: "Nearby landmark, floor, gate instructions",
+            onChanged: (v) =>
+                draft.landmark = v.trim().isEmpty ? null : v.trim(),
+          ),
+          const SizedBox(height: 14),
+          const _FieldLabel("Location image (optional)"),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: _pickImage,
+            child: draft.imageLocalPath != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    // image_picker returns a blob: URL on web (no real
+                    // filesystem path, and dart:io's File isn't usable
+                    // there anyway) — Image.network reads that URL
+                    // directly, where Image.file would just throw.
+                    child: kIsWeb
+                        ? Image.network(
+                            draft.imageLocalPath!,
+                            height: 140,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.file(
+                            File(draft.imageLocalPath!),
+                            height: 140,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                  )
+                : Container(
+                    height: 90,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      // image_picker returns a blob: URL on web (no real
-                      // filesystem path, and dart:io's File isn't usable
-                      // there anyway) — Image.network reads that URL
-                      // directly, where Image.file would just throw.
-                      child: kIsWeb
-                          ? Image.network(
-                              draft.imageLocalPath!,
-                              height: 140,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            )
-                          : Image.file(
-                              File(draft.imageLocalPath!),
-                              height: 140,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                    )
-                  : Container(
-                      height: 90,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE0E0E0)),
+                      border: Border.all(color: const Color(0xFFE0E0E0)),
+                    ),
+                    child: const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_photo_alternate_outlined,
+                              color: Color(0xFF6B6B6B)),
+                          SizedBox(height: 4),
+                          Text("Add a photo",
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                  color: Color(0xFF6B6B6B))),
+                        ],
                       ),
-                      child: const Center(
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: _contactError != null
+                      ? const Color(0xFFE53935)
+                      : const Color(0xFFE0E0E0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () =>
+                      setState(() => _contactExpanded = !_contactExpanded),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.person_outline_rounded,
+                          color: Color(0xFF3DAA5C)),
+                      const SizedBox(width: 12),
+                      Expanded(
                         child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.add_photo_alternate_outlined,
-                                color: Color(0xFF6B6B6B)),
-                            SizedBox(height: 4),
-                            Text("Add a photo",
+                            const Text("Contact Details",
                                 style: TextStyle(
                                     fontFamily: 'Poppins',
-                                    fontSize: 12,
-                                    color: Color(0xFF6B6B6B))),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87)),
+                            // Collapsed-only preview — once expanded the
+                            // fields below already show this, so skip the
+                            // redundant line to save vertical space.
+                            if (!_contactExpanded) ...[
+                              const SizedBox(height: 2),
+                              if (_nameController.text.trim().isEmpty)
+                                Text(
+                                  _contactError ?? "Add recipient name & phone",
+                                  style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 12,
+                                      color: _contactError != null
+                                          ? const Color(0xFFE53935)
+                                          : const Color(0xFF9E9E9E)),
+                                )
+                              else
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(_nameController.text.trim(),
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 12,
+                                              color: Color(0xFF6B6B6B))),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE8F5E9),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(_contactLabel,
+                                          style: const TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF3DAA5C))),
+                                    ),
+                                  ],
+                                ),
+                            ],
                           ],
                         ),
                       ),
-                    ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                    color: _contactError != null
-                        ? const Color(0xFFE53935)
-                        : const Color(0xFFE0E0E0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () =>
-                        setState(() => _contactExpanded = !_contactExpanded),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.person_outline_rounded,
-                            color: Color(0xFF3DAA5C)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text("Contact Details",
-                                  style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.black87)),
-                              // Collapsed-only preview — once expanded the
-                              // fields below already show this, so skip the
-                              // redundant line to save vertical space.
-                              if (!_contactExpanded) ...[
-                                const SizedBox(height: 2),
-                                if (_nameController.text.trim().isEmpty)
-                                  Text(
-                                    _contactError ?? "Add recipient name & phone",
-                                    style: TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 12,
-                                        color: _contactError != null
-                                            ? const Color(0xFFE53935)
-                                            : const Color(0xFF9E9E9E)),
-                                  )
-                                else
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: Text(_nameController.text.trim(),
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                                fontFamily: 'Poppins',
-                                                fontSize: 12,
-                                                color: Color(0xFF6B6B6B))),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFE8F5E9),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(_contactLabel,
-                                            style: const TextStyle(
-                                                fontFamily: 'Poppins',
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w700,
-                                                color: Color(0xFF3DAA5C))),
-                                      ),
-                                    ],
-                                  ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          _contactExpanded
-                              ? Icons.expand_less_rounded
-                              : Icons.expand_more_rounded,
-                          color: const Color(0xFF6B6B6B),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_contactExpanded) ...[
-                    const Divider(height: 16, color: Color(0xFFE0E0E0)),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ToggleButton(
-                            label: "For me",
-                            selected: _forSelf,
-                            onTap: () => _setForSelf(true),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _ToggleButton(
-                            label: "For someone else",
-                            selected: !_forSelf,
-                            onTap: () => _setForSelf(false),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _WizardField(
-                            controller: _nameController,
-                            label: "Name",
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _WizardField(
-                            controller: _phoneController,
-                            label: "Phone",
-                            keyboardType: TextInputType.phone,
-                            maxLength: 10,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly
-                            ],
-                            prefixText: "+91 ",
-                            // Picking from contacts only makes sense when
-                            // filling in someone else's number — "For me"
-                            // is already the account's own number.
-                            // flutter_contacts has no web implementation
-                            // at all, so the picker is hidden there too.
-                            trailing: (_forSelf || kIsWeb)
-                                ? null
-                                : IconButton(
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    icon: const Icon(Icons.contacts_rounded,
-                                        size: 18, color: Color(0xFF3DAA5C)),
-                                    onPressed: _pickContact,
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    if (_forSelf) ...[
-                      const Text("Save address as",
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF6B6B6B))),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        children: AddressLabel.values.map((l) {
-                          final selected = l == _label;
-                          return ChoiceChip(
-                            label: Text(l.display),
-                            selected: selected,
-                            onSelected: (_) => setState(() => _label = l),
-                            selectedColor: const Color(0xFF3DAA5C),
-                            backgroundColor: Colors.white,
-                            labelStyle: TextStyle(
-                              color: selected ? Colors.white : Colors.black87,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              side: BorderSide(
-                                  color: selected
-                                      ? const Color(0xFF3DAA5C)
-                                      : const Color(0xFFE0E0E0)),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      if (_label == AddressLabel.other) ...[
-                        const SizedBox(height: 10),
-                        _WizardField(
-                          controller: _customLabelController,
-                          hint: "Label (e.g. Friend's place)",
-                        ),
-                      ],
-                    ] else ...[
-                      const Text("Save address as (optional)",
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF6B6B6B))),
-                      const SizedBox(height: 6),
-                      _WizardField(
-                        controller: _customLabelController,
-                        hint: "e.g. Mom's place, Office reception",
+                      Icon(
+                        _contactExpanded
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                        color: const Color(0xFF6B6B6B),
                       ),
                     ],
+                  ),
+                ),
+                if (_contactExpanded) ...[
+                  const Divider(height: 16, color: Color(0xFFE0E0E0)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ToggleButton(
+                          label: "For me",
+                          selected: _forSelf,
+                          onTap: () => _setForSelf(true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _ToggleButton(
+                          label: "For someone else",
+                          selected: !_forSelf,
+                          onTap: () => _setForSelf(false),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _WizardField(
+                          controller: _nameController,
+                          label: "Name",
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _WizardField(
+                          controller: _phoneController,
+                          label: "Phone",
+                          keyboardType: TextInputType.phone,
+                          maxLength: 10,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
+                          prefixText: "+91 ",
+                          // Picking from contacts only makes sense when
+                          // filling in someone else's number — "For me"
+                          // is already the account's own number.
+                          // flutter_contacts has no web implementation
+                          // at all, so the picker is hidden there too.
+                          trailing: (_forSelf || kIsWeb)
+                              ? null
+                              : IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  icon: const Icon(Icons.contacts_rounded,
+                                      size: 18, color: Color(0xFF3DAA5C)),
+                                  onPressed: _pickContact,
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (_forSelf) ...[
+                    const Text("Save address as",
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF6B6B6B))),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: AddressLabel.values.map((l) {
+                        final selected = l == _label;
+                        return ChoiceChip(
+                          label: Text(l.display),
+                          selected: selected,
+                          onSelected: (_) => setState(() => _label = l),
+                          selectedColor: const Color(0xFF3DAA5C),
+                          backgroundColor: Colors.white,
+                          labelStyle: TextStyle(
+                            color: selected ? Colors.white : Colors.black87,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide(
+                                color: selected
+                                    ? const Color(0xFF3DAA5C)
+                                    : const Color(0xFFE0E0E0)),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    if (_label == AddressLabel.other) ...[
+                      const SizedBox(height: 10),
+                      _WizardField(
+                        controller: _customLabelController,
+                        hint: "Label (e.g. Friend's place)",
+                      ),
+                    ],
+                  ] else ...[
+                    const Text("Save address as (optional)",
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF6B6B6B))),
+                    const SizedBox(height: 6),
+                    _WizardField(
+                      controller: _customLabelController,
+                      hint: "e.g. Mom's place, Office reception",
+                    ),
                   ],
                 ],
-              ),
+              ],
             ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: _onNext,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3DAA5C),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  elevation: 0,
-                ),
-                child: const Text("Next",
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15)),
+          ),
+          const SizedBox(height: 28),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _onNext,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3DAA5C),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
               ),
+              child: const Text("Next",
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15)),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -575,9 +568,8 @@ class _ToggleButton extends StatelessWidget {
           color: selected ? const Color(0xFF3DAA5C) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-              color: selected
-                  ? const Color(0xFF3DAA5C)
-                  : const Color(0xFFE0E0E0)),
+              color:
+                  selected ? const Color(0xFF3DAA5C) : const Color(0xFFE0E0E0)),
         ),
         child: Text(
           label,

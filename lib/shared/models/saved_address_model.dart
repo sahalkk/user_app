@@ -76,6 +76,12 @@ class SavedAddressModel extends Equatable {
   String get primaryAddressText =>
       addressLine.isNotEmpty ? addressLine : formattedAddress;
 
+  /// Whether [other] is the same saved address. Ids alone aren't enough:
+  /// a freshly saved address keeps its local id, while the copy fetched
+  /// back from the backend uses the backend record id as its id.
+  bool isSameAddressAs(SavedAddressModel other) =>
+      id == other.id || (backendId != null && backendId == other.backendId);
+
   SavedAddressModel copyWith({
     String? id,
     AddressLabel? label,

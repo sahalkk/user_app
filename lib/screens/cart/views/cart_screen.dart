@@ -1,13 +1,16 @@
 import 'package:beeyo_customer/blocs/auth_bloc/auth_bloc.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_state.dart';
 import 'package:beeyo_customer/screens/auth/views/login_screen.dart';
-import 'package:beeyo_customer/screens/checkout/views/add_address_screen.dart';
 import 'package:beeyo_customer/screens/checkout/views/checkout_screen.dart';
+import 'package:beeyo_customer/screens/checkout/views/select_address_screen.dart';
+import 'package:beeyo_customer/screens/location/cubit/location_cubit.dart';
+import 'package:beeyo_customer/screens/location/views/map_pin_picker_screen.dart';
 import 'package:beeyo_customer/screens/product_details/views/product_details_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../blocs/cart_bloc/cart_bloc.dart';
 import '../../../shared/models/cart_item_model.dart';
+import '../../../shared/models/saved_address_model.dart';
 
 const _kUndoDuration = Duration(seconds: 4);
 
@@ -23,6 +26,32 @@ class _CartScreenState extends State<CartScreen> {
   // snackbar is showing. The actual CartBloc removal only happens once the
   // snackbar closes without the user tapping UNDO.
   final Set<String> _pendingDeleteIds = {};
+  bool _isProceeding = false;
+
+  /// The delivery address is LocationCubit's bound address. A first-time
+  /// user (nothing saved yet) goes straight to the map, starting on the
+  /// area they already picked; everyone else picks from their saved
+  /// addresses. Either way, Order Summary only opens once a real saved
+  /// address with recipient details is bound.
+  Future<void> _confirmAddressThenCheckout() async {
+    final cubit = context.read<LocationCubit>();
+    setState(() => _isProceeding = true);
+    final bool ready;
+    try {
+      final saved = await cubit.getSavedAddresses();
+      if (!mounted) return;
+      ready = saved.isEmpty
+          ? await MapPinPickerScreen.openForNewAddress(context)
+          : await SelectAddressScreen.open(context);
+    } finally {
+      if (mounted) setState(() => _isProceeding = false);
+    }
+    if (!ready || !mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const CheckoutScreen()),
+    );
+  }
 
   void _handleSwipeDelete(CartItemModel cartItem) {
     setState(() => _pendingDeleteIds.add(cartItem.product.id));
@@ -165,7 +194,7 @@ class _CartScreenState extends State<CartScreen> {
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: () async {
+                          onPressed: _isProceeding ? null : () async {
                             // --- STEP 1: LOGIN CHECK ---
                             final authBloc = context.read<AuthBloc>();
 
@@ -205,42 +234,9 @@ class _CartScreenState extends State<CartScreen> {
                               }
                             }
 
-                            // --- STEP 2: ADDRESS CHECK ---
-                            // (We check the CartBloc state to see if we already have an address)
+                            // --- STEP 2: ADDRESS ---
                             if (!context.mounted) return; // Safety check
-                            final cartState = context.read<CartBloc>().state;
-
-                            if (cartState.deliveryAddress == null) {
-                              // CASE A: No Address -> Go to "Add Address" Screen
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => AddAddressScreen(
-                                    onSave: (newAddress) {
-                                      // 1. Save address to Bloc
-                                      context.read<CartBloc>().add(
-                                          UpdateDeliveryAddress(newAddress));
-
-                                      // 2. Redirect immediately to Checkout Screen
-                                      Navigator.pushReplacement(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) =>
-                                                const CheckoutScreen()),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              );
-                            } else {
-                              // CASE B: Address Exists -> Go straight to Checkout
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                        const CheckoutScreen()),
-                              );
-                            }
+                            await _confirmAddressThenCheckout();
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(context).primaryColor,
@@ -249,17 +245,26 @@ class _CartScreenState extends State<CartScreen> {
                             ),
                             elevation: 0,
                           ),
-                          child: Text(
-                            state.deliveryAddress == null
-                                ? "Continue to Address"
-                                : "Checkout",
-                            style: const TextStyle(
-                                fontSize: 18,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
-                          ),
+                          child: _isProceeding
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : const Text(
+                                  "Proceed to checkout",
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold),
+                                ),
                         ),
-                      )
+                      ),
+                      const SizedBox(height: 10),
+                      const _DeliveringToLine(),
                     ],
                   ),
                 ),
@@ -268,6 +273,47 @@ class _CartScreenState extends State<CartScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  "Delivering to …" under the checkout button
+// ─────────────────────────────────────────────
+class _DeliveringToLine extends StatelessWidget {
+  const _DeliveringToLine();
+
+  // A saved address reads best by its label ("Home · MG Road"); the
+  // ambient pick from app start has no meaningful label, just an area.
+  static String _describe(SavedAddressModel a) => a.recipientName.isNotEmpty
+      ? "${a.displayLabel} · ${a.formattedAddress}"
+      : a.formattedAddress;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<LocationCubit, LocationState>(
+      builder: (context, state) {
+        if (state is! Bound) return const SizedBox();
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.location_on_rounded,
+                size: 14, color: Color(0xFF3DAA5C)),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                "Delivering to ${_describe(state.address)}",
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    color: Color(0xFF6B6B6B)),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
