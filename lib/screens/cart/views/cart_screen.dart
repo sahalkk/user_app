@@ -2,7 +2,7 @@ import 'package:beeyo_customer/blocs/auth_bloc/auth_bloc.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_state.dart';
 import 'package:beeyo_customer/screens/auth/views/login_screen.dart';
 import 'package:beeyo_customer/screens/checkout/views/checkout_screen.dart';
-import 'package:beeyo_customer/screens/checkout/views/select_address_screen.dart';
+import 'package:beeyo_customer/screens/checkout/widgets/delivery_address_picker.dart';
 import 'package:beeyo_customer/screens/location/cubit/location_cubit.dart';
 import 'package:beeyo_customer/screens/location/views/map_pin_picker_screen.dart';
 import 'package:beeyo_customer/screens/product_details/views/product_details_screen.dart';
@@ -10,9 +10,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../blocs/cart_bloc/cart_bloc.dart';
 import '../../../shared/models/cart_item_model.dart';
-import '../../../shared/models/saved_address_model.dart';
 
 const _kUndoDuration = Duration(seconds: 4);
+const _kPanelDuration = Duration(milliseconds: 250);
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -27,26 +27,85 @@ class _CartScreenState extends State<CartScreen> {
   // snackbar closes without the user tapping UNDO.
   final Set<String> _pendingDeleteIds = {};
   bool _isProceeding = false;
+  // The footer's inline address picker. [_needsAddress] is set when
+  // Proceed opened it because no saved address is bound yet.
+  bool _addressExpanded = false;
+  bool _needsAddress = false;
 
-  /// The delivery address is LocationCubit's bound address. A first-time
-  /// user (nothing saved yet) goes straight to the map, starting on the
-  /// area they already picked; everyone else picks from their saved
-  /// addresses. Either way, Order Summary only opens once a real saved
-  /// address with recipient details is bound.
-  Future<void> _confirmAddressThenCheckout() async {
+  void _setAddressExpanded(bool expanded, {bool needsAddress = false}) {
+    setState(() {
+      _addressExpanded = expanded;
+      _needsAddress = expanded && needsAddress;
+    });
+  }
+
+  Future<void> _toggleAddressPicker() async {
+    if (_addressExpanded) {
+      _setAddressExpanded(false);
+      return;
+    }
+    // Guests have no saved addresses to pick from — log in first.
+    if (!await _ensureLoggedIn() || !mounted) return;
+    _setAddressExpanded(true);
+  }
+
+  /// True once the user is logged in, sending guests through LoginScreen
+  /// first (false if they back out of it).
+  Future<bool> _ensureLoggedIn() async {
+    final authBloc = context.read<AuthBloc>();
+
+    // If the AuthBloc is still in the initial state (e.g. after a hot
+    // restart) wait briefly for it to initialize so we do not incorrectly
+    // force the user to the login screen on first tap.
+    if (authBloc.state is AuthInitial) {
+      try {
+        await authBloc.stream
+            .firstWhere((s) => s is! AuthInitial)
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {
+        // ignore timeout and re-check below
+      }
+      if (!mounted) return false;
+    }
+    if (authBloc.state is AuthAuthenticated) return true;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+    );
+    // They may have pressed "Back" and still be a guest.
+    return mounted && authBloc.state is AuthAuthenticated;
+  }
+
+  /// The delivery address is LocationCubit's bound address, picked in the
+  /// footer's inline picker — so with a saved address (with a recipient)
+  /// already bound, this goes straight to Order Summary. A first-time user
+  /// (nothing saved yet) goes to the map, starting on the area they already
+  /// picked; anyone else without a saved address bound gets the picker
+  /// opened instead.
+  Future<void> _proceedToCheckout() async {
+    if (!await _ensureLoggedIn() || !mounted) return;
     final cubit = context.read<LocationCubit>();
     setState(() => _isProceeding = true);
-    final bool ready;
+    var ready = false;
     try {
       final saved = await cubit.getSavedAddresses();
       if (!mounted) return;
-      ready = saved.isEmpty
-          ? await MapPinPickerScreen.openForNewAddress(context)
-          : await SelectAddressScreen.open(context);
+      final bound = DeliveryAddressPicker.boundSaved(cubit.state, saved);
+      if (saved.isEmpty) {
+        ready = await MapPinPickerScreen.openForNewAddress(context);
+      } else if (bound == null) {
+        _setAddressExpanded(true, needsAddress: true);
+      } else if (DeliveryAddressPicker.hasContact(bound)) {
+        ready = true;
+      } else {
+        ready = await DeliveryAddressPicker.completeContact(context, bound);
+      }
     } finally {
       if (mounted) setState(() => _isProceeding = false);
     }
     if (!ready || !mounted) return;
+    _setAddressExpanded(false);
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const CheckoutScreen()),
@@ -94,6 +153,17 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      // Back closes an open address picker before it leaves the cart.
+      canPop: !_addressExpanded,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _setAddressExpanded(false);
+      },
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFFFFFF),
       appBar: AppBar(
@@ -140,26 +210,43 @@ class _CartScreenState extends State<CartScreen> {
 
           return Column(
             children: [
-              // 1. List of Items
+              // 1. List of Items, dimmed while the address picker is open
               Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: visibleItems.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    final cartItem = visibleItems[index];
-                    return _CartItemCard(
-                      key: ValueKey(cartItem.product.id),
-                      cartItem: cartItem,
-                      onSwipeDelete: () => _handleSwipeDelete(cartItem),
-                    );
-                  },
+                child: Stack(
+                  children: [
+                    ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: visibleItems.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 16),
+                      itemBuilder: (context, index) {
+                        final cartItem = visibleItems[index];
+                        return _CartItemCard(
+                          key: ValueKey(cartItem.product.id),
+                          cartItem: cartItem,
+                          onSwipeDelete: () => _handleSwipeDelete(cartItem),
+                        );
+                      },
+                    ),
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        ignoring: !_addressExpanded,
+                        child: GestureDetector(
+                          onTap: () => _setAddressExpanded(false),
+                          child: AnimatedOpacity(
+                            opacity: _addressExpanded ? 1 : 0,
+                            duration: _kPanelDuration,
+                            child: const ColoredBox(color: Color(0x33000000)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              // 2. Checkout Section
+              // 2. Checkout Section — grows upward to pick the address
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFFFFF),
                   border: const Border(
@@ -168,8 +255,31 @@ class _CartScreenState extends State<CartScreen> {
                       const BorderRadius.vertical(top: Radius.circular(24)),
                 ),
                 child: SafeArea(
+                  top: false,
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
+                      _DeliverToStrip(
+                        expanded: _addressExpanded,
+                        needsAddress: _needsAddress,
+                        onTap: _isProceeding ? null : _toggleAddressPicker,
+                      ),
+                      AnimatedSize(
+                        duration: _kPanelDuration,
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.bottomCenter,
+                        child: _addressExpanded
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: DeliveryAddressPicker(
+                                  maxHeight:
+                                      MediaQuery.sizeOf(context).height * 0.45,
+                                  onResolved: () => _setAddressExpanded(false),
+                                ),
+                              )
+                            : const SizedBox(width: double.infinity),
+                      ),
+                      const Divider(height: 24, color: Color(0xFFEEEEEE)),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -189,55 +299,12 @@ class _CartScreenState extends State<CartScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: _isProceeding ? null : () async {
-                            // --- STEP 1: LOGIN CHECK ---
-                            final authBloc = context.read<AuthBloc>();
-
-                            // If the AuthBloc is still in the initial state (e.g. after a
-                            // hot restart) wait briefly for it to initialize so we do not
-                            // incorrectly force the user to the login screen on first tap.
-                            final currentAuth = authBloc.state;
-                            if (currentAuth is AuthInitial) {
-                              try {
-                                await authBloc.stream
-                                    .firstWhere((s) => s is! AuthInitial)
-                                    .timeout(const Duration(seconds: 2));
-                              } catch (_) {
-                                // ignore timeout and re-check below
-                              }
-                              if (!context.mounted) return;
-                            }
-
-                            final authState = authBloc.state;
-
-                            if (authState is! AuthAuthenticated) {
-                              // Redirect to Login Page and WAIT for them to close it
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => const LoginScreen()),
-                              );
-
-                              // Safety check: Ensure the screen still exists after waiting
-                              if (!context.mounted) return;
-
-                              // 🔥 THE FIX: Ask the Bloc if they actually logged in!
-                              final newState = context.read<AuthBloc>().state;
-                              if (newState is! AuthAuthenticated) {
-                                // They pressed "Back" and are still a guest. Stop the checkout!
-                                return;
-                              }
-                            }
-
-                            // --- STEP 2: ADDRESS ---
-                            if (!context.mounted) return; // Safety check
-                            await _confirmAddressThenCheckout();
-                          },
+                          onPressed: _isProceeding ? null : _proceedToCheckout,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(context).primaryColor,
                             shape: RoundedRectangleBorder(
@@ -263,8 +330,6 @@ class _CartScreenState extends State<CartScreen> {
                                 ),
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      const _DeliveringToLine(),
                     ],
                   ),
                 ),
@@ -278,40 +343,91 @@ class _CartScreenState extends State<CartScreen> {
 }
 
 // ─────────────────────────────────────────────
-//  "Delivering to …" under the checkout button
+//  "Deliver to …" strip above the total — tap to pick the address
 // ─────────────────────────────────────────────
-class _DeliveringToLine extends StatelessWidget {
-  const _DeliveringToLine();
+class _DeliverToStrip extends StatelessWidget {
+  final bool expanded;
+  final bool needsAddress;
+  final VoidCallback? onTap;
 
-  // A saved address reads best by its label ("Home · MG Road"); the
-  // ambient pick from app start has no meaningful label, just an area.
-  static String _describe(SavedAddressModel a) => a.recipientName.isNotEmpty
-      ? "${a.displayLabel} · ${a.formattedAddress}"
-      : a.formattedAddress;
+  const _DeliverToStrip({
+    required this.expanded,
+    required this.needsAddress,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LocationCubit, LocationState>(
       builder: (context, state) {
-        if (state is! Bound) return const SizedBox();
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.location_on_rounded,
-                size: 14, color: Color(0xFF3DAA5C)),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                "Delivering to ${_describe(state.address)}",
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 12,
-                    color: Color(0xFF6B6B6B)),
-              ),
+        final String title;
+        String? subtitle;
+        if (expanded) {
+          title = "Choose delivery address";
+          if (needsAddress) subtitle = "Pick where this order should go";
+        } else if (state is Bound) {
+          // A saved address reads best by its label ("Home"); the ambient
+          // pick from app start has no meaningful label, just an area.
+          final a = state.address;
+          final isSaved = a.recipientName.isNotEmpty;
+          title = isSaved ? "Deliver to ${a.displayLabel}" : "Delivering to";
+          subtitle = isSaved ? a.primaryAddressText : a.formattedAddress;
+        } else if (state is CheckingServiceability) {
+          title = "Checking delivery availability…";
+        } else {
+          title = "Choose delivery address";
+        }
+
+        return InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                      color: Color(0xFFE8F5E9), shape: BoxShape.circle),
+                  child: const Icon(Icons.location_on_rounded,
+                      size: 18, color: Color(0xFF3DAA5C)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87)),
+                      if (subtitle != null)
+                        Text(subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                color: needsAddress && expanded
+                                    ? const Color(0xFFF57C00)
+                                    : const Color(0xFF6B6B6B))),
+                    ],
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: expanded ? 0.5 : 0,
+                  duration: _kPanelDuration,
+                  child: const Icon(Icons.keyboard_arrow_up_rounded,
+                      color: Color(0xFF6B6B6B)),
+                ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );

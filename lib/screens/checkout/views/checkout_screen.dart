@@ -9,7 +9,7 @@ import '../../../shared/models/saved_address_model.dart';
 import '../../location/cubit/location_cubit.dart';
 import '../../location/views/not_deliverable_view.dart';
 import '../../main_wrapper.dart'; // Import to navigate Home
-import 'select_address_screen.dart';
+import '../widgets/delivery_address_picker.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -44,9 +44,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ));
     }
   }
-
-  static bool _hasContact(SavedAddressModel a) =>
-      a.recipientName.isNotEmpty && a.recipientPhone.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -128,7 +125,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       const SizedBox(height: 10),
                       _DeliverToCard(
                         locState: locState,
-                        onChange: () => SelectAddressScreen.open(context),
+                        onChange: () =>
+                            DeliveryAddressPicker.showSheet(context),
                       ),
 
                       const SizedBox(height: 24),
@@ -194,7 +192,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             child: ElevatedButton(
                               onPressed: isPlacing ||
                                       bound == null ||
-                                      !_hasContact(bound.address)
+                                      !DeliveryAddressPicker.hasContact(
+                                          bound.address)
                                   ? null
                                   : () {
                                       final address = bound.address;
