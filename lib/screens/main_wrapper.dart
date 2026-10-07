@@ -61,6 +61,11 @@ class _MainWrapperState extends State<MainWrapper> {
       // placed after that.
       context.read<OrderBloc>().add(LoadOrders());
     }
+    // Order Again lists past orders too — refresh quietly (no spinner) so
+    // anything placed since the last load shows up. Guests have no orders.
+    if (index == 1 && context.read<AuthBloc>().state is AuthAuthenticated) {
+      context.read<OrderBloc>().add(const LoadOrders(silent: true));
+    }
     setState(() {
       _currentIndex = index;
     });

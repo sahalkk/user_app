@@ -13,6 +13,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
   CartBloc() : super(CartInitial()) {
     on<LoadCart>(_onLoadCart);
     on<AddToCart>(_onAddToCart);
+    on<AddItemsToCart>(_onAddItemsToCart);
     on<RemoveFromCart>(_onRemoveFromCart);
     on<UpdateCartItemQuantity>(_onUpdateQuantity);
     on<ClearCart>(_onClearCart);
@@ -34,6 +35,23 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         product: event.product,
         quantity: 1,
       ));
+    }
+    _emitLoaded(emit);
+  }
+
+  void _onAddItemsToCart(AddItemsToCart event, Emitter<CartState> emit) {
+    for (final incoming in event.items) {
+      final existingIndex = _items
+          .indexWhere((item) => item.product.id == incoming.product.id);
+      if (existingIndex >= 0) {
+        _items[existingIndex].quantity += incoming.quantity;
+      } else {
+        _items.add(CartItemModel(
+          id: DateTime.now().toString(),
+          product: incoming.product,
+          quantity: incoming.quantity,
+        ));
+      }
     }
     _emitLoaded(emit);
   }

@@ -15,6 +15,15 @@ class AddToCart extends CartEvent {
   List<Object> get props => [product];
 }
 
+/// Adds several products at once (e.g. "Reorder" on a past order), each
+/// with its own quantity, in a single state update.
+class AddItemsToCart extends CartEvent {
+  final List<CartItemModel> items;
+  const AddItemsToCart(this.items);
+  @override
+  List<Object> get props => [items];
+}
+
 class RemoveFromCart extends CartEvent {
   final String productId;
   const RemoveFromCart(this.productId);
