@@ -76,6 +76,11 @@ class SavedAddressModel extends Equatable {
   String get primaryAddressText =>
       addressLine.isNotEmpty ? addressLine : formattedAddress;
 
+  /// False for addresses with no real fix — e.g. ones created before the
+  /// backend stored lat/lng, which come back as LatLng(0, 0) (the same
+  /// "unknown position" sentinel used in delivery_zone_model.dart).
+  bool get hasPosition => position.latitude != 0 || position.longitude != 0;
+
   /// Whether [other] is the same saved address. Ids alone aren't enough:
   /// a freshly saved address keeps its local id, while the copy fetched
   /// back from the backend uses the backend record id as its id.

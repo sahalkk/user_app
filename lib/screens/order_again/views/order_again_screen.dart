@@ -154,7 +154,7 @@ class _OrderAgainScreenState extends State<OrderAgainScreen> {
             ),
             SliverToBoxAdapter(
               child: SizedBox(
-                height: 222,
+                height: 206,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
@@ -294,7 +294,9 @@ void _reorder(BuildContext context, List<_ResolvedItem> items) {
     behavior: SnackBarBehavior.floating,
     backgroundColor: const Color(0xFF222222),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    margin: const EdgeInsets.all(16),
+    // Lifted clear of the floating "View Cart" banner, which appears as
+    // soon as the cart has items.
+    margin: const EdgeInsets.fromLTRB(16, 0, 16, 96),
     duration: const Duration(seconds: 2),
     content: Row(
       children: [
@@ -830,7 +832,7 @@ class _OrdersSkeleton extends StatelessWidget {
           bar(160, 20),
           const SizedBox(height: 16),
           SizedBox(
-            height: 210,
+            height: 194,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               physics: const NeverScrollableScrollPhysics(),

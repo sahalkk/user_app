@@ -47,8 +47,7 @@ class _SelectAddressScreenState extends State<SelectAddressScreen> {
 
   Future<void> _select(SavedAddressModel address) async {
     final cubit = context.read<LocationCubit>();
-    final current = cubit.state;
-    if (current is Bound && address.isSameAddressAs(current.address)) return;
+    if (cubit.isBound(address)) return;
     setState(() => _isBusy = true);
     await cubit.switchToSavedAddress(address);
     if (mounted) setState(() => _isBusy = false);
@@ -77,24 +76,11 @@ class _SelectAddressScreenState extends State<SelectAddressScreen> {
     // Older saved addresses can lack a recipient — collect it through the
     // wizard's edit mode (pin + details prefilled) before letting the
     // order go out without anyone to hand it to.
-    final cubit = context.read<LocationCubit>();
-    final priorState = cubit.state;
-    final priorBound = priorState is Bound ? priorState : null;
-    final saved = await Navigator.push(
-      context,
-      MapPinPickerScreen.route(
-        cubit: cubit,
-        initialPosition: address.position,
-        existingAddress: address,
-      ),
-    );
+    final saved = await MapPinPickerScreen.openForEdit(context, address);
     if (!mounted) return;
-    if (cubit.state is! Bound && priorBound != null) {
-      cubit.restorePreviousBound(priorBound);
-    }
     _reloadAddresses();
-    final state = cubit.state;
-    if (saved == true && state is Bound && _hasContact(state.address)) {
+    final state = context.read<LocationCubit>().state;
+    if (saved && state is Bound && _hasContact(state.address)) {
       Navigator.pop(context, true);
     }
   }

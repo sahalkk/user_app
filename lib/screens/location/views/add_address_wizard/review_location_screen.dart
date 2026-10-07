@@ -187,7 +187,7 @@ class ReviewLocationScreen extends StatelessWidget {
     // Editing a saved address that ISN'T the one currently bound should
     // just persist the change, not re-run serviceability or rebind it —
     // same distinction MapPinPickerScreen's _ConfirmSheet used to make.
-    final isInactiveEdit = editing != null && editing.id != cubit.boundAddressId;
+    final isInactiveEdit = editing != null && !cubit.isBound(editing);
 
     if (isInactiveEdit) {
       final updated = SavedAddressModel(

@@ -14,18 +14,15 @@ import '../cubit/location_cubit.dart';
 import 'map_pin_picker_screen.dart';
 import 'not_deliverable_view.dart';
 
+/// The ambient "where are you / is my area serviceable" picker: GPS, search,
+/// or a saved address. GPS picks bind straight away; search results get a
+/// trimmed map confirm step. Creating or editing a full named address is
+/// not done here — that's MapPinPickerScreen's add-address wizard, opened
+/// directly by checkout and the Address Book.
 class LocationPickerSheet extends StatefulWidget {
-  /// False (default): the ambient "is my area serviceable" flow — GPS/search
-  /// picks skip straight to the answer, and "Add new address" is hidden
-  /// since there's no named-address feature to attach a manually-dropped
-  /// pin to from here. True: an explicit add/edit-a-delivery-address flow
-  /// (Address Book, checkout) — GPS/search picks land on the pin-adjust
-  /// step, and "Add new address" (precise pin drop) stays available.
-  final bool precise;
+  const LocationPickerSheet({super.key});
 
-  const LocationPickerSheet({super.key, this.precise = false});
-
-  static Future<void> show(BuildContext context, {bool precise = false}) async {
+  static Future<void> show(BuildContext context) async {
     final cubit = context.read<LocationCubit>();
     // Captured before anything below can move the cubit off of it — restored
     // afterward if the sheet gets dismissed/abandoned without landing on a
@@ -34,10 +31,9 @@ class LocationPickerSheet extends StatefulWidget {
     final priorBound = priorState is Bound ? priorState : null;
     // Opening the sheet while state is already NotDeliverable (carried over
     // from before it was opened — e.g. "Choose a different location" on
-    // NotServiceableScreen, the header's "Not deliverable here" dropdown,
-    // or Address Book's own "Add new" reached while its embedded
-    // NotDeliverableView is already showing) would otherwise render that exact same sorry message a
-    // second time, stacked on top of the one already visible behind it.
+    // NotServiceableScreen, or the header's "Not deliverable here" dropdown)
+    // would otherwise render that exact same sorry message a second time,
+    // stacked on top of the one already visible behind it.
     // Reset to ManualEntry first so the sheet opens fresh on the actual
     // search view instead. Doesn't affect the legitimate case — reaching
     // NotDeliverable from an action taken *inside* the sheet (a saved-
@@ -53,7 +49,7 @@ class LocationPickerSheet extends StatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => BlocProvider.value(
         value: cubit,
-        child: LocationPickerSheet(precise: precise),
+        child: const LocationPickerSheet(),
       ),
     );
     // Covers every dismissal path uniformly (drag-to-dismiss, tap-outside,
@@ -65,7 +61,7 @@ class LocationPickerSheet extends StatefulWidget {
     // new location must not be destructive to an already-bound address
     // until a new bind actually succeeds.
     if (cubit.state is! Bound && priorBound != null) {
-      cubit.restorePreviousBound(priorBound);
+      cubit.restorePreviousState(priorBound);
     }
   }
 
@@ -128,7 +124,8 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       });
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 400), () => _runSearch(query));
+    _debounce =
+        Timer(const Duration(milliseconds: 400), () => _runSearch(query));
   }
 
   Future<void> _runSearch(String query) async {
@@ -160,11 +157,9 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   /// disposing its context before the awaited Navigator.push future even
   /// resolves, which silently no-ops any pop attempted from it.
   ///
-  /// Shared by both entry modes: the listener in [build] pushes this the
-  /// instant GPS or a search result lands on [Confirming] — neither mode
-  /// stops at an intermediate text preview first.
-  Future<void> _pushMapConfirm(Confirming state,
-      {required bool ambientConfirm}) async {
+  /// The listener in [build] pushes this the instant a search result lands
+  /// on [Confirming] — there's no intermediate text preview first.
+  Future<void> _pushMapConfirm(Confirming state) async {
     final cubit = context.read<LocationCubit>();
     await Navigator.push(
       context,
@@ -172,7 +167,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
         cubit: cubit,
         initialPosition: state.position,
         initialFormattedAddress: state.formattedAddress,
-        ambientConfirm: ambientConfirm,
+        ambientConfirm: true,
       ),
     );
     if (!mounted) return;
@@ -191,16 +186,6 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     if (cubit.state is Confirming) {
       cubit.pickDifferentLocation();
     }
-  }
-
-  /// Precise mode's "Add new address" row — the pin starts where the user
-  /// already is (see [LocationCubit.bestMapStart]) rather than a fixed
-  /// city. Awaited here, on the sheet's own long-lived State, for the same
-  /// reason as [_pushMapConfirm]: the sheet closes itself once the wizard
-  /// reports a successful save.
-  Future<void> _addNewAddress() async {
-    final saved = await MapPinPickerScreen.openForNewAddress(context);
-    if (mounted && saved) Navigator.of(context).maybePop();
   }
 
   /// Opens the Address Book and, once it returns, refreshes this sheet's
@@ -249,27 +234,28 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
               if (state is Bound) {
                 if (isTopmost) Navigator.of(context).maybePop();
               } else if (state is Confirming && isTopmost) {
-                // Both modes land straight on the map+pin confirm step
-                // instead of stopping at an intermediate text preview —
-                // ambientConfirm controls only the chrome MapPinPickerScreen
-                // shows once there (trimmed for ambient, full label/landmark
-                // UI for precise). Gated on isTopmost for the same reason as
-                // the Bound case above: once MapPinPickerScreen is pushed, IT
+                // A search result lands straight on the (trimmed-chrome)
+                // map+pin confirm step instead of stopping at an
+                // intermediate text preview. Gated on isTopmost for the
+                // same reason as the Bound case above: once
+                // MapPinPickerScreen is pushed, IT
                 // keeps re-emitting Confirming as its own normal operation
                 // (initState seeding, dragging the pin, its own search box)
                 // — without this guard, every one of those would push
                 // ANOTHER map screen on top, since this listener stays
                 // subscribed the whole time the sheet is merely buried, not
                 // disposed.
-                _pushMapConfirm(state, ambientConfirm: !widget.precise);
+                _pushMapConfirm(state);
               }
             },
             builder: (context, state) {
               if (state is PermissionPrimer) {
-                return _PermissionPrimerView(scrollController: scrollController);
+                return _PermissionPrimerView(
+                    scrollController: scrollController);
               }
               if (state is CheckingServiceability) {
-                return const _CenteredLoader(label: "Checking delivery availability…");
+                return const _CenteredLoader(
+                    label: "Checking delivery availability…");
               }
               if (state is NotDeliverable) {
                 return SingleChildScrollView(
@@ -278,8 +264,8 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 );
               }
               if (state is Confirming) {
-                // Both modes auto-navigate straight to the map/pin confirm
-                // step (see the listener above) — this never renders for
+                // Auto-navigates straight to the map/pin confirm step (see
+                // the listener above) — this never renders for
                 // longer than the one frame before that push happens. A
                 // brief loader covers that frame. It's also never left
                 // standing after the map screen is dismissed —
@@ -298,10 +284,8 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 searchFailed: _searchFailed,
                 isResolving: state is Resolving || state is PermissionChecking,
                 notice: state is ManualEntry ? state.message : null,
-                precise: widget.precise,
                 addressesFuture: _addressesFuture,
                 positionFuture: _positionFuture,
-                onAddNewAddress: _addNewAddress,
                 onOpenAddressBook: _openAddressBook,
               );
             },
@@ -383,23 +367,25 @@ class _PermissionPrimerView extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: () => context.read<LocationCubit>().acknowledgePrimer(),
+              onPressed: () =>
+                  context.read<LocationCubit>().acknowledgePrimer(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF3DAA5C),
-                shape:
-                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
               ),
               child: const Text("Allow location access",
-                  style:
-                      TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w700)),
             ),
           ),
           const SizedBox(height: 8),
           TextButton(
             onPressed: () => context.read<LocationCubit>().declinePrimer(),
             child: const Text("Enter address manually",
-                style: TextStyle(color: Color(0xFF6B6B6B), fontWeight: FontWeight.w600)),
+                style: TextStyle(
+                    color: Color(0xFF6B6B6B), fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -422,10 +408,8 @@ class _MainPickerView extends StatelessWidget {
   // denied OS dialog right before this sheet auto-opened — would leave the
   // user on the search view with no hint why nothing happened.
   final String? notice;
-  final bool precise;
   final Future<List<SavedAddressModel>> addressesFuture;
   final Future<LatLng?> positionFuture;
-  final VoidCallback onAddNewAddress;
   final VoidCallback onOpenAddressBook;
 
   const _MainPickerView({
@@ -438,10 +422,8 @@ class _MainPickerView extends StatelessWidget {
     required this.searchFailed,
     required this.isResolving,
     this.notice,
-    required this.precise,
     required this.addressesFuture,
     required this.positionFuture,
-    required this.onAddNewAddress,
     required this.onOpenAddressBook,
   });
 
@@ -538,7 +520,9 @@ class _MainPickerView extends StatelessWidget {
             decoration: const InputDecoration(
               hintText: "Search for area, street, or landmark",
               hintStyle: TextStyle(
-                  fontFamily: 'Poppins', fontSize: 13, color: Color(0xFF9E9E9E)),
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  color: Color(0xFF9E9E9E)),
               prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF6B6B6B)),
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(vertical: 14),
@@ -567,7 +551,9 @@ class _MainPickerView extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontFamily: 'Poppins', fontSize: 13, color: Colors.black87)),
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        color: Colors.black87)),
                 // autoConfirm defaults to false: every search result lands
                 // on Confirming and gets reviewed on the map first (see
                 // the sheet's listener/builder for how each mode routes
@@ -594,7 +580,8 @@ class _MainPickerView extends StatelessWidget {
                     height: 20,
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Color(0xFF3DAA5C)))
-                : const Icon(Icons.my_location_rounded, color: Color(0xFF3DAA5C)),
+                : const Icon(Icons.my_location_rounded,
+                    color: Color(0xFF3DAA5C)),
             title: const Text("Use my current location",
                 style: TextStyle(
                     fontFamily: 'Poppins',
@@ -603,9 +590,7 @@ class _MainPickerView extends StatelessWidget {
                     color: Color(0xFF3DAA5C))),
             onTap: isResolving
                 ? null
-                : () => context
-                    .read<LocationCubit>()
-                    .useCurrentLocation(autoConfirm: !precise),
+                : () => context.read<LocationCubit>().useCurrentLocation(),
           ),
           const Divider(height: 24, color: Color(0xFFE0E0E0)),
 
@@ -637,7 +622,8 @@ class _MainPickerView extends StatelessWidget {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
                     child: LinearProgressIndicator(
-                        color: Color(0xFF3DAA5C), backgroundColor: Color(0xFFF0F0F0)),
+                        color: Color(0xFF3DAA5C),
+                        backgroundColor: Color(0xFFF0F0F0)),
                   );
                 }
                 final addresses = snapshot.data ?? [];
@@ -646,7 +632,9 @@ class _MainPickerView extends StatelessWidget {
                     padding: EdgeInsets.symmetric(vertical: 12),
                     child: Text("No saved addresses yet",
                         style: TextStyle(
-                            fontFamily: 'Poppins', fontSize: 13, color: Color(0xFF9E9E9E))),
+                            fontFamily: 'Poppins',
+                            fontSize: 13,
+                            color: Color(0xFF9E9E9E))),
                   );
                 }
                 return Column(
@@ -659,24 +647,6 @@ class _MainPickerView extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          // Manually dropping a pin without a search match only matters
-          // when actually building a named delivery address — the ambient
-          // "is my area serviceable" flow has no address to attach it to,
-          // so this stays hidden there and only shows in precise mode
-          // (Address Book / checkout).
-          if (precise)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.add_location_alt_outlined,
-                  color: Color(0xFF3DAA5C)),
-              title: const Text("Add new address",
-                  style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF3DAA5C))),
-              onTap: onAddNewAddress,
-            ),
         ],
       ],
     );
@@ -711,9 +681,7 @@ class _SearchEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            failed
-                ? "Couldn't search right now"
-                : 'No results for "$query"',
+            failed ? "Couldn't search right now" : 'No results for "$query"',
             textAlign: TextAlign.center,
             style: const TextStyle(
                 fontFamily: 'Poppins',
@@ -750,7 +718,8 @@ class _SearchEmptyState extends StatelessWidget {
 class _SavedAddressTile extends StatelessWidget {
   final SavedAddressModel address;
   final Future<LatLng?> positionFuture;
-  const _SavedAddressTile({required this.address, required this.positionFuture});
+  const _SavedAddressTile(
+      {required this.address, required this.positionFuture});
 
   IconData get _icon {
     switch (address.label) {
@@ -765,14 +734,10 @@ class _SavedAddressTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // A saved address with no real fix (backend returned null lat/lng —
-    // e.g. addresses created before those columns existed) is stored as
-    // LatLng(0, 0), the same "unknown position" sentinel used elsewhere
-    // (see delivery_zone_model.dart). Showing a distance against Null
-    // Island would always read as a bogus ~8,000+ km — and since that's
-    // known up front, such a tile never shows a badge placeholder either.
-    final hasRealPosition =
-        address.position.latitude != 0 || address.position.longitude != 0;
+    // A distance to an address with no real fix (see
+    // SavedAddressModel.hasPosition) would read as a bogus ~8,000+ km —
+    // and since that's known up front, such a tile never shows a badge
+    // placeholder either.
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -819,7 +784,7 @@ class _SavedAddressTile extends StatelessWidget {
                           fontFamily: 'Poppins',
                           fontSize: 12,
                           color: Color(0xFF6B6B6B))),
-                  if (hasRealPosition)
+                  if (address.hasPosition)
                     _AsyncDistanceBadge(
                       target: address.position,
                       positionFuture: positionFuture,

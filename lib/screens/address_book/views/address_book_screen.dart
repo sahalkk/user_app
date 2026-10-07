@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../shared/models/saved_address_model.dart';
 import '../../location/cubit/location_cubit.dart';
-import '../../location/views/location_picker_sheet.dart';
 import '../../location/views/map_pin_picker_screen.dart';
 import '../../location/views/not_deliverable_view.dart';
 
@@ -43,47 +42,18 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     // no pop, so the user can immediately pick something else.
   }
 
+  /// Straight into the add-address wizard (map → details → review), pin
+  /// starting at the user's current delivery location. Stays on the Address
+  /// Book afterwards so the new entry shows up in the list, marked as the
+  /// one being delivered to.
   Future<void> _addNew() async {
-    final cubit = context.read<LocationCubit>();
-    // Address Book is reached while an address is already bound (it's the
-    // one showing "Delivering here"), so the sheet's dismissal alone can't
-    // tell "a new address was picked" apart from "the user just closed the
-    // sheet" — both leave the cubit Bound. Only pop this screen when the
-    // bound address actually changed to something new.
-    final priorBoundId =
-        cubit.state is Bound ? (cubit.state as Bound).address.id : null;
-
-    await LocationPickerSheet.show(context, precise: true);
-    if (!mounted) return;
-    _reload();
-    final state = cubit.state;
-    if (state is Bound && state.address.id != priorBoundId) {
-      Navigator.of(context).pop();
-    }
+    final saved = await MapPinPickerScreen.openForNewAddress(context);
+    if (mounted && saved) _reload();
   }
 
   Future<void> _edit(SavedAddressModel address) async {
-    final cubit = context.read<LocationCubit>();
-    // See _useCurrentLocation — captured so an edit that's abandoned (or
-    // that ends on a NotDeliverable candidate the user backs out of)
-    // doesn't leave this screen stuck showing that instead of the address
-    // list, when nothing about the real bound address actually changed.
-    final priorState = cubit.state;
-    final priorBound = priorState is Bound ? priorState : null;
-
-    await Navigator.push(
-      context,
-      MapPinPickerScreen.route(
-        cubit: cubit,
-        initialPosition: address.position,
-        existingAddress: address,
-      ),
-    );
-    if (!mounted) return;
-    if (cubit.state is! Bound && priorBound != null) {
-      cubit.restorePreviousBound(priorBound);
-    }
-    _reload();
+    final saved = await MapPinPickerScreen.openForEdit(context, address);
+    if (mounted && saved) _reload();
   }
 
   Future<void> _delete(SavedAddressModel address) async {
@@ -92,19 +62,24 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text("Remove this address?",
-            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800)),
+            style:
+                TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800)),
         content: Text(
           "\"${address.displayLabel}\" will be removed from your saved addresses.",
-          style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, color: Color(0xFF6B6B6B)),
+          style: const TextStyle(
+              fontFamily: 'Poppins', fontSize: 13, color: Color(0xFF6B6B6B)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("Cancel", style: TextStyle(color: Color(0xFF6B6B6B))),
+            child: const Text("Cancel",
+                style: TextStyle(color: Color(0xFF6B6B6B))),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("Remove", style: TextStyle(color: Color(0xFFE53935), fontWeight: FontWeight.w700)),
+            child: const Text("Remove",
+                style: TextStyle(
+                    color: Color(0xFFE53935), fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -112,7 +87,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     if (confirmed != true || !mounted) return;
 
     setState(() => _isBusy = true);
-    await context.read<LocationCubit>().deleteAddress(address.id);
+    await context.read<LocationCubit>().deleteAddress(address);
     if (!mounted) return;
     setState(() => _isBusy = false);
     _reload();
@@ -142,7 +117,8 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
             padding: const EdgeInsets.only(right: 12),
             child: TextButton.icon(
               onPressed: _addNew,
-              icon: const Icon(Icons.add_rounded, color: Color(0xFF3DAA5C), size: 18),
+              icon: const Icon(Icons.add_rounded,
+                  color: Color(0xFF3DAA5C), size: 18),
               label: const Text("Add New",
                   style: TextStyle(
                       fontFamily: 'Poppins',
@@ -151,8 +127,10 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                       fontSize: 13)),
               style: TextButton.styleFrom(
                 backgroundColor: const Color(0xFFE8F5E9),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
             ),
           ),
@@ -160,10 +138,6 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
       ),
       body: BlocBuilder<LocationCubit, LocationState>(
         builder: (context, locState) {
-          if (locState is NotDeliverable) {
-            return const SingleChildScrollView(child: NotDeliverableView());
-          }
-
           return Stack(
             children: [
               FutureBuilder<List<SavedAddressModel>>(
@@ -171,18 +145,32 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return const Center(
-                        child: CircularProgressIndicator(color: Color(0xFF3DAA5C)));
+                        child: CircularProgressIndicator(
+                            color: Color(0xFF3DAA5C)));
                   }
                   final addresses = snapshot.data!;
                   if (addresses.isEmpty) {
                     return _EmptyState(onAddPressed: _addNew);
                   }
 
-                  final boundId = context.read<LocationCubit>().boundAddressId;
+                  final cubit = context.read<LocationCubit>();
 
                   return ListView(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                     children: [
+                      // Shown above the list rather than instead of it, so
+                      // an unserviceable address can still be switched
+                      // away from, edited, or deleted right here.
+                      if (locState is NotDeliverable) ...[
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const NotDeliverableView(),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       const Text(
                         "Saved Addresses",
                         style: TextStyle(
@@ -196,7 +184,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                             padding: const EdgeInsets.only(bottom: 12),
                             child: _AddressCard(
                               address: a,
-                              isActive: a.id == boundId,
+                              isActive: cubit.isBound(a),
                               onTap: () => _selectAddress(a),
                               onEdit: () => _edit(a),
                               onDelete: () => _delete(a),
@@ -210,7 +198,8 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                 Container(
                   color: Colors.black.withValues(alpha: 0.05),
                   child: const Center(
-                      child: CircularProgressIndicator(color: Color(0xFF3DAA5C))),
+                      child:
+                          CircularProgressIndicator(color: Color(0xFF3DAA5C))),
                 ),
             ],
           );
@@ -239,11 +228,23 @@ class _AddressCard extends StatelessWidget {
   (IconData, Color, Color) get _iconStyle {
     switch (address.label) {
       case AddressLabel.home:
-        return (Icons.home_rounded, const Color(0xFFE8F5E9), const Color(0xFF3DAA5C));
+        return (
+          Icons.home_rounded,
+          const Color(0xFFE8F5E9),
+          const Color(0xFF3DAA5C)
+        );
       case AddressLabel.work:
-        return (Icons.work_rounded, const Color(0xFFE3F2FD), const Color(0xFF1E88E5));
+        return (
+          Icons.work_rounded,
+          const Color(0xFFE3F2FD),
+          const Color(0xFF1E88E5)
+        );
       case AddressLabel.other:
-        return (Icons.place_rounded, const Color(0xFFF0F0F0), const Color(0xFF6B6B6B));
+        return (
+          Icons.place_rounded,
+          const Color(0xFFF0F0F0),
+          const Color(0xFF6B6B6B)
+        );
     }
   }
 
@@ -260,7 +261,10 @@ class _AddressCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4)),
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4)),
           ],
         ),
         child: Row(
@@ -306,15 +310,22 @@ class _AddressCard extends StatelessWidget {
                     address.primaryAddressText,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Color(0xFF6B6B6B)),
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: Color(0xFF6B6B6B)),
                   ),
-                  if (address.recipientName.isNotEmpty || address.recipientPhone.isNotEmpty) ...[
+                  if (address.recipientName.isNotEmpty ||
+                      address.recipientPhone.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
                       "${address.recipientName} · ${address.recipientPhone}",
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, color: Color(0xFF9E9E9E)),
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 11,
+                          color: Color(0xFF9E9E9E)),
                     ),
                   ],
                   const SizedBox(height: 8),
@@ -323,7 +334,10 @@ class _AddressCard extends StatelessWidget {
                     children: [
                       _ActionIcon(icon: Icons.edit_outlined, onTap: onEdit),
                       const SizedBox(width: 4),
-                      _ActionIcon(icon: Icons.delete_outline_rounded, onTap: onDelete, color: const Color(0xFFE53935)),
+                      _ActionIcon(
+                          icon: Icons.delete_outline_rounded,
+                          onTap: onDelete,
+                          color: const Color(0xFFE53935)),
                     ],
                   ),
                 ],
@@ -346,10 +360,15 @@ class _Badge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
       child: Text(
         label,
-        style: TextStyle(fontFamily: 'Poppins', fontSize: 10, fontWeight: FontWeight.w700, color: fg),
+        style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: fg),
       ),
     );
   }
@@ -390,21 +409,29 @@ class _EmptyState extends StatelessWidget {
             Container(
               width: 84,
               height: 84,
-              decoration: const BoxDecoration(color: Color(0xFFE8F5E9), shape: BoxShape.circle),
-              child: const Icon(Icons.location_on_outlined, color: Color(0xFF3DAA5C), size: 38),
+              decoration: const BoxDecoration(
+                  color: Color(0xFFE8F5E9), shape: BoxShape.circle),
+              child: const Icon(Icons.location_on_outlined,
+                  color: Color(0xFF3DAA5C), size: 38),
             ),
             const SizedBox(height: 20),
             const Text(
               "You haven't saved any addresses yet",
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w800, color: Colors.black87),
+                  fontFamily: 'Poppins',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black87),
             ),
             const SizedBox(height: 8),
             const Text(
               "Save your home, work, or any other place for faster checkout next time.",
               textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: Color(0xFF6B6B6B)),
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  color: Color(0xFF6B6B6B)),
             ),
             const SizedBox(height: 24),
             SizedBox(
@@ -414,12 +441,16 @@ class _EmptyState extends StatelessWidget {
                 onPressed: onAddPressed,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF3DAA5C),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
                 ),
                 child: const Text(
                   "Add Address",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15),
                 ),
               ),
             ),

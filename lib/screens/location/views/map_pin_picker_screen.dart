@@ -30,7 +30,7 @@ class MapPinPickerScreen extends StatefulWidget {
   final String? initialFormattedAddress;
 
   /// True when entered from the ambient "is my area serviceable" search
-  /// flow (LocationPickerSheet in precise:false mode) rather than an
+  /// flow (a LocationPickerSheet search result) rather than an
   /// explicit add/edit-a-delivery-address flow. Trims the chrome down to
   /// just the map + a "Confirm Location" action — no title bar in the
   /// default mode, no Home/Work/Other label chips, no custom-label or
@@ -80,18 +80,13 @@ class MapPinPickerScreen extends StatefulWidget {
     );
   }
 
-  /// Opens the add-address flow for a brand-new address, with the pin on
-  /// [LocationCubit.bestMapStart]. Returns true once it's saved and bound.
-  /// Backing out leaves the previously bound address in place — the map
-  /// moves the cubit to Confirming while the pin is being adjusted.
+  /// Opens the add-address wizard for a brand-new address, with the pin on
+  /// [LocationCubit.bestMapStart]. Returns true once it's saved (and bound).
   static Future<bool> openForNewAddress(BuildContext context) async {
     final cubit = context.read<LocationCubit>();
-    final priorState = cubit.state;
-    final priorBound = priorState is Bound ? priorState : null;
-
     final start = await cubit.bestMapStart();
     if (!context.mounted) return false;
-    final saved = await Navigator.push(
+    return _openWizard(
       context,
       route(
         cubit: cubit,
@@ -100,9 +95,36 @@ class MapPinPickerScreen extends StatefulWidget {
         askToConfirmPin: true,
       ),
     );
-    if (cubit.state is! Bound && priorBound != null) {
-      cubit.restorePreviousBound(priorBound);
-    }
+  }
+
+  /// Opens the add-address wizard in edit mode for [address]. Returns true
+  /// once the edit is saved. An address with no stored position (see
+  /// [SavedAddressModel.hasPosition]) starts at [LocationCubit.bestMapStart]
+  /// instead of (0, 0) in the ocean — saving that would reverse-geocode to
+  /// no city/state, which the backend rejects.
+  static Future<bool> openForEdit(
+      BuildContext context, SavedAddressModel address) async {
+    final cubit = context.read<LocationCubit>();
+    final start = address.hasPosition
+        ? address.position
+        : (await cubit.bestMapStart()).position;
+    if (!context.mounted) return false;
+    return _openWizard(
+      context,
+      route(cubit: cubit, initialPosition: start, existingAddress: address),
+    );
+  }
+
+  /// Unless the wizard ends on a new bind, the app's location state must be
+  /// left as it was (bound, not deliverable, …) — the map moves the cubit
+  /// to Confirming while the pin is being adjusted, an inactive edit saves
+  /// without binding, and the review step can land on NotDeliverable.
+  static Future<bool> _openWizard(
+      BuildContext context, Route<bool> wizardRoute) async {
+    final cubit = context.read<LocationCubit>();
+    final priorState = cubit.state;
+    final saved = await Navigator.push(context, wizardRoute);
+    cubit.restorePreviousState(priorState);
     return saved == true;
   }
 
@@ -129,9 +151,11 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final cubit = context.read<LocationCubit>();
-      if (existing != null) {
+      if (existing != null && existing.hasPosition) {
         // Avoid a re-geocode flicker showing different wording than what
         // was originally saved, until the user actually moves the pin.
+        // (Without a stored position the pin starts elsewhere, so the
+        // saved wording wouldn't match it — geocode it below instead.)
         cubit.seedConfirming(existing);
       } else if (widget.initialFormattedAddress != null) {
         // Already resolved by the caller (GPS fix, search result) — don't

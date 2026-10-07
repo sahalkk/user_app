@@ -149,21 +149,19 @@ class LocationCubit extends Cubit<LocationState> {
   /// whenever it's already known, so MapPinPickerScreen can seed it instead
   /// of firing a redundant reverse-geocode for the same point.
   Future<({LatLng position, String? formattedAddress})> bestMapStart() async {
-    bool usable(SavedAddressModel? a) =>
-        a != null && (a.position.latitude != 0 || a.position.longitude != 0);
     String? textOf(SavedAddressModel a) =>
         a.formattedAddress.isEmpty ? null : a.formattedAddress;
 
     final current = state;
-    if (current is Bound && usable(current.address)) {
+    if (current is Bound && current.address.hasPosition) {
       return (
         position: current.address.position,
         formattedAddress: textOf(current.address),
       );
     }
     final ambient = await _repository.getLastAmbientLocation();
-    if (usable(ambient)) {
-      return (position: ambient!.position, formattedAddress: textOf(ambient));
+    if (ambient != null && ambient.hasPosition) {
+      return (position: ambient.position, formattedAddress: textOf(ambient));
     }
     final gps = await tryGetCurrentPosition();
     return (position: gps ?? _fallbackMapStart, formattedAddress: null);
@@ -239,8 +237,7 @@ class LocationCubit extends Cubit<LocationState> {
   /// [MapPinPickerScreen]'s own search box — always lands on [Confirming]
   /// first so the result can be reviewed/adjusted on the map before it's
   /// bound: the ambient sheet auto-navigates straight to a trimmed-chrome
-  /// map confirm step, while the precise flow shows the existing text
-  /// preview with an explicit "adjust pin" action.
+  /// map confirm step, while MapPinPickerScreen just re-centres its pin.
   void selectSearchResult(String label, LatLng position,
       {bool autoConfirm = false}) {
     if (autoConfirm) {
@@ -447,11 +444,12 @@ class LocationCubit extends Cubit<LocationState> {
 
   void pickDifferentLocation() => emit(const ManualEntry());
 
-  /// Restores a previously-bound address after an exploratory location
-  /// check (e.g. searching a candidate from the ambient picker sheet) was
-  /// abandoned without landing on a new [Bound] — guarded so it never
-  /// clobbers a legitimately fresh bind that did land in the meantime.
-  void restorePreviousBound(Bound previous) {
+  /// Restores the state from before an exploratory location check (e.g.
+  /// searching a candidate in the picker sheet, or adjusting a pin in the
+  /// add/edit-address wizard) that was abandoned without landing on a new
+  /// [Bound] — guarded so it never clobbers a legitimately fresh bind that
+  /// did land in the meantime.
+  void restorePreviousState(LocationState previous) {
     if (state is! Bound) emit(previous);
   }
 
@@ -460,9 +458,13 @@ class LocationCubit extends Cubit<LocationState> {
   Future<List<SavedAddressModel>> getSavedAddresses() =>
       _repository.getSavedAddresses();
 
-  String? get boundAddressId {
+  /// Whether [address] is the one currently bound. Matched via
+  /// [SavedAddressModel.isSameAddressAs], since a just-saved bound address
+  /// still carries its local id while lists fetched from the backend use
+  /// the backend id.
+  bool isBound(SavedAddressModel address) {
     final s = state;
-    return s is Bound ? s.address.id : null;
+    return s is Bound && s.address.isSameAddressAs(address);
   }
 
   /// Updates a saved address's details WITHOUT touching which address is
@@ -476,9 +478,9 @@ class LocationCubit extends Cubit<LocationState> {
   /// back to the next most-recently-used saved address (re-running
   /// serviceability for it), or drops to [ManualEntry] if none remain —
   /// never leaves the app holding a reference to a deleted address.
-  Future<void> deleteAddress(String id) async {
-    final wasBound = boundAddressId == id;
-    await _repository.deleteAddress(id);
+  Future<void> deleteAddress(SavedAddressModel address) async {
+    final wasBound = isBound(address);
+    await _repository.deleteAddress(address.id);
     if (!wasBound) return;
 
     final remaining = await _repository.getSavedAddresses();
