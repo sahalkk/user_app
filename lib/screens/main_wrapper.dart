@@ -25,14 +25,20 @@ import 'location/views/location_gate_screen.dart';
 import 'location/views/not_serviceable_screen.dart';
 
 class MainWrapper extends StatefulWidget {
-  const MainWrapper({super.key});
+  /// Tab to open on. Checkout passes 3 so a freshly placed order is the
+  /// first thing the user sees. No auth check needed for that: only a
+  /// logged-in user can have placed one, and OrdersScreen (built eagerly
+  /// by the IndexedStack) loads orders in its own initState.
+  final int initialIndex;
+
+  const MainWrapper({super.key, this.initialIndex = 0});
 
   @override
   State<MainWrapper> createState() => _MainWrapperState();
 }
 
 class _MainWrapperState extends State<MainWrapper> {
-  int _currentIndex = 0;
+  late int _currentIndex = widget.initialIndex;
 
   void _onTabTapped(int index) async {
     // Protect Orders (Index 3) - User must log in to see past orders!

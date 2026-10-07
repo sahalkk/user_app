@@ -7,6 +7,9 @@ class OrderModel {
   final double totalAmount;
   final DateTime date;
   final String status; // "PENDING", "PROCESSING", "DELIVERED", etc.
+  // Last time the backend touched the order. There's no dedicated
+  // deliveredAt, so for a DELIVERED order this is when it was delivered.
+  final DateTime? updatedAt;
 
   OrderModel({
     required this.id,
@@ -14,6 +17,7 @@ class OrderModel {
     required this.totalAmount,
     required this.date,
     this.status = "PENDING",
+    this.updatedAt,
   });
 
   /// The backend's `Order` response schema is untyped in its Swagger spec
@@ -76,6 +80,9 @@ class OrderModel {
       status: json['status']?.toString() ??
           json['orderStatus']?.toString() ??
           'PENDING',
+      updatedAt: DateTime.tryParse(json['updatedAt']?.toString() ??
+          json['updated_at']?.toString() ??
+          ''),
     );
   }
 }

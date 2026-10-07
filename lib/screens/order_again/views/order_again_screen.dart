@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 
 import '../../../blocs/auth_bloc/auth_bloc.dart';
 import '../../../blocs/auth_bloc/auth_state.dart';
@@ -11,6 +10,8 @@ import '../../../blocs/order_bloc/order_state.dart';
 import '../../../shared/models/cart_item_model.dart';
 import '../../../shared/models/order_model.dart';
 import '../../../shared/models/product_model.dart';
+import '../../../shared/utils/order_items_resolver.dart';
+import '../../../shared/widgets/order_status_chip.dart';
 import '../../../shared/widgets/floating_cart_banner.dart';
 import '../../../shared/widgets/global_header.dart';
 import '../../../shared/widgets/product_grid.dart';
@@ -25,18 +26,6 @@ const _amber = Color(0xFFF59E0B);
 
 const _maxOrdersShown = 10;
 const _maxUsualsShown = 9;
-
-/// An order line matched against the live catalog. Order history only
-/// carries productId/quantity/price, so name, image and current price come
-/// from [HomeLoaded.allProducts]; anything no longer in the catalog is
-/// shown but can't be re-added.
-class _ResolvedItem {
-  final ProductModel product;
-  final int quantity;
-  final bool available;
-
-  const _ResolvedItem(this.product, this.quantity, this.available);
-}
 
 class OrderAgainScreen extends StatefulWidget {
   const OrderAgainScreen({super.key});
@@ -164,7 +153,7 @@ class _OrderAgainScreenState extends State<OrderAgainScreen> {
                     final order = orders[index];
                     return _PastOrderCard(
                       order: order,
-                      items: _resolve(order, catalog),
+                      items: resolveOrderItems(order, catalog),
                     );
                   },
                 ),
@@ -240,39 +229,9 @@ class _OrderAgainScreenState extends State<OrderAgainScreen> {
   }
 }
 
-List<_ResolvedItem> _resolve(
-    OrderModel order, Map<String, ProductModel> catalog) {
-  return order.items.map((item) {
-    final live = catalog[item.product.id];
-    return _ResolvedItem(live ?? item.product, item.quantity, live != null);
-  }).toList();
-}
-
-double _orderTotal(OrderModel order) {
-  if (order.totalAmount > 0) return order.totalAmount;
-  return order.items.fold(0.0, (sum, item) => sum + item.totalPrice);
-}
-
-String _formatPrice(double value) => value == value.roundToDouble()
-    ? "₹${value.toStringAsFixed(0)}"
-    : "₹${value.toStringAsFixed(2)}";
-
-String _dateLabel(DateTime date) {
-  final local = date.toLocal();
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final day = DateTime(local.year, local.month, local.day);
-  final time = DateFormat('h:mm a').format(local);
-  final diff = today.difference(day).inDays;
-  if (diff == 0) return "Today, $time";
-  if (diff == 1) return "Yesterday, $time";
-  if (local.year == now.year) return DateFormat('d MMM, h:mm a').format(local);
-  return DateFormat('d MMM yyyy').format(local);
-}
-
 /// Adds every still-available item of a past order to the cart at its
 /// original quantity, and tells the user what happened.
-void _reorder(BuildContext context, List<_ResolvedItem> items) {
+void _reorder(BuildContext context, List<ResolvedOrderItem> items) {
   final available = items.where((i) => i.available).toList();
   final skipped = items.length - available.length;
   final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
@@ -361,7 +320,7 @@ class _SectionHeader extends StatelessWidget {
 // ─────────────────────────────────────────────
 class _PastOrderCard extends StatelessWidget {
   final OrderModel order;
-  final List<_ResolvedItem> items;
+  final List<ResolvedOrderItem> items;
 
   const _PastOrderCard({required this.order, required this.items});
 
@@ -396,7 +355,7 @@ class _PastOrderCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(_dateLabel(order.date),
+                  child: Text(orderDateLabel(order.date),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -406,7 +365,7 @@ class _PastOrderCard extends StatelessWidget {
                           color: Colors.black87)),
                 ),
                 const SizedBox(width: 8),
-                _StatusChip(status: order.status),
+                OrderStatusChip(order: order),
               ],
             ),
             const SizedBox(height: 12),
@@ -425,7 +384,7 @@ class _PastOrderCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_formatPrice(_orderTotal(order)),
+                      Text(formatPrice(orderTotal(order)),
                           style: const TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 16,
@@ -488,42 +447,10 @@ class _ReorderButton extends StatelessWidget {
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  final String status;
-
-  const _StatusChip({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color) = switch (status.toUpperCase()) {
-      'DELIVERED' => ("Delivered", _green),
-      'CANCELLED' => ("Cancelled", _red),
-      'RETURNED' => ("Returned", _red),
-      'SHIPPED' => ("On the way", _amber),
-      'PAID' => ("Confirmed", _amber),
-      'PROCESSING' => ("Processing", _amber),
-      _ => ("Placed", _amber),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(label,
-          style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: color)),
-    );
-  }
-}
-
 /// Up to four product thumbnails in a row; when there are more items the
 /// last slot becomes a "+N" tile.
 class _ThumbStrip extends StatelessWidget {
-  final List<_ResolvedItem> items;
+  final List<ResolvedOrderItem> items;
 
   const _ThumbStrip({required this.items});
 
@@ -604,7 +531,7 @@ class _ProductThumb extends StatelessWidget {
 // ─────────────────────────────────────────────
 class _OrderDetailsSheet extends StatelessWidget {
   final OrderModel order;
-  final List<_ResolvedItem> items;
+  final List<ResolvedOrderItem> items;
   final VoidCallback onReorder;
 
   const _OrderDetailsSheet({
@@ -616,7 +543,7 @@ class _OrderDetailsSheet extends StatelessWidget {
   // [context] is the screen's, not the sheet's — the reorder runs after the
   // sheet has closed, so it must use a context that's still mounted.
   static void show(
-      BuildContext context, OrderModel order, List<_ResolvedItem> items) {
+      BuildContext context, OrderModel order, List<ResolvedOrderItem> items) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -668,7 +595,7 @@ class _OrderDetailsSheet extends StatelessWidget {
                               fontSize: 17,
                               fontWeight: FontWeight.w800,
                               color: Colors.black87)),
-                      Text(_dateLabel(order.date),
+                      Text(orderDateLabel(order.date),
                           style: const TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 12,
@@ -676,7 +603,7 @@ class _OrderDetailsSheet extends StatelessWidget {
                     ],
                   ),
                 ),
-                _StatusChip(status: order.status),
+                OrderStatusChip(order: order),
               ],
             ),
           ),
@@ -711,7 +638,7 @@ class _OrderDetailsSheet extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                               item.available
-                                  ? "Qty ${item.quantity} · ${_formatPrice(item.product.priceValue)} each"
+                                  ? "Qty ${item.quantity} · ${formatPrice(item.product.priceValue)} each"
                                   : "No longer available",
                               style: TextStyle(
                                   fontFamily: 'Poppins',
@@ -722,7 +649,7 @@ class _OrderDetailsSheet extends StatelessWidget {
                     ),
                     if (item.available)
                       Text(
-                          _formatPrice(
+                          formatPrice(
                               item.product.priceValue * item.quantity),
                           style: const TextStyle(
                               fontFamily: 'Poppins',

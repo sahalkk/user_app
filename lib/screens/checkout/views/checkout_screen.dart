@@ -84,7 +84,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Future.delayed(const Duration(seconds: 2), () {
                 if (!context.mounted) return;
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => const MainWrapper()),
+                  MaterialPageRoute(
+                      builder: (context) => const MainWrapper(initialIndex: 3)),
                 );
               });
             } else if (orderState is OrderPlaceError) {
