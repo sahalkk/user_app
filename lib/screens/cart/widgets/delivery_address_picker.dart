@@ -10,8 +10,7 @@ import '../../location/views/map_pin_picker_screen.dart';
 /// the delivery address); this widget only reports, via [onResolved], when
 /// a saved address with recipient details has been bound by the user.
 ///
-/// Hosted inline by the cart's expandable footer and in a bottom sheet by
-/// Order Summary's "Change" — one list implementation for both.
+/// Hosted inline by the cart's expandable footer.
 class DeliveryAddressPicker extends StatefulWidget {
   final VoidCallback onResolved;
 
@@ -47,51 +46,6 @@ class DeliveryAddressPicker extends StatefulWidget {
     final saved = await MapPinPickerScreen.openForEdit(context, address);
     final state = cubit.state;
     return saved && state is Bound && hasContact(state.address);
-  }
-
-  /// Order Summary's "Change": the same picker in a bottom sheet that
-  /// closes as soon as an address is resolved.
-  static Future<void> showSheet(BuildContext context) {
-    return showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0E0E0),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text("Select delivery address",
-                  style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black87)),
-              const SizedBox(height: 12),
-              DeliveryAddressPicker(
-                maxHeight: MediaQuery.of(sheetContext).size.height * 0.6,
-                onResolved: () => Navigator.of(sheetContext).maybePop(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   @override

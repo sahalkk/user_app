@@ -1,18 +1,27 @@
 import 'package:beeyo_customer/blocs/auth_bloc/auth_bloc.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_state.dart';
 import 'package:beeyo_customer/screens/auth/views/login_screen.dart';
-import 'package:beeyo_customer/screens/checkout/views/checkout_screen.dart';
-import 'package:beeyo_customer/screens/checkout/widgets/delivery_address_picker.dart';
 import 'package:beeyo_customer/screens/location/cubit/location_cubit.dart';
 import 'package:beeyo_customer/screens/location/views/map_pin_picker_screen.dart';
+import 'package:beeyo_customer/screens/main_wrapper.dart';
 import 'package:beeyo_customer/screens/product_details/views/product_details_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../blocs/cart_bloc/cart_bloc.dart';
+import '../../../blocs/order_bloc/order_bloc.dart';
+import '../../../blocs/order_bloc/order_event.dart';
+import '../../../blocs/order_bloc/order_state.dart';
 import '../../../shared/models/cart_item_model.dart';
+import '../../../shared/models/checkout_address_model.dart';
+import '../widgets/checkout_footer_parts.dart';
+import '../widgets/delivery_address_picker.dart';
 
 const _kUndoDuration = Duration(seconds: 4);
 const _kPanelDuration = Duration(milliseconds: 250);
+
+/// What's expanded above the footer's rows — at most one at a time, so the
+/// footer never grows by more than a single panel.
+enum _FooterPanel { address, bill, payment }
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -26,27 +35,45 @@ class _CartScreenState extends State<CartScreen> {
   // snackbar is showing. The actual CartBloc removal only happens once the
   // snackbar closes without the user tapping UNDO.
   final Set<String> _pendingDeleteIds = {};
-  bool _isProceeding = false;
-  // The footer's inline address picker. [_needsAddress] is set when
-  // Proceed opened it because no saved address is bound yet.
-  bool _addressExpanded = false;
+  // Covers the address checks before PlaceOrder is dispatched; OrderBloc's
+  // OrderPlacing covers the request itself.
+  bool _isPreparing = false;
+  _FooterPanel? _openPanel;
+  // Set when Place order opened the address panel because no saved address
+  // is bound yet.
   bool _needsAddress = false;
+  // Only COD can be picked until payments are integrated.
+  PaymentOption _payment = PaymentOption.cod;
+  // Dark store serving the last bound address seen here — a switch that
+  // lands on a different store gets a heads-up, since what's in stock can
+  // differ between stores.
+  String? _lastDarkStoreId;
 
-  void _setAddressExpanded(bool expanded, {bool needsAddress = false}) {
+  @override
+  void initState() {
+    super.initState();
+    final state = context.read<LocationCubit>().state;
+    if (state is Bound) _lastDarkStoreId = state.darkStoreId;
+  }
+
+  void _setPanel(_FooterPanel? panel, {bool needsAddress = false}) {
     setState(() {
-      _addressExpanded = expanded;
-      _needsAddress = expanded && needsAddress;
+      _openPanel = panel;
+      _needsAddress = panel == _FooterPanel.address && needsAddress;
     });
   }
 
-  Future<void> _toggleAddressPicker() async {
-    if (_addressExpanded) {
-      _setAddressExpanded(false);
+  Future<void> _togglePanel(_FooterPanel panel) async {
+    if (_openPanel == panel) {
+      _setPanel(null);
       return;
     }
     // Guests have no saved addresses to pick from — log in first.
-    if (!await _ensureLoggedIn() || !mounted) return;
-    _setAddressExpanded(true);
+    if (panel == _FooterPanel.address &&
+        (!await _ensureLoggedIn() || !mounted)) {
+      return;
+    }
+    _setPanel(panel);
   }
 
   /// True once the user is logged in, sending guests through LoginScreen
@@ -77,16 +104,14 @@ class _CartScreenState extends State<CartScreen> {
     return mounted && authBloc.state is AuthAuthenticated;
   }
 
-  /// The delivery address is LocationCubit's bound address, picked in the
-  /// footer's inline picker — so with a saved address (with a recipient)
-  /// already bound, this goes straight to Order Summary. A first-time user
-  /// (nothing saved yet) goes to the map, starting on the area they already
-  /// picked; anyone else without a saved address bound gets the picker
-  /// opened instead.
-  Future<void> _proceedToCheckout() async {
+  /// Places the order against LocationCubit's bound address, picked in the
+  /// footer's inline picker. A first-time user (nothing saved yet) goes to
+  /// the map first, starting on the area they already picked; anyone else
+  /// without a saved address bound gets the picker opened instead.
+  Future<void> _placeOrder() async {
     if (!await _ensureLoggedIn() || !mounted) return;
     final cubit = context.read<LocationCubit>();
-    setState(() => _isProceeding = true);
+    setState(() => _isPreparing = true);
     var ready = false;
     try {
       final saved = await cubit.getSavedAddresses();
@@ -95,21 +120,87 @@ class _CartScreenState extends State<CartScreen> {
       if (saved.isEmpty) {
         ready = await MapPinPickerScreen.openForNewAddress(context);
       } else if (bound == null) {
-        _setAddressExpanded(true, needsAddress: true);
+        _setPanel(_FooterPanel.address, needsAddress: true);
       } else if (DeliveryAddressPicker.hasContact(bound)) {
         ready = true;
       } else {
         ready = await DeliveryAddressPicker.completeContact(context, bound);
       }
     } finally {
-      if (mounted) setState(() => _isProceeding = false);
+      if (mounted) setState(() => _isPreparing = false);
     }
     if (!ready || !mounted) return;
-    _setAddressExpanded(false);
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const CheckoutScreen()),
+
+    // Re-read: the add/complete steps above may have bound a new address.
+    final location = cubit.state;
+    final cart = context.read<CartBloc>().state;
+    if (location is! Bound || cart is! CartLoaded) return;
+    _setPanel(null);
+    final address = location.address;
+    context.read<OrderBloc>().add(PlaceOrder(
+          items: List.from(cart.items),
+          totalAmount: cart.totalAmount + kDeliveryFee,
+          address: CheckoutAddressModel(
+            recipientName: address.recipientName,
+            recipientPhone: address.recipientPhone,
+            address: address,
+          ),
+        ));
+  }
+
+  void _onOrderStateChanged(BuildContext context, OrderState state) {
+    if (state is OrderPlaceError) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(state.message)));
+      return;
+    }
+    if (state is! OrderPlaced) return;
+
+    context.read<CartBloc>().add(ClearCart());
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 80),
+            SizedBox(height: 16),
+            Text("Order Placed!",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            Text("Your order has been received successfully.",
+                textAlign: TextAlign.center),
+          ],
+        ),
+      ),
     );
+
+    // A fresh stack on the Orders tab — back from there shouldn't land on
+    // the now-empty cart.
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!context.mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+            builder: (context) => const MainWrapper(initialIndex: 3)),
+        (_) => false,
+      );
+    });
+  }
+
+  void _onLocationChanged(BuildContext context, LocationState state) {
+    if (state is! Bound) return;
+    final previous = _lastDarkStoreId;
+    _lastDarkStoreId = state.darkStoreId;
+    if (previous != null &&
+        state.darkStoreId != null &&
+        state.darkStoreId != previous) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+            "This address is served by a different store — item availability may change."),
+      ));
+    }
   }
 
   void _handleSwipeDelete(CartItemModel cartItem) {
@@ -153,13 +244,20 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      // Back closes an open address picker before it leaves the cart.
-      canPop: !_addressExpanded,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _setAddressExpanded(false);
-      },
-      child: _buildScaffold(context),
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<OrderBloc, OrderState>(listener: _onOrderStateChanged),
+        BlocListener<LocationCubit, LocationState>(
+            listener: _onLocationChanged),
+      ],
+      child: PopScope(
+        // Back closes an open footer panel before it leaves the cart.
+        canPop: _openPanel == null,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _setPanel(null);
+        },
+        child: _buildScaffold(context),
+      ),
     );
   }
 
@@ -229,11 +327,11 @@ class _CartScreenState extends State<CartScreen> {
                     ),
                     Positioned.fill(
                       child: IgnorePointer(
-                        ignoring: !_addressExpanded,
+                        ignoring: _openPanel == null,
                         child: GestureDetector(
-                          onTap: () => _setAddressExpanded(false),
+                          onTap: () => _setPanel(null),
                           child: AnimatedOpacity(
-                            opacity: _addressExpanded ? 1 : 0,
+                            opacity: _openPanel == null ? 0 : 1,
                             duration: _kPanelDuration,
                             child: const ColoredBox(color: Color(0x33000000)),
                           ),
@@ -244,9 +342,9 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ),
 
-              // 2. Checkout Section — grows upward to pick the address
+              // 2. Checkout Section — each row's panel grows upward from it
               Container(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFFFFF),
                   border: const Border(
@@ -256,81 +354,109 @@ class _CartScreenState extends State<CartScreen> {
                 ),
                 child: SafeArea(
                   top: false,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _DeliverToStrip(
-                        expanded: _addressExpanded,
-                        needsAddress: _needsAddress,
-                        onTap: _isProceeding ? null : _toggleAddressPicker,
-                      ),
-                      AnimatedSize(
-                        duration: _kPanelDuration,
-                        curve: Curves.easeOutCubic,
-                        alignment: Alignment.bottomCenter,
-                        child: _addressExpanded
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: DeliveryAddressPicker(
-                                  maxHeight:
-                                      MediaQuery.sizeOf(context).height * 0.45,
-                                  onResolved: () => _setAddressExpanded(false),
-                                ),
-                              )
-                            : const SizedBox(width: double.infinity),
-                      ),
-                      const Divider(height: 24, color: Color(0xFFEEEEEE)),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: BlocBuilder<OrderBloc, OrderState>(
+                    builder: (context, orderState) {
+                      final busy = _isPreparing || orderState is OrderPlacing;
+                      final panelMaxHeight =
+                          MediaQuery.sizeOf(context).height * 0.45;
+                      final toPay = state.totalAmount + kDeliveryFee;
+
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text("Total:",
-                              style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 16,
-                                  color: Color(0xFF6B6B6B))),
-                          Text(
-                            "₹${state.totalAmount.toStringAsFixed(2)}",
-                            style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 24,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.black87,
+                          DeliverToStrip(
+                            expanded: _openPanel == _FooterPanel.address,
+                            needsAddress: _needsAddress,
+                            onTap: busy
+                                ? null
+                                : () => _togglePanel(_FooterPanel.address),
+                          ),
+                          _panelSlot(
+                            _FooterPanel.address,
+                            () => DeliveryAddressPicker(
+                              maxHeight: panelMaxHeight,
+                              onResolved: () => _setPanel(null),
                             ),
+                          ),
+                          BillSummaryRow(
+                            toPay: toPay,
+                            expanded: _openPanel == _FooterPanel.bill,
+                            onTap: () => _togglePanel(_FooterPanel.bill),
+                          ),
+                          _panelSlot(
+                            _FooterPanel.bill,
+                            () => BillBreakdown(itemTotal: state.totalAmount),
+                          ),
+                          _panelSlot(
+                            _FooterPanel.payment,
+                            () => PaymentOptionsPanel(
+                              selected: _payment,
+                              maxHeight: panelMaxHeight,
+                              onSelected: (option) {
+                                _payment = option;
+                                _setPanel(null);
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: PaymentChip(
+                                  option: _payment,
+                                  expanded: _openPanel == _FooterPanel.payment,
+                                  onTap: busy
+                                      ? null
+                                      : () =>
+                                          _togglePanel(_FooterPanel.payment),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                flex: 3,
+                                child: SizedBox(
+                                  height: 56,
+                                  child: ElevatedButton(
+                                    onPressed: busy ? null : _placeOrder,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          Theme.of(context).primaryColor,
+                                      disabledBackgroundColor:
+                                          Theme.of(context).primaryColor,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12),
+                                    ),
+                                    child: busy
+                                        ? const SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2.5,
+                                            ),
+                                          )
+                                        : FittedBox(
+                                            child: Text(
+                                              "Place order · ${formatRupees(toPay)}",
+                                              style: const TextStyle(
+                                                  fontSize: 16,
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _isProceeding ? null : _proceedToCheckout,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).primaryColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: _isProceeding
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2.5,
-                                  ),
-                                )
-                              : const Text(
-                                  "Proceed to checkout",
-                                  style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                        ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               )
@@ -340,96 +466,21 @@ class _CartScreenState extends State<CartScreen> {
       ),
     );
   }
-}
 
-// ─────────────────────────────────────────────
-//  "Deliver to …" strip above the total — tap to pick the address
-// ─────────────────────────────────────────────
-class _DeliverToStrip extends StatelessWidget {
-  final bool expanded;
-  final bool needsAddress;
-  final VoidCallback? onTap;
-
-  const _DeliverToStrip({
-    required this.expanded,
-    required this.needsAddress,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<LocationCubit, LocationState>(
-      builder: (context, state) {
-        final String title;
-        String? subtitle;
-        if (expanded) {
-          title = "Choose delivery address";
-          if (needsAddress) subtitle = "Pick where this order should go";
-        } else if (state is Bound) {
-          // A saved address reads best by its label ("Home"); the ambient
-          // pick from app start has no meaningful label, just an area.
-          final a = state.address;
-          final isSaved = a.recipientName.isNotEmpty;
-          title = isSaved ? "Deliver to ${a.displayLabel}" : "Delivering to";
-          subtitle = isSaved ? a.primaryAddressText : a.formattedAddress;
-        } else if (state is CheckingServiceability) {
-          title = "Checking delivery availability…";
-        } else {
-          title = "Choose delivery address";
-        }
-
-        return InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: const BoxDecoration(
-                      color: Color(0xFFE8F5E9), shape: BoxShape.circle),
-                  child: const Icon(Icons.location_on_rounded,
-                      size: 18, color: Color(0xFF3DAA5C)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black87)),
-                      if (subtitle != null)
-                        Text(subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 12,
-                                color: needsAddress && expanded
-                                    ? const Color(0xFFF57C00)
-                                    : const Color(0xFF6B6B6B))),
-                    ],
-                  ),
-                ),
-                AnimatedRotation(
-                  turns: expanded ? 0.5 : 0,
-                  duration: _kPanelDuration,
-                  child: const Icon(Icons.keyboard_arrow_up_rounded,
-                      color: Color(0xFF6B6B6B)),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+  /// [panel]'s content while it's the open one; collapses smoothly to
+  /// nothing otherwise. Built lazily so closed panels (e.g. the address
+  /// list, which fetches on init) don't exist at all.
+  Widget _panelSlot(_FooterPanel panel, Widget Function() build) {
+    return AnimatedSize(
+      duration: _kPanelDuration,
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.bottomCenter,
+      child: _openPanel == panel
+          ? Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 8),
+              child: build(),
+            )
+          : const SizedBox(width: double.infinity),
     );
   }
 }
