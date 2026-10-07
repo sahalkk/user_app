@@ -10,6 +10,17 @@ abstract class AuthEvent extends Equatable {
 // Fired when the app first opens to check if user is already logged in
 class AppStarted extends AuthEvent {}
 
+// Fired when user taps "Continue" on the phone step, or "Send OTP (SMS)"
+// to resend a code.
+class OtpRequested extends AuthEvent {
+  final String phone;
+
+  const OtpRequested({required this.phone});
+
+  @override
+  List<Object> get props => [phone];
+}
+
 // Fired when user clicks "Verify & Login"
 class LoginRequested extends AuthEvent {
   final String phone;

@@ -44,6 +44,33 @@ class AuthUnauthenticated extends AuthState {}
 // app_view.dart's BlocListener can key off of to route back to LoginScreen.
 class SessionExpired extends AuthUnauthenticated {}
 
+// --- OTP request lifecycle ---
+// The user is still logged out while requesting a code, so these extend
+// AuthUnauthenticated (same reasoning as SessionExpired) and every
+// guest-view check keeps working while the login screen is open.
+
+// Waiting on POST /auth/send-otp.
+class OtpSending extends AuthUnauthenticated {}
+
+// The code is on its way — the resend countdown should start from
+// [retryAfterSeconds].
+class OtpSent extends AuthUnauthenticated {
+  final int retryAfterSeconds;
+  OtpSent(this.retryAfterSeconds);
+  @override
+  List<Object?> get props => [retryAfterSeconds];
+}
+
+// Sending the code failed. [retryAfterSeconds] is set when the backend
+// rate-limited the request (429) and says when to try again.
+class OtpFailure extends AuthUnauthenticated {
+  final String message;
+  final int? retryAfterSeconds;
+  OtpFailure(this.message, {this.retryAfterSeconds});
+  @override
+  List<Object?> get props => [message, retryAfterSeconds];
+}
+
 // Optional: specific error state
 class AuthFailure extends AuthState {
   final String message;

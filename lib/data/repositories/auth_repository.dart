@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:beeyo_customer/shared/constants/api_constants.dart';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,9 +24,24 @@ class SessionExpiredException implements Exception {
   String toString() => 'Session expired. Please log in again.';
 }
 
+/// A user-facing auth failure — [message] is safe to show on screen as-is
+/// (it's either the backend's own `message` or one of our friendly
+/// fallbacks, never a raw exception dump).
+class AuthApiException implements Exception {
+  final String message;
+  // Set on 429s — how long until the backend will accept another OTP request.
+  final int? retryAfterSeconds;
+
+  const AuthApiException(this.message, {this.retryAfterSeconds});
+
+  @override
+  String toString() => message;
+}
+
 class AuthRepository {
   // Added 'https://' so the app knows how to connect to it securely
   final String loginUrl = '${ApiConstants.baseUrl}/api/v1/auth/signin';
+  final String sendOtpUrl = '${ApiConstants.baseUrl}/api/v1/auth/send-otp';
   final String profileUrl = '${ApiConstants.baseUrl}/api/v1/users/profile';
 
   static const String _tokenKey = 'auth_token';
@@ -35,6 +49,8 @@ class AuthRepository {
   static const String _userIdKey = 'user_id';
   static const String _userNameKey = 'user_name';
   static const String _fallbackToken = 'success_fallback_token';
+  static const Duration _requestTimeout = Duration(seconds: 10);
+  static const int _defaultResendSeconds = 30;
 
   // Broadcasts once whenever any repository hits a 401 on an authenticated
   // endpoint. AuthBloc subscribes to this to flip the whole app back to
@@ -91,81 +107,79 @@ class AuthRepository {
     return prefs.getString(_userNameKey);
   }
 
+  /// Asks the backend to SMS a login OTP to [phone] (10 digits, no +91).
+  /// Returns how many seconds to wait before the user may request another.
+  Future<int> sendOtp(String phone) async {
+    final response = await _postAuth(sendOtpUrl, {'mobile': phone});
+    final body = _decodeBody(response);
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = body?['data'];
+      final retryAfter = data is Map ? data['retryAfterSeconds'] : null;
+      return retryAfter is num ? retryAfter.toInt() : _defaultResendSeconds;
+    }
+
+    throw _errorFrom(response, body,
+        fallback: 'Could not send OTP right now. Please try again shortly.');
+  }
+
   // --- INTEGRATED API LOGIN FUNCTION ---
   Future<LoginResult> login(String phone, String otp) async {
-    try {
-      final response = await http.post(
-        Uri.parse(loginUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode({
-          'mobile': phone,
-          'otp': otp,
-        }),
-      );
+    final response = await _postAuth(loginUrl, {'mobile': phone, 'otp': otp});
 
-      debugPrint("=== LOGIN API RESPONSE ===");
-      debugPrint("Status Code: ${response.statusCode}");
-      debugPrint("Body: ${response.body}");
-      debugPrint("==========================");
-
-      // Check if the API returned 201 Created (or 200 OK)
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        // 1. Parse the JSON response body. Real shape (confirmed live):
-        // { success, code, message, data: { accessToken, user: { id, isNew, ... } }, errors, metadata }
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
-        final data = responseData['data'] as Map<String, dynamic>?;
-
-        // 2. Extract the token — prefer the nested `data.accessToken` shape,
-        // fall back to a few likely alternates in case the backend shape
-        // ever changes, but never silently store a fake token.
-        final String? realToken = data?['accessToken'] as String? ??
-            data?['token'] as String? ??
-            responseData['accessToken'] as String? ??
-            responseData['token'] as String?;
-
-        if (realToken == null) {
-          throw Exception('Login succeeded but no token was returned');
-        }
-
-        // 3. Save the real token locally
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_tokenKey, realToken);
-        await prefs.setString(_userKey, phone);
-
-        // 4. Store the backend user id — required for order
-        // placement/history, which are keyed by userId, not the token.
-        final userJson = data?['user'] as Map<String, dynamic>?;
-        final userId = userJson?['id'];
-        if (userId != null) {
-          await prefs.setString(_userIdKey, userId.toString());
-        } else {
-          await _fetchAndStoreProfile(realToken);
-        }
-
-        // 5. First-time signers have no display name yet — the caller
-        // (AuthBloc/LoginScreen) uses this to route them through a
-        // "what should we call you?" prompt. Returning users might already
-        // have a name saved on the backend from a previous session/device,
-        // so fetch it once and cache locally if we don't have it yet.
-        final isNewUser = userJson?['isNew'] as bool? ?? false;
-        String? name = await getUserName();
-        if (!isNewUser && name == null) {
-          name = await _fetchAndStoreProfile(realToken);
-        }
-
-        return LoginResult(isNewUser: isNewUser, name: name);
-      } else {
-        // If the API returns an error (like 400 Wrong OTP), we throw an error
-        // so the AuthBloc can catch it and show a message on the screen.
-        throw Exception('Invalid OTP or Phone Number. Please try again.');
-      }
-    } catch (e) {
-      // Catches network errors (no internet) or the exception we threw above
-      throw Exception('Login failed: $e');
+    // Check if the API returned 201 Created (or 200 OK)
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      // 401 carries the exact reason (wrong code + attempts left, expired,
+      // locked) in `message` — surface that instead of a generic error.
+      throw _errorFrom(response, _decodeBody(response),
+          fallback: 'Invalid OTP or Phone Number. Please try again.');
     }
+
+    // 1. Parse the JSON response body. Real shape (confirmed live):
+    // { success, code, message, data: { accessToken, user: { id, isNew, ... } }, errors, metadata }
+    final responseData = _decodeBody(response);
+    final data = responseData?['data'] as Map<String, dynamic>?;
+
+    // 2. Extract the token — prefer the nested `data.accessToken` shape,
+    // fall back to a few likely alternates in case the backend shape
+    // ever changes, but never silently store a fake token.
+    final String? realToken = data?['accessToken'] as String? ??
+        data?['token'] as String? ??
+        responseData?['accessToken'] as String? ??
+        responseData?['token'] as String?;
+
+    if (realToken == null) {
+      throw const AuthApiException(
+          'Login succeeded but no token was returned. Please try again.');
+    }
+
+    // 3. Save the real token locally
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_tokenKey, realToken);
+    await prefs.setString(_userKey, phone);
+
+    // 4. Store the backend user id — required for order
+    // placement/history, which are keyed by userId, not the token.
+    final userJson = data?['user'] as Map<String, dynamic>?;
+    final userId = userJson?['id'];
+    if (userId != null) {
+      await prefs.setString(_userIdKey, userId.toString());
+    } else {
+      await _fetchAndStoreProfile(realToken);
+    }
+
+    // 5. First-time signers have no display name yet — the caller
+    // (AuthBloc/LoginScreen) uses this to route them through a
+    // "what should we call you?" prompt. Returning users might already
+    // have a name saved on the backend from a previous session/device,
+    // so fetch it once and cache locally if we don't have it yet.
+    final isNewUser = userJson?['isNew'] as bool? ?? false;
+    String? name = await getUserName();
+    if (!isNewUser && name == null) {
+      name = await _fetchAndStoreProfile(realToken);
+    }
+
+    return LoginResult(isNewUser: isNewUser, name: name);
   }
 
   /// Pushes a new display name to the backend user record and caches it
@@ -247,6 +261,75 @@ class AuthRepository {
     } catch (_) {
       return null;
     }
+  }
+
+  /// POSTs a JSON body to an unauthenticated auth endpoint, turning
+  /// timeouts and connectivity failures into user-facing messages.
+  Future<http.Response> _postAuth(String url, Map<String, String> body) async {
+    try {
+      return await http
+          .post(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(_requestTimeout);
+    } on TimeoutException {
+      throw const AuthApiException(
+          'The server is taking too long to respond. Please try again.');
+    } catch (_) {
+      throw const AuthApiException(
+          "Couldn't reach the server. Check your internet connection and try again.");
+    }
+  }
+
+  Map<String, dynamic>? _decodeBody(http.Response response) {
+    try {
+      final decoded = jsonDecode(response.body);
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Builds the error for a non-2xx response from the backend's envelope:
+  /// `{ success, code, message, data, errors, metadata }`.
+  AuthApiException _errorFrom(
+    http.Response response,
+    Map<String, dynamic>? body, {
+    required String fallback,
+  }) {
+    final message = body?['message'];
+    final errors = body?['errors'];
+    final data = body?['data'];
+
+    if (response.statusCode == 429) {
+      final retryAfter = data is Map ? data['retryAfterSeconds'] : null;
+      return AuthApiException(
+        message is String && message.isNotEmpty
+            ? message
+            : 'Too many attempts. Please try again later.',
+        retryAfterSeconds: retryAfter is num ? retryAfter.toInt() : null,
+      );
+    }
+
+    // Validation failures (400) put the useful reason in `errors`, with a
+    // generic "Validation failed" as the `message`.
+    if (response.statusCode == 400 && errors is List && errors.isNotEmpty) {
+      return AuthApiException(errors.first.toString());
+    }
+
+    // 503 (SMS provider down) has a friendly message; other 5xx are just
+    // "Internal server error", so prefer our own wording there.
+    if (response.statusCode >= 500 && response.statusCode != 503) {
+      return AuthApiException(fallback);
+    }
+
+    return AuthApiException(
+        message is String && message.isNotEmpty ? message : fallback);
   }
 
   // Logout function

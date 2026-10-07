@@ -13,13 +13,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     // 1. Check Login Status on App Start
     on<AppStarted>(_onAppStarted);
 
-    // 2. Handle Login
+    // 2. Send (or resend) the login OTP
+    on<OtpRequested>(_onOtpRequested);
+
+    // 3. Handle Login
     on<LoginRequested>(_onLoginRequested);
 
-    // 3. Handle Logout
+    // 4. Handle Logout
     on<LogoutRequested>(_onLogoutRequested);
 
-    // 4. A repository hit a 401 — the session is already cleared by the
+    // 5. A repository hit a 401 — the session is already cleared by the
     // time this fires (see AuthRepository.handleUnauthorized).
     on<SessionExpiredEvent>((event, emit) => emit(SessionExpired()));
 
@@ -64,6 +67,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
+  Future<void> _onOtpRequested(
+      OtpRequested event, Emitter<AuthState> emit) async {
+    emit(OtpSending());
+    try {
+      final retryAfterSeconds = await authRepository.sendOtp(event.phone);
+      emit(OtpSent(retryAfterSeconds));
+    } on AuthApiException catch (e) {
+      emit(OtpFailure(e.message, retryAfterSeconds: e.retryAfterSeconds));
+    } catch (_) {
+      emit(OtpFailure('Could not send OTP right now. Please try again.'));
+    }
+  }
+
   Future<void> _onLoginRequested(
       LoginRequested event, Emitter<AuthState> emit) async {
     emit(AuthLoading());
@@ -81,8 +97,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       } else {
         emit(const AuthFailure("Login failed: No token received"));
       }
-    } catch (e) {
-      emit(AuthFailure(e.toString()));
+    } on AuthApiException catch (e) {
+      emit(AuthFailure(e.message));
+    } catch (_) {
+      emit(const AuthFailure('Login failed. Please try again.'));
     }
   }
 

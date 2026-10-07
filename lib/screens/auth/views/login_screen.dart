@@ -36,8 +36,8 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _startTimer() {
-    setState(() => _secondsRemaining = 29);
+  void _startTimer(int seconds) {
+    setState(() => _secondsRemaining = seconds);
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_secondsRemaining > 0) {
@@ -45,6 +45,23 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         timer.cancel();
       }
+    });
+  }
+
+  String get _phoneDigits =>
+      _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+  // Send-OTP or verify request in flight — every button on the screen is
+  // disabled until it settles.
+  bool _isBusy(AuthState state) => state is OtpSending || state is AuthLoading;
+
+  // "Change number": back to the phone step with a clean slate.
+  void _resetToPhoneStep() {
+    _timer?.cancel();
+    setState(() {
+      _isOtpSent = false;
+      _validationError = '';
+      _otpController.clear();
     });
   }
 
@@ -70,14 +87,35 @@ class _LoginScreenState extends State<LoginScreen> {
               } else {
                 Navigator.pop(context, true);
               }
+            } else if (state is OtpSent) {
+              // A new code invalidates the previous one, so start each
+              // (re)send with an empty input.
+              final wasOnPhoneStep = !_isOtpSent;
+              setState(() {
+                _validationError = '';
+                _isOtpSent = true;
+                _otpController.clear();
+              });
+              _startTimer(state.retryAfterSeconds);
+
+              // 🔥 FIX: Wait 300ms for the AnimatedSwitcher to finish, THEN open keyboard
+              Future.delayed(Duration(milliseconds: wasOnPhoneStep ? 300 : 0),
+                  () {
+                if (mounted) _otpFocusNode.requestFocus();
+              });
+            } else if (state is OtpFailure) {
+              setState(() => _validationError = state.message);
+              // Rate-limited resend — count down to when the backend will
+              // actually accept the next request.
+              if (_isOtpSent && state.retryAfterSeconds != null) {
+                _startTimer(state.retryAfterSeconds!);
+              }
             } else if (state is AuthFailure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: Colors.redAccent,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              setState(() {
+                _validationError = state.message;
+                _otpController.clear();
+              });
+              _otpFocusNode.requestFocus();
             }
           },
           child: SafeArea(
@@ -100,6 +138,9 @@ class _LoginScreenState extends State<LoginScreen> {
   // 1. PHONE INPUT STEP
   // ==========================================
   Widget _buildPhoneStep() {
+    final authState = context.watch<AuthBloc>().state;
+    final isBusy = _isBusy(authState);
+
     return Column(
       key: const ValueKey("PhoneStep"),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,36 +229,40 @@ class _LoginScreenState extends State<LoginScreen> {
           width: double.infinity,
           height: 56,
           child: ElevatedButton(
-            onPressed: () {
-              final phoneDigits =
-                  _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
-              if (phoneDigits.length < 10) {
-                setState(() => _validationError =
-                    'Mobile number must be at least 10 digits');
-                return;
-              }
-              setState(() {
-                _validationError = '';
-                _isOtpSent = true;
-              });
-              _startTimer();
+            onPressed: isBusy
+                ? null
+                : () {
+                    if (_phoneDigits.length < 10) {
+                      setState(() => _validationError =
+                          'Mobile number must be at least 10 digits');
+                      return;
+                    }
+                    setState(() => _validationError = '');
 
-              // 🔥 FIX: Wait 300ms for the AnimatedSwitcher to finish, THEN open keyboard
-              Future.delayed(const Duration(milliseconds: 300), () {
-                _otpFocusNode.requestFocus();
-              });
-            },
+                    // Moves to the OTP step only once the backend confirms
+                    // the code was sent (see OtpSent in the listener).
+                    context
+                        .read<AuthBloc>()
+                        .add(OtpRequested(phone: _phoneDigits));
+                  },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF00E676),
+              disabledBackgroundColor: const Color(0xFF00E676),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(28)),
               elevation: 0,
             ),
-            child: const Text("Continue",
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white)),
+            child: authState is OtpSending
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 3))
+                : const Text("Continue",
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
           ),
         ),
         const Spacer(),
@@ -252,18 +297,17 @@ class _LoginScreenState extends State<LoginScreen> {
   // 2. OTP VERIFICATION STEP
   // ==========================================
   Widget _buildOtpStep() {
+    final authState = context.watch<AuthBloc>().state;
+    final isBusy = _isBusy(authState);
+    final canResend = _secondsRemaining == 0 && !isBusy;
+
     return Column(
       key: const ValueKey("OtpStep"),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Top Back Button
         GestureDetector(
-          onTap: () {
-            setState(() {
-              _isOtpSent = false;
-              _otpController.clear();
-            });
-          },
+          onTap: isBusy ? null : _resetToPhoneStep,
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -367,7 +411,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
         // --- TIMER & RESEND ROW ---
         Text(
-          "00:${_secondsRemaining.toString().padLeft(2, '0')}",
+          // Cooldowns from a rate limit can run past a minute.
+          "${(_secondsRemaining ~/ 60).toString().padLeft(2, '0')}:"
+          "${(_secondsRemaining % 60).toString().padLeft(2, '0')}",
           style: const TextStyle(
               color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
         ),
@@ -380,11 +426,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 color: Colors.white70, size: 16),
             const SizedBox(width: 6),
             GestureDetector(
-              onTap: _secondsRemaining == 0 ? () => _startTimer() : null,
+              onTap: canResend
+                  ? () {
+                      setState(() => _validationError = '');
+                      context
+                          .read<AuthBloc>()
+                          .add(OtpRequested(phone: _phoneDigits));
+                    }
+                  : null,
               child: Text(
-                "Send OTP (SMS)",
+                authState is OtpSending ? "Sending..." : "Send OTP (SMS)",
                 style: TextStyle(
-                  color: _secondsRemaining == 0 ? Colors.white : Colors.white38,
+                  color: canResend ? Colors.white : Colors.white38,
                   decoration: TextDecoration.underline,
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
@@ -401,43 +454,40 @@ class _LoginScreenState extends State<LoginScreen> {
           width: double.infinity,
           height: 56,
           child: ElevatedButton(
-            onPressed: () {
-              final otpDigits =
-                  _otpController.text.replaceAll(RegExp(r'[^0-9]'), '');
-              if (otpDigits.length < 6) {
-                setState(() => _validationError = 'OTP must be 6 digits');
-                return;
-              }
-              setState(() => _validationError = '');
+            onPressed: isBusy
+                ? null
+                : () {
+                    final otpDigits =
+                        _otpController.text.replaceAll(RegExp(r'[^0-9]'), '');
+                    if (otpDigits.length < 6) {
+                      setState(() => _validationError = 'OTP must be 6 digits');
+                      return;
+                    }
+                    setState(() => _validationError = '');
 
-              // Trigger Bloc Login
-              context.read<AuthBloc>().add(
-                    LoginRequested(
-                        phone: _phoneController.text, otp: _otpController.text),
-                  );
-            },
+                    // Trigger Bloc Login
+                    context.read<AuthBloc>().add(
+                          LoginRequested(phone: _phoneDigits, otp: otpDigits),
+                        );
+                  },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF00E676),
+              disabledBackgroundColor: const Color(0xFF00E676),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(28)),
               elevation: 0,
             ),
-            child: BlocBuilder<AuthBloc, AuthState>(
-              builder: (context, state) {
-                if (state is AuthLoading) {
-                  return const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 3));
-                }
-                return const Text("Verify & Login",
+            child: authState is AuthLoading
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 3))
+                : const Text("Verify & Login",
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white));
-              },
-            ),
+                        color: Colors.white)),
           ),
         ),
       ],
