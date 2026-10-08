@@ -18,6 +18,7 @@ import 'data/repositories/product_repository.dart';
 import 'data/repositories/category_repository.dart';
 import 'screens/categories/blocs/categories_bloc.dart';
 import 'screens/splash/splash_screen.dart';
+import 'debug/debug_log.dart';
 
 // Lets the SessionExpired listener below push LoginScreen from outside any
 // screen's own BuildContext — a 401 can happen while any screen is on top.
@@ -126,7 +127,11 @@ class MyAppView extends StatelessWidget {
                 systemNavigationBarColor: Colors.white,
                 systemNavigationBarIconBrightness: Brightness.dark,
               ),
-              child: child!,
+              // TEMP: floating debug-log button — see lib/debug/debug_log.dart.
+              child: DebugLogOverlay(
+                navigatorKey: rootNavigatorKey,
+                child: child!,
+              ),
             ),
             home: const SplashScreen(),
           ),

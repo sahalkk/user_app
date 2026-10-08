@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'app.dart';
+import 'debug/debug_log.dart';
 import 'simple_bloc_observer.dart';
 
 Future<void> main() async {
@@ -19,7 +20,8 @@ Future<void> main() async {
 
   Bloc.observer = SimpleBlocObserver();
 
-  runApp(const MyApp());
+  // TEMP: on-screen request/error log — see lib/debug/debug_log.dart.
+  DebugLog.runZoned(() => runApp(const MyApp()));
 }
 
 class MyHttpOverrides extends HttpOverrides {
