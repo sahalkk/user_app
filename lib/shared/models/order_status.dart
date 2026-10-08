@@ -13,7 +13,7 @@ enum OrderStage {
 
   static OrderStage fromStatus(String status) =>
       switch (status.toUpperCase()) {
-        'SHIPPED' => OrderStage.onDelivery,
+        'SHIPPED' || 'OUT_FOR_DELIVERY' => OrderStage.onDelivery,
         'DELIVERED' => OrderStage.delivered,
         'CANCELLED' || 'RETURNED' => OrderStage.cancelled,
         // PENDING, PROCESSING, PAID and anything unknown.

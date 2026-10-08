@@ -6,6 +6,8 @@ import '../../location/cubit/location_cubit.dart';
 import '../../location/views/map_pin_picker_screen.dart';
 import '../../location/views/not_deliverable_view.dart';
 
+enum _AddressAction { deliverHere, edit, delete }
+
 class AddressBookScreen extends StatefulWidget {
   const AddressBookScreen({super.key});
 
@@ -91,6 +93,31 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     if (!mounted) return;
     setState(() => _isBusy = false);
     _reload();
+  }
+
+  /// A card tap only opens this sheet — switching the delivery address,
+  /// editing or deleting each take a deliberate second tap, so a stray tap
+  /// on the list can't silently change where orders go.
+  Future<void> _openActions(SavedAddressModel address) async {
+    final action = await showModalBottomSheet<_AddressAction>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _AddressActionsSheet(
+        address: address,
+        isActive: context.read<LocationCubit>().isBound(address),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _AddressAction.deliverHere:
+        await _selectAddress(address);
+      case _AddressAction.edit:
+        await _edit(address);
+      case _AddressAction.delete:
+        await _delete(address);
+    }
   }
 
   @override
@@ -185,9 +212,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                             child: _AddressCard(
                               address: a,
                               isActive: cubit.isBound(a),
-                              onTap: () => _selectAddress(a),
-                              onEdit: () => _edit(a),
-                              onDelete: () => _delete(a),
+                              onTap: () => _openActions(a),
                             ),
                           )),
                     ],
@@ -209,49 +234,60 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   }
 }
 
+/// Icon, background and foreground colour for an address label.
+(IconData, Color, Color) _labelStyle(AddressLabel label) {
+  switch (label) {
+    case AddressLabel.home:
+      return (
+        Icons.home_rounded,
+        const Color(0xFFE8F5E9),
+        const Color(0xFF3DAA5C)
+      );
+    case AddressLabel.work:
+      return (
+        Icons.work_rounded,
+        const Color(0xFFE3F2FD),
+        const Color(0xFF1E88E5)
+      );
+    case AddressLabel.other:
+      return (
+        Icons.place_rounded,
+        const Color(0xFFF0F0F0),
+        const Color(0xFF6B6B6B)
+      );
+  }
+}
+
+class _LabelAvatar extends StatelessWidget {
+  final AddressLabel label;
+  const _LabelAvatar(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, bg, fg) = _labelStyle(label);
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+      child: Icon(icon, color: fg, size: 20),
+    );
+  }
+}
+
 // ── Saved address card ────────────────────────────────────────────────
 class _AddressCard extends StatelessWidget {
   final SavedAddressModel address;
   final bool isActive;
   final VoidCallback onTap;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
 
   const _AddressCard({
     required this.address,
     required this.isActive,
     required this.onTap,
-    required this.onEdit,
-    required this.onDelete,
   });
-
-  (IconData, Color, Color) get _iconStyle {
-    switch (address.label) {
-      case AddressLabel.home:
-        return (
-          Icons.home_rounded,
-          const Color(0xFFE8F5E9),
-          const Color(0xFF3DAA5C)
-        );
-      case AddressLabel.work:
-        return (
-          Icons.work_rounded,
-          const Color(0xFFE3F2FD),
-          const Color(0xFF1E88E5)
-        );
-      case AddressLabel.other:
-        return (
-          Icons.place_rounded,
-          const Color(0xFFF0F0F0),
-          const Color(0xFF6B6B6B)
-        );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    final (icon, bg, fg) = _iconStyle;
-
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -270,12 +306,7 @@ class _AddressCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-              child: Icon(icon, color: fg, size: 20),
-            ),
+            _LabelAvatar(address.label),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -328,20 +359,14 @@ class _AddressCard extends StatelessWidget {
                           color: Color(0xFF9E9E9E)),
                     ),
                   ],
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _ActionIcon(icon: Icons.edit_outlined, onTap: onEdit),
-                      const SizedBox(width: 4),
-                      _ActionIcon(
-                          icon: Icons.delete_outline_rounded,
-                          onTap: onDelete,
-                          color: const Color(0xFFE53935)),
-                    ],
-                  ),
                 ],
               ),
+            ),
+            // Hints that a tap opens options rather than acting directly.
+            const Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Icon(Icons.more_vert_rounded,
+                  size: 20, color: Color(0xFF9E9E9E)),
             ),
           ],
         ),
@@ -374,20 +399,128 @@ class _Badge extends StatelessWidget {
   }
 }
 
-class _ActionIcon extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final Color? color;
-  const _ActionIcon({required this.icon, required this.onTap, this.color});
+// ── Per-address options sheet ─────────────────────────────────────────
+/// Pops with the chosen [_AddressAction], or null if dismissed.
+class _AddressActionsSheet extends StatelessWidget {
+  final SavedAddressModel address;
+  final bool isActive;
+
+  const _AddressActionsSheet({required this.address, required this.isActive});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+    void choose(_AddressAction action) => Navigator.pop(context, action);
+
+    return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Icon(icon, size: 18, color: color ?? const Color(0xFF6B6B6B)),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0E0E0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _LabelAvatar(address.label),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(address.displayLabel,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.black87)),
+                      Text(address.primaryAddressText,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              color: Color(0xFF6B6B6B))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 28, color: Color(0xFFEEEEEE)),
+            isActive
+                ? const _SheetAction(
+                    icon: Icons.check_circle_rounded,
+                    label: "Currently delivering here",
+                    color: Color(0xFF3DAA5C),
+                  )
+                : _SheetAction(
+                    icon: Icons.local_shipping_outlined,
+                    label: "Set as delivery address",
+                    color: const Color(0xFF3DAA5C),
+                    onTap: () => choose(_AddressAction.deliverHere),
+                  ),
+            _SheetAction(
+              icon: Icons.edit_outlined,
+              label: "Edit address",
+              onTap: () => choose(_AddressAction.edit),
+            ),
+            _SheetAction(
+              icon: Icons.delete_outline_rounded,
+              label: "Delete address",
+              color: const Color(0xFFE53935),
+              onTap: () => choose(_AddressAction.delete),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One option row in [_AddressActionsSheet]; [onTap] null renders it as a
+/// non-interactive status line.
+class _SheetAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _SheetAction({
+    required this.icon,
+    required this.label,
+    this.color = Colors.black87,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: color),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(label,
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: color)),
+            ),
+            if (onTap != null)
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFFBDBDBD)),
+          ],
+        ),
       ),
     );
   }

@@ -2,15 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:latlong2/latlong.dart';
 
+import '../../../data/repositories/location_repository.dart'
+    show AddressSearchFailed, distanceMeters;
+import '../../../shared/models/place_suggestion_model.dart';
 import '../../../shared/models/saved_address_model.dart';
+import '../../../shared/widgets/place_suggestion_tile.dart';
 import '../cubit/location_cubit.dart';
 import 'add_address_wizard/address_details_screen.dart';
 import 'add_address_wizard/address_wizard_draft.dart';
-
-typedef _SearchResult = ({String label, LatLng position});
 
 /// Full-screen "drop a pin" picker. The pin stays fixed at the screen
 /// center — the map pans underneath it — which is what riders' navigation
@@ -132,21 +134,39 @@ class MapPinPickerScreen extends StatefulWidget {
   State<MapPinPickerScreen> createState() => _MapPinPickerScreenState();
 }
 
+// Roof level — close enough to see individual buildings on satellite.
+const double _pinZoom = 18;
+
+gmaps.LatLng _toG(LatLng p) => gmaps.LatLng(p.latitude, p.longitude);
+
 class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
-  late final MapController _mapController;
+  gmaps.GoogleMapController? _mapController;
+  // The point under the fixed centre pin, kept in sync from onCameraMove.
+  late LatLng _cameraCenter = widget.initialPosition;
+  // Set while the camera is moving because of our own animateCamera call
+  // (search pick, locate-me), whose address is already known. Unlike
+  // flutter_map, google_maps_flutter doesn't say whether a move came from a
+  // gesture, so this is how we skip the drag UI + redundant re-geocode.
+  // Starts at the initial position: the map reports an idle once it first
+  // loads, and that spot's address was already seeded in initState.
+  late LatLng? _programmaticTarget = widget.initialPosition;
   bool _isDragging = false;
+  // Hybrid = satellite photo + road/place labels, so customers can drop the
+  // pin on their own roof; the layers button flips to the plain map.
+  gmaps.MapType _mapType = gmaps.MapType.hybrid;
 
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   Timer? _searchDebounce;
-  List<_SearchResult> _searchResults = [];
+  List<PlaceSuggestion> _searchResults = [];
   bool _isSearching = false;
+  // Guards against a slow older response overwriting newer results.
+  int _searchSeq = 0;
+  String _sessionToken = newPlacesSessionToken();
 
   @override
   void initState() {
     super.initState();
-    _mapController = MapController();
-
     final existing = widget.existingAddress;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -176,16 +196,33 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
     super.dispose();
   }
 
-  void _onMapEventFinished() {
+  void _moveCamera(LatLng position) {
+    _programmaticTarget = position;
+    _mapController?.animateCamera(
+        gmaps.CameraUpdate.newLatLngZoom(_toG(position), _pinZoom));
+  }
+
+  void _onCameraMoveStarted() {
+    if (_programmaticTarget == null && !_isDragging) {
+      setState(() => _isDragging = true);
+    }
+  }
+
+  void _onCameraIdle() {
+    final target = _programmaticTarget;
+    _programmaticTarget = null;
+    // Our own move landing where we sent it already knows its address. If
+    // the centre is elsewhere, the user dragged (an animation to the
+    // current spot may never report idle, leaving a stale target).
+    if (target != null && distanceMeters(target, _cameraCenter) < 2) return;
     setState(() => _isDragging = false);
-    context
-        .read<LocationCubit>()
-        .updatePinPosition(_mapController.camera.center);
+    context.read<LocationCubit>().updatePinPosition(_cameraCenter);
   }
 
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
     if (query.trim().length < 3) {
+      _searchSeq++; // drop any in-flight response for the old query
       setState(() {
         _searchResults = [];
         _isSearching = false;
@@ -193,9 +230,18 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
       return;
     }
     setState(() => _isSearching = true);
-    _searchDebounce = Timer(const Duration(milliseconds: 400), () async {
-      final results = await context.read<LocationCubit>().searchAddress(query);
-      if (!mounted) return;
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () async {
+      final seq = ++_searchSeq;
+      List<PlaceSuggestion> results;
+      try {
+        // Rank around wherever the map is currently looking.
+        results = (await context.read<LocationCubit>().searchPlaces(query,
+                near: _cameraCenter, sessionToken: _sessionToken))
+            .results;
+      } on AddressSearchFailed {
+        results = [];
+      }
+      if (!mounted || seq != _searchSeq) return;
       setState(() {
         _searchResults = results;
         _isSearching = false;
@@ -203,18 +249,29 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
     });
   }
 
-  void _selectSearchResult(_SearchResult result) {
+  Future<void> _selectSearchResult(PlaceSuggestion result) async {
     _searchController.clear();
     _searchFocusNode.unfocus();
     setState(() => _searchResults = []);
+    final cubit = context.read<LocationCubit>();
+    final token = _sessionToken;
+    _sessionToken = newPlacesSessionToken();
+    final LatLng position;
+    try {
+      position = await cubit.resolvePlace(result, sessionToken: token);
+    } on AddressSearchFailed {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Couldn't open that place. Please try again.")));
+      return;
+    }
+    if (!mounted) return;
     // autoConfirm: false — we're already mid pin-adjustment on this screen,
     // so a search result here should just re-center the pin (landing on
     // Confirming, same as GPS/drag), not immediately confirm out from
     // under whatever the user is still doing here.
-    context
-        .read<LocationCubit>()
-        .selectSearchResult(result.label, result.position, autoConfirm: false);
-    _mapController.move(result.position, 16);
+    cubit.selectSearchResult(result.label, position, autoConfirm: false);
+    _moveCamera(position);
   }
 
   @override
@@ -244,34 +301,20 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
       child: Scaffold(
         body: Stack(
           children: [
-            FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: widget.initialPosition,
-                initialZoom: 16,
-                onPositionChanged: (position, hasGesture) {
-                  if (hasGesture && !_isDragging) {
-                    setState(() => _isDragging = true);
-                  }
-                },
-                onMapEvent: (event) {
-                  // mapController-sourced moves (our own .move() calls from
-                  // the locate-me FAB and search result selection) already
-                  // know their address — re-geocoding them here would be a
-                  // redundant, back-to-back native geocoder call for the
-                  // exact position that was just resolved.
-                  if (event is MapEventMoveEnd &&
-                      event.source != MapEventSource.mapController) {
-                    _onMapEventFinished();
-                  }
-                },
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.beeyo.customer',
-                ),
-              ],
+            gmaps.GoogleMap(
+              initialCameraPosition: gmaps.CameraPosition(
+                  target: _toG(widget.initialPosition), zoom: _pinZoom),
+              mapType: _mapType,
+              onMapCreated: (controller) => _mapController = controller,
+              onCameraMoveStarted: _onCameraMoveStarted,
+              onCameraMove: (position) => _cameraCenter =
+                  LatLng(position.target.latitude, position.target.longitude),
+              onCameraIdle: _onCameraIdle,
+              // The screen has its own locate-me button and search bar.
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              compassEnabled: false,
             ),
 
             // Fixed center pin
@@ -281,6 +324,32 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                   padding: EdgeInsets.only(bottom: 40),
                   child: Icon(Icons.location_pin,
                       size: 44, color: Color(0xFF3DAA5C)),
+                ),
+              ),
+            ),
+
+            // White fade behind the status bar / title / search so they
+            // stay readable over busy satellite imagery.
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Container(
+                  height: MediaQuery.of(context).padding.top +
+                      (widget.ambientConfirm ? 120 : 80),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.95),
+                        Colors.white.withValues(alpha: 0.75),
+                        Colors.white.withValues(alpha: 0),
+                      ],
+                      stops: const [0, 0.6, 1],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -298,9 +367,10 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                       "Confirm location",
                       style: TextStyle(
                           fontFamily: 'Poppins',
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black87),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.2,
+                          color: Color(0xFF1A1A1A)),
                     ),
                     const SizedBox(height: 10),
                   ],
@@ -308,19 +378,23 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                     children: [
                       _RoundIconButton(
                         icon: Icons.arrow_back_rounded,
+                        size: _searchBarHeight,
+                        borderRadius: _searchBarRadius,
                         onTap: () => Navigator.pop(context),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Container(
-                          height: 42,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          height: _searchBarHeight,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(21),
+                            borderRadius:
+                                BorderRadius.circular(_searchBarRadius),
+                            border: Border.all(color: const Color(0xFFE3E3E3)),
                             boxShadow: [
                               BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.15),
+                                  color: Colors.black.withValues(alpha: 0.12),
                                   blurRadius: 8,
                                   offset: const Offset(0, 2)),
                             ],
@@ -336,13 +410,15 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                                   focusNode: _searchFocusNode,
                                   onChanged: _onSearchChanged,
                                   style: const TextStyle(
-                                      fontFamily: 'Poppins', fontSize: 14),
+                                      fontFamily: 'Poppins',
+                                      fontSize: 14,
+                                      color: Color(0xFF1A1A1A)),
                                   decoration: const InputDecoration(
                                     hintText: "Search for area, street...",
                                     hintStyle: TextStyle(
                                         fontFamily: 'Poppins',
-                                        fontSize: 14,
-                                        color: Color(0xFF9E9E9E)),
+                                        fontSize: 13.5,
+                                        color: Color(0xFF9A9A9A)),
                                     border: InputBorder.none,
                                     isDense: true,
                                   ),
@@ -372,11 +448,14 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                   ),
                   if (_searchResults.isNotEmpty)
                     Container(
-                      margin: const EdgeInsets.only(top: 8, left: 52),
+                      margin: const EdgeInsets.only(
+                          top: 6, left: _searchBarHeight + 8),
                       constraints: const BoxConstraints(maxHeight: 260),
+                      clipBehavior: Clip.antiAlias,
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(_searchBarRadius),
+                        border: Border.all(color: const Color(0xFFE3E3E3)),
                         boxShadow: [
                           BoxShadow(
                               color: Colors.black.withValues(alpha: 0.12),
@@ -392,26 +471,31 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                             const Divider(height: 1, color: Color(0xFFE0E0E0)),
                         itemBuilder: (context, index) {
                           final result = _searchResults[index];
-                          return ListTile(
+                          return PlaceSuggestionTile(
+                            suggestion: result,
                             dense: true,
-                            leading: const Icon(Icons.location_on_outlined,
-                                color: Color(0xFF3DAA5C), size: 20),
-                            title: Text(
-                              result.label,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87),
-                            ),
                             onTap: () => _selectSearchResult(result),
                           );
                         },
                       ),
                     ),
                 ],
+              ),
+            ),
+
+            // Satellite <-> plain map toggle
+            Positioned(
+              right: 16,
+              bottom: 312,
+              child: _RoundIconButton(
+                icon: _mapType == gmaps.MapType.hybrid
+                    ? Icons.map_outlined
+                    : Icons.satellite_alt_outlined,
+                onTap: () => setState(() {
+                  _mapType = _mapType == gmaps.MapType.hybrid
+                      ? gmaps.MapType.normal
+                      : gmaps.MapType.hybrid;
+                }),
               ),
             ),
 
@@ -429,9 +513,7 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                   final cubit = context.read<LocationCubit>();
                   await cubit.useCurrentLocation(autoConfirm: false);
                   final state = cubit.state;
-                  if (state is Confirming) {
-                    _mapController.move(state.position, 16);
-                  }
+                  if (state is Confirming) _moveCamera(state.position);
                 },
               ),
             ),
@@ -453,21 +535,39 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
   }
 }
 
+// Top bar: rectangular search box with small rounded corners, and a
+// matching square back button.
+const double _searchBarHeight = 46;
+const double _searchBarRadius = 8;
+
 class _RoundIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-  const _RoundIconButton({required this.icon, required this.onTap});
+  final double size;
+  // Null = circle (map FABs); a value = rounded square (back button).
+  final double? borderRadius;
+  const _RoundIconButton({
+    required this.icon,
+    required this.onTap,
+    this.size = 42,
+    this.borderRadius,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final radius = borderRadius;
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 42,
-        height: 42,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: Colors.white,
-          shape: BoxShape.circle,
+          shape: radius == null ? BoxShape.circle : BoxShape.rectangle,
+          borderRadius: radius == null ? null : BorderRadius.circular(radius),
+          border: radius == null
+              ? null
+              : Border.all(color: const Color(0xFFE3E3E3)),
           boxShadow: [
             BoxShadow(
                 color: Colors.black.withValues(alpha: 0.15),

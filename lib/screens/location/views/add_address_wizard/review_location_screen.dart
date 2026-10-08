@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 
 import '../../../../shared/models/saved_address_model.dart';
 import '../../cubit/location_cubit.dart';
@@ -57,29 +57,26 @@ class ReviewLocationScreen extends StatelessWidget {
                   child: SizedBox(
                     height: 180,
                     child: IgnorePointer(
-                      child: FlutterMap(
-                        options: MapOptions(
-                          initialCenter: draft.position,
-                          initialZoom: 16,
-                          interactionOptions:
-                              const InteractionOptions(flags: InteractiveFlag.none),
+                      // Lite mode: a static, lightweight map snapshot on
+                      // Android — this preview is never interacted with.
+                      child: gmaps.GoogleMap(
+                        liteModeEnabled: true,
+                        mapType: gmaps.MapType.hybrid,
+                        initialCameraPosition: gmaps.CameraPosition(
+                          target: gmaps.LatLng(draft.position.latitude,
+                              draft.position.longitude),
+                          zoom: 18,
                         ),
-                        children: [
-                          TileLayer(
-                            urlTemplate:
-                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'com.beeyo.customer',
+                        markers: {
+                          gmaps.Marker(
+                            markerId: const gmaps.MarkerId('pin'),
+                            position: gmaps.LatLng(draft.position.latitude,
+                                draft.position.longitude),
                           ),
-                          MarkerLayer(markers: [
-                            Marker(
-                              point: draft.position,
-                              width: 44,
-                              height: 56,
-                              child: const Icon(Icons.location_pin,
-                                  size: 44, color: Color(0xFF3DAA5C)),
-                            ),
-                          ]),
-                        ],
+                        },
+                        zoomControlsEnabled: false,
+                        mapToolbarEnabled: false,
+                        myLocationButtonEnabled: false,
                       ),
                     ),
                   ),

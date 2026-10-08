@@ -1,1 +1,3 @@
 #include "Generated.xcconfig"
+// Gitignored; holds MAPS_API_KEY = ... for the Google Maps SDK (optional include).
+#include? "Secrets.xcconfig"

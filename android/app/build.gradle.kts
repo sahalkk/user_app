@@ -17,6 +17,14 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+// Google Maps SDK key lives in the gitignored android/local.properties as
+// MAPS_API_KEY=... so it never lands in git.
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
+}
+
 android {
     namespace = "com.beeyo.customer"
     compileSdk = flutter.compileSdkVersion
@@ -44,6 +52,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY") ?: ""
     }
 
     signingConfigs {

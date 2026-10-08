@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../data/repositories/location_repository.dart';
 import '../../../shared/models/delivery_zone_model.dart';
+import '../../../shared/models/place_suggestion_model.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../../../shared/models/serviceability_result_model.dart';
 
@@ -229,8 +230,13 @@ class LocationCubit extends Cubit<LocationState> {
 
   void enterManualMode() => emit(const ManualEntry());
 
-  Future<List<({String label, LatLng position})>> searchAddress(String query) =>
-      _repository.searchAddress(query);
+  Future<PlaceSearchResult> searchPlaces(String query,
+          {LatLng? near, String? sessionToken}) =>
+      _repository.searchPlaces(query, near: near, sessionToken: sessionToken);
+
+  Future<LatLng> resolvePlace(PlaceSuggestion suggestion,
+          {String? sessionToken}) =>
+      _repository.resolvePlace(suggestion, sessionToken: sessionToken);
 
   /// Same caller-decided [autoConfirm] rule as [useCurrentLocation]. Unlike
   /// GPS, a search result — in both the ambient sheet and inside

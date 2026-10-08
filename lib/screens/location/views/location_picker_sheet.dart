@@ -8,7 +8,9 @@ import '../../../blocs/auth_bloc/auth_bloc.dart';
 import '../../../blocs/auth_bloc/auth_state.dart';
 import '../../../data/repositories/location_repository.dart'
     show AddressSearchFailed, distanceMeters;
+import '../../../shared/models/place_suggestion_model.dart';
 import '../../../shared/models/saved_address_model.dart';
+import '../../../shared/widgets/place_suggestion_tile.dart';
 import '../../address_book/views/address_book_screen.dart';
 import '../cubit/location_cubit.dart';
 import 'map_pin_picker_screen.dart';
@@ -60,8 +62,16 @@ class LocationPickerSheet extends StatefulWidget {
 class _LocationPickerSheetState extends State<LocationPickerSheet> {
   final _searchController = TextEditingController();
   Timer? _debounce;
-  List<({String label, LatLng position})> _results = [];
+  List<PlaceSuggestion> _results = [];
+  bool _poweredByGoogle = false;
   bool _isSearching = false;
+  // Bumped per search so a slow response for "kas" can't overwrite the
+  // newer results for "kasara" that arrived first.
+  int _searchSeq = 0;
+  String _sessionToken = newPlacesSessionToken();
+  // Ranks suggestions near the user: the GPS fix once it resolves, else the
+  // address they're currently on. Null just means "anywhere in India".
+  LatLng? _searchBias;
   // True when the last search attempt couldn't complete at all (network/
   // backend unreachable) — distinct from it completing and genuinely
   // finding nothing, which is just an empty [_results] with this false.
@@ -85,6 +95,11 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     final cubit = context.read<LocationCubit>();
     _addressesFuture = cubit.getSavedAddresses();
     _positionFuture = cubit.tryGetCurrentPosition();
+    final current = cubit.state;
+    if (current is Bound) _searchBias = current.address.position;
+    _positionFuture.then((p) {
+      if (p != null) _searchBias = p;
+    });
   }
 
   /// Re-fetches the saved addresses — called after returning from the
@@ -106,35 +121,59 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   void _onSearchChanged(String query) {
     _debounce?.cancel();
     if (query.trim().length < 3) {
+      _searchSeq++; // drop any in-flight response for the old query
       setState(() {
         _results = [];
+        _isSearching = false;
         _searchFailed = false;
       });
       return;
     }
     _debounce =
-        Timer(const Duration(milliseconds: 400), () => _runSearch(query));
+        Timer(const Duration(milliseconds: 300), () => _runSearch(query));
   }
 
   Future<void> _runSearch(String query) async {
+    final seq = ++_searchSeq;
     setState(() {
       _isSearching = true;
       _searchFailed = false;
     });
     try {
-      final results = await context.read<LocationCubit>().searchAddress(query);
-      if (!mounted) return;
+      final search = await context.read<LocationCubit>().searchPlaces(query,
+          near: _searchBias, sessionToken: _sessionToken);
+      if (!mounted || seq != _searchSeq) return;
       setState(() {
-        _results = results;
+        _results = search.results;
+        _poweredByGoogle = search.poweredByGoogle;
         _isSearching = false;
       });
     } on AddressSearchFailed {
-      if (!mounted) return;
+      if (!mounted || seq != _searchSeq) return;
       setState(() {
         _results = [];
         _isSearching = false;
         _searchFailed = true;
       });
+    }
+  }
+
+  // autoConfirm defaults to false: every search result lands on Confirming
+  // and gets reviewed on the map first (see the listener/builder in build
+  // for how each mode routes from there).
+  Future<void> _selectResult(PlaceSuggestion suggestion) async {
+    final cubit = context.read<LocationCubit>();
+    final token = _sessionToken;
+    // The pick ends this billing session; the next search starts a new one.
+    _sessionToken = newPlacesSessionToken();
+    try {
+      final position = await cubit.resolvePlace(suggestion, sessionToken: token);
+      if (!mounted) return;
+      cubit.selectSearchResult(suggestion.label, position);
+    } on AddressSearchFailed {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Couldn't open that place. Please try again.")));
     }
   }
 
@@ -263,6 +302,8 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 onSearchChanged: _onSearchChanged,
                 onRetrySearch: () => _runSearch(_searchController.text),
                 results: _results,
+                poweredByGoogle: _poweredByGoogle,
+                onSelectResult: _selectResult,
                 isSearching: _isSearching,
                 searchFailed: _searchFailed,
                 isResolving: state is Resolving || state is PermissionChecking,
@@ -382,7 +423,9 @@ class _MainPickerView extends StatelessWidget {
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onRetrySearch;
-  final List<({String label, LatLng position})> results;
+  final List<PlaceSuggestion> results;
+  final bool poweredByGoogle;
+  final ValueChanged<PlaceSuggestion> onSelectResult;
   final bool isSearching;
   final bool searchFailed;
   final bool isResolving;
@@ -401,6 +444,8 @@ class _MainPickerView extends StatelessWidget {
     required this.onSearchChanged,
     required this.onRetrySearch,
     required this.results,
+    required this.poweredByGoogle,
+    required this.onSelectResult,
     required this.isSearching,
     required this.searchFailed,
     required this.isResolving,
@@ -526,25 +571,25 @@ class _MainPickerView extends StatelessWidget {
 
         if (results.isNotEmpty) ...[
           const SizedBox(height: 8),
-          ...results.map((r) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.location_on_outlined,
-                    color: Color(0xFF6B6B6B)),
-                title: Text(r.label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+          for (final (i, r) in results.indexed) ...[
+            if (i > 0) const Divider(height: 1, color: Color(0xFFEEEEEE)),
+            PlaceSuggestionTile(
+                suggestion: r, onTap: () => onSelectResult(r)),
+          ],
+          // Google's terms require this wherever its suggestions are shown
+          // without a Google map.
+          if (poweredByGoogle)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text("Powered by Google",
+                    style: TextStyle(
                         fontFamily: 'Poppins',
-                        fontSize: 13,
-                        color: Colors.black87)),
-                // autoConfirm defaults to false: every search result lands
-                // on Confirming and gets reviewed on the map first (see
-                // the sheet's listener/builder for how each mode routes
-                // from there).
-                onTap: () => context
-                    .read<LocationCubit>()
-                    .selectSearchResult(r.label, r.position),
-              )),
+                        fontSize: 11,
+                        color: Color(0xFF9E9E9E))),
+              ),
+            ),
         ] else if (showSearchEmptyState) ...[
           const SizedBox(height: 8),
           _SearchEmptyState(

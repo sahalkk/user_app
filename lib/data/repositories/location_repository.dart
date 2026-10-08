@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../shared/constants/api_constants.dart';
+import '../../shared/models/place_suggestion_model.dart';
 import '../../shared/models/saved_address_model.dart';
 import '../../shared/models/serviceability_result_model.dart';
 import 'auth_repository.dart';
@@ -157,9 +158,9 @@ class LocationRepository {
     try {
       final uri = Uri.parse(
           'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${position.latitude}&lon=${position.longitude}&addressdetails=1');
-      final response = await http
-          .get(uri, headers: {'User-Agent': _nominatimUserAgent})
-          .timeout(const Duration(seconds: 8));
+      final response = await http.get(uri, headers: {
+        'User-Agent': _nominatimUserAgent
+      }).timeout(const Duration(seconds: 8));
       if (response.statusCode != 200) return null;
       return jsonDecode(response.body) as Map<String, dynamic>;
     } catch (_) {
@@ -176,11 +177,7 @@ class LocationRepository {
       address?['suburb'],
       address?['city'] ?? address?['town'] ?? address?['village'],
       address?['postcode'],
-    ]
-        .whereType<String>()
-        .where((s) => s.trim().isNotEmpty)
-        .toSet()
-        .toList();
+    ].whereType<String>().where((s) => s.trim().isNotEmpty).toSet().toList();
     if (parts.isNotEmpty) return parts.join(', ');
     return data['display_name'] as String?;
   }
@@ -213,29 +210,71 @@ class LocationRepository {
     }
   }
 
-  /// Simple address -> coordinates search. This is a stand-in for a real
-  /// Places Autocomplete API — it geocodes the whole query on every call
-  /// rather than offering live suggestions. Swap for a Places API-backed
-  /// implementation when one is wired up server-side.
-  Future<List<({String label, LatLng position})>> _webSearchAddress(
-      String query) async {
+  // ── Place search (autocomplete) ─────────────────────────────────
+
+  // Search goes through the backend's /places endpoints, which pick the
+  // provider (Photon / Ola Maps / Google) server-side — switching provider
+  // or adding an API key never needs an app release. If the backend is
+  // unreachable or doesn't have the endpoint yet (older deploy), we fall
+  // back to calling Photon directly: free, keyless, same result shape.
+  //
+  // The old approach (native `locationFromAddress`) was a geocoder, not
+  // autocomplete — it needed the full word ("kasara" found Kasara in
+  // Maharashtra, not Kasaragod) and returned a single guess.
+
+  static const _photonBaseUrl = 'https://photon.komoot.io/api/';
+  // minLon,minLat,maxLon,maxLat — keeps direct-Photon results in India.
+  static const _indiaBbox = '68.1,6.5,97.4,35.7';
+
+  /// Suggestions for a partially typed [query], ranked towards [near]
+  /// (map centre / GPS fix) when given. Throws [AddressSearchFailed] only
+  /// when no source could be reached; an empty list means "no matches".
+  ///
+  /// [sessionToken] should stay the same for every keystroke of one search
+  /// and the [resolvePlace] call that ends it — Google bills that as one
+  /// session instead of per request.
+  Future<PlaceSearchResult> searchPlaces(
+    String query, {
+    LatLng? near,
+    String? sessionToken,
+  }) async {
+    final q = query.trim();
+    if (q.length < 3) {
+      return (results: <PlaceSuggestion>[], poweredByGoogle: false);
+    }
     try {
-      final uri = Uri.parse(
-          'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${Uri.encodeQueryComponent(query)}');
-      final response = await http
-          .get(uri, headers: {'User-Agent': _nominatimUserAgent})
-          .timeout(const Duration(seconds: 8));
+      return await _backendAutocomplete(q, near, sessionToken);
+    } catch (_) {
+      try {
+        return (
+          results: await _photonAutocomplete(q, near),
+          poweredByGoogle: false,
+        );
+      } catch (_) {
+        throw const AddressSearchFailed();
+      }
+    }
+  }
+
+  /// Coordinates for a picked suggestion — usually already on it; Google
+  /// suggestions need a details call. Throws [AddressSearchFailed].
+  Future<LatLng> resolvePlace(PlaceSuggestion suggestion,
+      {String? sessionToken}) async {
+    final position = suggestion.position;
+    if (position != null) return position;
+    try {
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/v1/places/details')
+          .replace(queryParameters: {
+        'id': suggestion.id,
+        if (sessionToken != null) 'sessionToken': sessionToken,
+      });
+      final response = await http.get(uri).timeout(const Duration(seconds: 8));
       if (response.statusCode != 200) throw const AddressSearchFailed();
-      final list = jsonDecode(response.body) as List;
-      return list
-          .map((e) => (
-                label: (e['display_name'] as String?) ?? query,
-                position: LatLng(
-                  double.parse(e['lat'] as String),
-                  double.parse(e['lon'] as String),
-                ),
-              ))
-          .toList();
+      final data = (jsonDecode(response.body) as Map<String, dynamic>)['data']
+          as Map<String, dynamic>;
+      final resolved = PlaceSuggestion.fromJson(data).position;
+      if (resolved == null) throw const AddressSearchFailed();
+      return resolved;
     } on AddressSearchFailed {
       rethrow;
     } catch (_) {
@@ -243,30 +282,100 @@ class LocationRepository {
     }
   }
 
-  Future<List<({String label, LatLng position})>> searchAddress(
-      String query) async {
-    if (query.trim().length < 3) return [];
-    if (kIsWeb) return _webSearchAddress(query);
-    try {
-      final locations = await geocoding
-          .locationFromAddress(query)
-          .timeout(const Duration(seconds: 8));
-      final results = <({String label, LatLng position})>[];
-      for (final loc in locations.take(5)) {
-        final pos = LatLng(loc.latitude, loc.longitude);
-        final label = await reverseGeocode(pos) ?? query;
-        results.add((label: label, position: pos));
-      }
-      return results;
-    } on geocoding.NoResultFoundException {
-      // Genuinely zero matches for this query — not a failure.
-      return [];
-    } catch (_) {
-      // Network/timeout/service unreachable — we don't actually know
-      // whether there are matches, so this must not be conflated with the
-      // "searched and found nothing" case above.
-      throw const AddressSearchFailed();
+  Future<PlaceSearchResult> _backendAutocomplete(
+      String q, LatLng? near, String? sessionToken) async {
+    final uri = Uri.parse('${ApiConstants.baseUrl}/api/v1/places/autocomplete')
+        .replace(queryParameters: {
+      'q': q,
+      if (near != null) 'lat': near.latitude.toStringAsFixed(5),
+      if (near != null) 'lng': near.longitude.toStringAsFixed(5),
+      if (sessionToken != null) 'sessionToken': sessionToken,
+    });
+    // Google normally answers well under 1s; 4s only matters when the
+    // backend is down, and keeps the fallback from feeling stuck.
+    final response = await http.get(uri).timeout(const Duration(seconds: 4));
+    if (response.statusCode != 200) {
+      throw Exception('places autocomplete ${response.statusCode}');
     }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final metadata = body['metadata'] as Map<String, dynamic>?;
+    return (
+      results: (body['data'] as List)
+          .map((e) => PlaceSuggestion.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      poweredByGoogle: metadata?['provider'] == 'GOOGLE',
+    );
+  }
+
+  /// Mirrors the backend's Photon provider so the fallback looks the same.
+  Future<List<PlaceSuggestion>> _photonAutocomplete(
+      String q, LatLng? near) async {
+    final uri = Uri.parse(_photonBaseUrl).replace(queryParameters: {
+      'q': q,
+      'limit': '10',
+      'lang': 'en',
+      'bbox': _indiaBbox,
+      if (near != null) 'lat': near.latitude.toStringAsFixed(5),
+      if (near != null) 'lon': near.longitude.toStringAsFixed(5),
+      // Favour places within roughly a district of the user.
+      if (near != null) 'zoom': '12',
+      if (near != null) 'location_bias_scale': '0.1',
+    });
+    final response = await http.get(uri, headers: {
+      'User-Agent': _nominatimUserAgent
+    }).timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) {
+      throw Exception('photon ${response.statusCode}');
+    }
+    final features =
+        (jsonDecode(response.body) as Map<String, dynamic>)['features'] as List;
+
+    String joinParts(Iterable<String?> parts) => parts
+        .map((s) => s?.trim())
+        .whereType<String>()
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .join(', ');
+
+    final seen = <String>{};
+    final results = <PlaceSuggestion>[];
+    for (final f in features.cast<Map<String, dynamic>>()) {
+      final p = f['properties'] as Map<String, dynamic>;
+      String? str(String key) => p[key] as String?;
+      // Platforms/stop positions just repeat the station they belong to.
+      if (str('osm_value') == 'platform' ||
+          str('osm_key') == 'public_transport') {
+        continue;
+      }
+      final name = str('name');
+      final title = (name != null && name.isNotEmpty)
+          ? name
+          : joinParts([str('housenumber'), str('street')]);
+      if (title.isEmpty) continue;
+      final subtitle = joinParts(
+        ['street', 'locality', 'district', 'city', 'county', 'state', 'country']
+            .map(str)
+            .where((s) => s != title),
+      );
+      // One row per name within a taluk (county), and never two rows with
+      // identical text — OSM repeats a town as point/boundary/station and
+      // splits roads into many segments.
+      final keys = ['t|$title|$subtitle', 'c|$title|${str('county') ?? ''}']
+          .map((k) => k.toLowerCase())
+          .toList();
+      if (keys.any(seen.contains)) continue;
+      seen.addAll(keys);
+      final coords =
+          (f['geometry'] as Map<String, dynamic>)['coordinates'] as List;
+      results.add(PlaceSuggestion(
+        id: '${str('osm_type')}${p['osm_id']}',
+        title: title,
+        subtitle: subtitle,
+        position: LatLng(
+            (coords[1] as num).toDouble(), (coords[0] as num).toDouble()),
+      ));
+    }
+    return results.take(8).toList();
   }
 
   // ── Serviceability (backend-authoritative) ──────────────────────
@@ -338,18 +447,22 @@ class LocationRepository {
     // Fill them from the account's own contact and persist it directly here
     // so this only runs once per address, not via saveAddress() (which would
     // call back into this and recurse).
-    final needsBackfill =
-        addresses.any((a) => a.recipientName.isEmpty || a.recipientPhone.isEmpty);
+    final needsBackfill = addresses
+        .any((a) => a.recipientName.isEmpty || a.recipientPhone.isEmpty);
     if (needsBackfill) {
       final accountName = await authRepository.getUserName();
       final accountPhone = await authRepository.getUserPhone();
-      if ((accountName?.isNotEmpty ?? false) || (accountPhone?.isNotEmpty ?? false)) {
+      if ((accountName?.isNotEmpty ?? false) ||
+          (accountPhone?.isNotEmpty ?? false)) {
         for (var i = 0; i < addresses.length; i++) {
           final a = addresses[i];
           if (a.recipientName.isEmpty || a.recipientPhone.isEmpty) {
             addresses[i] = a.copyWith(
-              recipientName: a.recipientName.isEmpty ? accountName ?? '' : a.recipientName,
-              recipientPhone: a.recipientPhone.isEmpty ? accountPhone ?? '' : a.recipientPhone,
+              recipientName:
+                  a.recipientName.isEmpty ? accountName ?? '' : a.recipientName,
+              recipientPhone: a.recipientPhone.isEmpty
+                  ? accountPhone ?? ''
+                  : a.recipientPhone,
             );
           }
         }
@@ -438,7 +551,9 @@ class LocationRepository {
       id: id,
       backendId: id,
       label: AddressLabel.values.firstWhere(
-        (l) => l.name.toUpperCase() == (json['addressType'] as String?)?.toUpperCase(),
+        (l) =>
+            l.name.toUpperCase() ==
+            (json['addressType'] as String?)?.toUpperCase(),
         orElse: () => AddressLabel.other,
       ),
       customLabel: json['customLabel'] as String?,
