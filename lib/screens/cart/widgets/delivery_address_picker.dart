@@ -152,6 +152,13 @@ class _DeliveryAddressPickerState extends State<DeliveryAddressPicker> {
                 children: [
                   if (locState is NotDeliverable)
                     _NotDeliverableNotice(address: locState.formattedAddress),
+                  // A searched/GPS location is bound but isn't saved yet —
+                  // offer to turn it into an address right where they are.
+                  if (locState is Bound && selected == null)
+                    _SaveCurrentLocationRow(
+                      areaText: locState.address.formattedAddress,
+                      onTap: locked ? null : _addNew,
+                    ),
                   ...addresses.map((a) => _AddressRow(
                         address: a,
                         isSelected:
@@ -302,6 +309,63 @@ class _AddressRow extends StatelessWidget {
                     : const Color(0xFFE0E0E0),
                 size: 22,
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SaveCurrentLocationRow extends StatelessWidget {
+  final String areaText;
+  final VoidCallback? onTap;
+  const _SaveCurrentLocationRow({required this.areaText, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF8E1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFFCC80)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.my_location_rounded,
+                size: 20, color: Color(0xFFF57C00)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Deliver to this location",
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87)),
+                  if (areaText.isNotEmpty)
+                    Text(areaText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            color: Color(0xFF6B6B6B))),
+                  const Text("Confirm pin & add house no., contact",
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 11,
+                          color: Color(0xFFF57C00))),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFFF57C00)),
           ],
         ),
       ),

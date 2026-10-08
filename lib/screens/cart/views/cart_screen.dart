@@ -105,9 +105,11 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   /// Places the order against LocationCubit's bound address, picked in the
-  /// footer's inline picker. A first-time user (nothing saved yet) goes to
-  /// the map first, starting on the area they already picked; anyone else
-  /// without a saved address bound gets the picker opened instead.
+  /// footer's inline picker. When the bound location isn't a saved address
+  /// — a searched area or GPS fix, with no flat number or recipient — or
+  /// nothing is saved yet, the add-address wizard opens on that spot so the
+  /// user confirms the pin and fills in details, then the order goes out.
+  /// With nothing bound at all, the picker opens instead.
   Future<void> _placeOrder() async {
     if (!await _ensureLoggedIn() || !mounted) return;
     final cubit = context.read<LocationCubit>();
@@ -117,7 +119,7 @@ class _CartScreenState extends State<CartScreen> {
       final saved = await cubit.getSavedAddresses();
       if (!mounted) return;
       final bound = DeliveryAddressPicker.boundSaved(cubit.state, saved);
-      if (saved.isEmpty) {
+      if (saved.isEmpty || (bound == null && cubit.state is Bound)) {
         ready = await MapPinPickerScreen.openForNewAddress(context);
       } else if (bound == null) {
         _setPanel(_FooterPanel.address, needsAddress: true);

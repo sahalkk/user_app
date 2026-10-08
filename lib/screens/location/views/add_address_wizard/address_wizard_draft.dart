@@ -14,7 +14,8 @@ const kAddressMapRouteName = 'address-map-pin-picker';
 /// MapPinPickerScreen. Not a bloc state / not Equatable — this is scratch
 /// space for an in-progress form, not something anything reacts to.
 class AddressWizardDraft {
-  final LatLng position;
+  // Mutable: the review step lets the user fine-tune the pin one last time.
+  LatLng position;
   final String areaLabel;
   String addressLine;
   String? googleMapsLink;
