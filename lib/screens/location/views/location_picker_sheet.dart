@@ -12,7 +12,6 @@ import '../../../shared/models/saved_address_model.dart';
 import '../../address_book/views/address_book_screen.dart';
 import '../cubit/location_cubit.dart';
 import 'map_pin_picker_screen.dart';
-import 'not_deliverable_view.dart';
 
 /// The ambient "where are you / is my area serviceable" picker: GPS, search,
 /// or a saved address. GPS picks bind straight away; search results get a
@@ -25,25 +24,24 @@ class LocationPickerSheet extends StatefulWidget {
   static Future<void> show(BuildContext context) async {
     final cubit = context.read<LocationCubit>();
     // Captured before anything below can move the cubit off of it — restored
-    // afterward if the sheet gets dismissed/abandoned without landing on a
-    // new Bound (see the check after the await below).
+    // afterward if the sheet is dismissed without the user picking anything.
     final priorState = cubit.state;
-    final priorBound = priorState is Bound ? priorState : null;
     // Opening the sheet while state is already NotDeliverable (carried over
     // from before it was opened — e.g. "Choose a different location" on
     // NotServiceableScreen, or the header's "Not deliverable here" dropdown)
-    // would otherwise render that exact same sorry message a second time,
-    // stacked on top of the one already visible behind it.
-    // Reset to ManualEntry first so the sheet opens fresh on the actual
-    // search view instead. Doesn't affect the legitimate case — reaching
-    // NotDeliverable from an action taken *inside* the sheet (a saved-
-    // address tap, "Use current location") still renders NotDeliverableView
-    // inline as normal, since that happens after this one-time check, via
-    // the sheet's own BlocConsumer further down.
+    // would otherwise make the sheet's listener see no change on a repeat
+    // pick of the same spot. Reset to ManualEntry so it opens fresh on the
+    // search view.
     if (cubit.state is NotDeliverable) {
       cubit.pickDifferentLocation();
     }
-    await showModalBottomSheet(
+    // True when the sheet closed itself because the user's pick reached a
+    // result (see the listener in build) — that result is what Home should
+    // now show, good or bad. Anything else (drag-to-dismiss, tap-outside,
+    // back, or backing out of a map confirm step) is an abandoned
+    // exploration, which must leave the app as it was before the sheet
+    // opened.
+    final picked = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -52,17 +50,7 @@ class LocationPickerSheet extends StatefulWidget {
         child: const LocationPickerSheet(),
       ),
     );
-    // Covers every dismissal path uniformly (drag-to-dismiss, tap-outside,
-    // back button, or reaching NotDeliverable/ManualEntry and just closing
-    // without finishing) — this await already spans the sheet's entire
-    // lifetime, including any MapPinPickerScreen pushed from within it
-    // (e.g. via "Adjust pin on map & save"), so by the time control gets
-    // here the whole exploration is over one way or another. Exploring a
-    // new location must not be destructive to an already-bound address
-    // until a new bind actually succeeds.
-    if (cubit.state is! Bound && priorBound != null) {
-      cubit.restorePreviousState(priorBound);
-    }
+    if (picked != true) cubit.restorePreviousState(priorState);
   }
 
   @override
@@ -172,20 +160,15 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     );
     if (!mounted) return;
     if (cubit.state is Bound) {
-      Navigator.of(context).maybePop();
+      Navigator.of(context).maybePop(true);
       return;
     }
-    // Backed out of the map screen without binding. The builder's Confirming
-    // branch is only the "Loading map…" placeholder that exists to cover
-    // this push, so leaving the cubit on Confirming strands the sheet on
-    // that spinner permanently — the listener can't re-fire without a state
-    // change, so nothing re-pushes the map either, and drag-to-dismiss would
-    // be the only way out. Reset to ManualEntry so backing out lands on the
-    // plain search view instead (with the user's previous query and results
-    // still in place).
-    if (cubit.state is Confirming) {
-      cubit.pickDifferentLocation();
-    }
+    // Backed out of the map screen without binding — possibly after it
+    // showed NotDeliverable/CheckFailed inline. Reset to ManualEntry so the
+    // sheet lands back on the plain search view (with the user's previous
+    // query and results still in place) rather than on the "Loading map…"
+    // placeholder or a result state the user just walked away from.
+    cubit.pickDifferentLocation();
   }
 
   /// Opens the Address Book and, once it returns, refreshes this sheet's
@@ -223,16 +206,22 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
           ),
           child: BlocConsumer<LocationCubit, LocationState>(
             listener: (context, state) {
-              // Binding succeeded — the header already reflects it, so
-              // close the sheet automatically. Only do this when the
-              // sheet is actually the topmost route: when a map confirm
-              // step has pushed MapPinPickerScreen on top, that screen
-              // owns closing itself on Bound — popping here too would
-              // race it and could pop the wrong route.
+              // The user's pick (saved address, current location) reached
+              // a result — close the sheet so they see it on Home: the new
+              // address in the header, the not-serviceable screen, or the
+              // couldn't-check screen with its retry. Nothing is left to do
+              // here, and staying open would hide that result. Only when
+              // the sheet is the topmost route: when a map confirm step has
+              // pushed MapPinPickerScreen on top, that screen owns its own
+              // result (and NotDeliverable is shown inline there) — popping
+              // here too would race it and could pop the wrong route.
               final route = ModalRoute.of(context);
               final isTopmost = route == null || route.isCurrent;
-              if (state is Bound) {
-                if (isTopmost) Navigator.of(context).maybePop();
+              final isResult = state is Bound ||
+                  state is NotDeliverable ||
+                  state is CheckFailed;
+              if (isResult) {
+                if (isTopmost) Navigator.of(context).maybePop(true);
               } else if (state is Confirming && isTopmost) {
                 // A search result lands straight on the (trimmed-chrome)
                 // map+pin confirm step instead of stopping at an
@@ -256,12 +245,6 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
               if (state is CheckingServiceability) {
                 return const _CenteredLoader(
                     label: "Checking delivery availability…");
-              }
-              if (state is NotDeliverable) {
-                return SingleChildScrollView(
-                  controller: scrollController,
-                  child: const NotDeliverableView(),
-                );
               }
               if (state is Confirming) {
                 // Auto-navigates straight to the map/pin confirm step (see
