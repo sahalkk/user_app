@@ -40,9 +40,25 @@ class DebugLog {
 
   static int get errorCount => entries.value.where((e) => e.isError).length;
 
+  static final List<DebugLogEntry> _pending = [];
+  static bool _flushScheduled = false;
+
   static void add(String message, {bool isError = false}) {
     debugPrint('[DebugLog] $message');
-    final next = [...entries.value, DebugLogEntry(message, isError: isError)];
+    _pending.add(DebugLogEntry(message, isError: isError));
+    // Notify listeners in a microtask, never synchronously: add() is called
+    // from FlutterError.onError, often mid-build, and notifying then would
+    // throw "setState() called during build" → onError → add() → infinite loop.
+    if (_flushScheduled) return;
+    _flushScheduled = true;
+    scheduleMicrotask(_flush);
+  }
+
+  static void _flush() {
+    _flushScheduled = false;
+    if (_pending.isEmpty) return;
+    final next = [...entries.value, ..._pending];
+    _pending.clear();
     entries.value = next.length > _maxEntries
         ? next.sublist(next.length - _maxEntries)
         : next;
@@ -57,7 +73,10 @@ class DebugLog {
     );
   }
 
-  static void clear() => entries.value = const [];
+  static void clear() {
+    _pending.clear();
+    entries.value = const [];
+  }
 
   /// Runs [body] (i.e. `runApp`) with every `package:http` request routed
   /// through [_LoggingClient], and hooks Flutter's global error handlers.

@@ -238,11 +238,12 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       maxChildSize: 0.95,
       expand: false,
       builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
+        // Material (not a coloured Container) so the ListTiles inside paint
+        // their ink splashes on this surface instead of underneath it.
+        return Material(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
           child: BlocConsumer<LocationCubit, LocationState>(
             listener: (context, state) {
               // The user's pick (saved address, current location) reached
