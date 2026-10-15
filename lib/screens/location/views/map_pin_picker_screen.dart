@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -137,6 +138,14 @@ class MapPinPickerScreen extends StatefulWidget {
 // Roof level — close enough to see individual buildings on satellite.
 const double _pinZoom = 18;
 
+// Camera transitions for programmatic moves (search pick, locate-me) — see
+// _MapPinPickerScreenState._moveCamera.
+const double _glideMaxMeters = 1500;
+const double _flyMaxMeters = 50000;
+const Duration _glideDuration = Duration(milliseconds: 700);
+const Duration _flyLegDuration = Duration(milliseconds: 700);
+const Duration _flyPause = Duration(milliseconds: 250);
+
 gmaps.LatLng _toG(LatLng p) => gmaps.LatLng(p.latitude, p.longitude);
 
 class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
@@ -150,6 +159,14 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
   // Starts at the initial position: the map reports an idle once it first
   // loads, and that spot's address was already seeded in initState.
   late LatLng? _programmaticTarget = widget.initialPosition;
+  // Whether the stalled-animation retry in _onCameraIdle was already spent
+  // on the current _programmaticTarget, so it can't loop.
+  bool _retriedProgrammaticMove = false;
+  // Bumped per _moveCamera call (and by a touch) so a superseded
+  // two-leg fly doesn't fire its second leg.
+  int _moveSeq = 0;
+  // True during the zoom-out leg of a fly, whose idle isn't the target.
+  bool _isFlyingOut = false;
   bool _isDragging = false;
   // Hybrid = satellite photo + road/place labels, so customers can drop the
   // pin on their own roof; the layers button flips to the plain map.
@@ -196,10 +213,59 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
     super.dispose();
   }
 
-  void _moveCamera(LatLng position) {
+  /// Moves the pin to [position], picking the transition by distance: a
+  /// street-level glide when close, a zoom-out-and-back-in when far enough
+  /// that a street-level glide would just smear unloaded tiles, and an
+  /// instant jump when it's so far that the zoom-out shows nothing useful.
+  Future<void> _moveCamera(LatLng position) async {
+    final controller = _mapController;
+    if (controller == null) return;
+    final seq = ++_moveSeq;
     _programmaticTarget = position;
-    _mapController?.animateCamera(
-        gmaps.CameraUpdate.newLatLngZoom(_toG(position), _pinZoom));
+    _retriedProgrammaticMove = false;
+    final from = _cameraCenter;
+    final distance = distanceMeters(from, position);
+    final landing = gmaps.CameraUpdate.newLatLngZoom(_toG(position), _pinZoom);
+
+    if (distance <= _glideMaxMeters) {
+      await controller.animateCamera(landing, duration: _glideDuration);
+      return;
+    }
+    if (distance > _flyMaxMeters) {
+      await controller.moveCamera(landing);
+      return;
+    }
+
+    // Leg 1: pull back until both points are in view. Its idle lands short
+    // of the target by design, so _onCameraIdle must ignore it.
+    _isFlyingOut = true;
+    await controller.animateCamera(
+      gmaps.CameraUpdate.newLatLngBounds(
+        gmaps.LatLngBounds(
+          southwest: gmaps.LatLng(math.min(from.latitude, position.latitude),
+              math.min(from.longitude, position.longitude)),
+          northeast: gmaps.LatLng(math.max(from.latitude, position.latitude),
+              math.max(from.longitude, position.longitude)),
+        ),
+        80,
+      ),
+      duration: _flyLegDuration,
+    );
+    // The platform call returns as the animation starts, not when it ends.
+    await Future<void>.delayed(_flyLegDuration + _flyPause);
+    // A finger on the map or a newer move took over in the meantime.
+    if (!mounted || seq != _moveSeq) return;
+    _isFlyingOut = false;
+    // Leg 2: drop into the target.
+    await controller.animateCamera(landing, duration: _flyLegDuration);
+  }
+
+  // Any finger on the map hands control back to the user, so a stale
+  // programmatic target (or a half-finished fly) can't mask their drag.
+  void _onMapPointerDown(PointerDownEvent _) {
+    _programmaticTarget = null;
+    _isFlyingOut = false;
+    _moveSeq++;
   }
 
   void _onCameraMoveStarted() {
@@ -209,12 +275,23 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
   }
 
   void _onCameraIdle() {
+    if (_isFlyingOut) return;
     final target = _programmaticTarget;
+    // Our own move landing where we sent it already knows its address.
+    if (target != null && distanceMeters(target, _cameraCenter) < 2) {
+      _programmaticTarget = null;
+      return;
+    }
+    // Our own move stopped short with no finger on the map — the animation
+    // was interrupted (e.g. the map resizing under it). Jump straight there
+    // once rather than leaving the pin on the old spot.
+    if (target != null && !_retriedProgrammaticMove) {
+      _retriedProgrammaticMove = true;
+      _mapController?.moveCamera(
+          gmaps.CameraUpdate.newLatLngZoom(_toG(target), _pinZoom));
+      return;
+    }
     _programmaticTarget = null;
-    // Our own move landing where we sent it already knows its address. If
-    // the centre is elsewhere, the user dragged (an animation to the
-    // current spot may never report idle, leaving a stale target).
-    if (target != null && distanceMeters(target, _cameraCenter) < 2) return;
     setState(() => _isDragging = false);
     context.read<LocationCubit>().updatePinPosition(_cameraCenter);
   }
@@ -299,22 +376,29 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
         }
       },
       child: Scaffold(
+        // Keep the map full-size while the search keyboard is up: resizing
+        // it as the keyboard closes on a result pick interrupts the camera
+        // animation to that result.
+        resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
-            gmaps.GoogleMap(
-              initialCameraPosition: gmaps.CameraPosition(
-                  target: _toG(widget.initialPosition), zoom: _pinZoom),
-              mapType: _mapType,
-              onMapCreated: (controller) => _mapController = controller,
-              onCameraMoveStarted: _onCameraMoveStarted,
-              onCameraMove: (position) => _cameraCenter =
-                  LatLng(position.target.latitude, position.target.longitude),
-              onCameraIdle: _onCameraIdle,
-              // The screen has its own locate-me button and search bar.
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              mapToolbarEnabled: false,
-              compassEnabled: false,
+            Listener(
+              onPointerDown: _onMapPointerDown,
+              child: gmaps.GoogleMap(
+                initialCameraPosition: gmaps.CameraPosition(
+                    target: _toG(widget.initialPosition), zoom: _pinZoom),
+                mapType: _mapType,
+                onMapCreated: (controller) => _mapController = controller,
+                onCameraMoveStarted: _onCameraMoveStarted,
+                onCameraMove: (position) => _cameraCenter =
+                    LatLng(position.target.latitude, position.target.longitude),
+                onCameraIdle: _onCameraIdle,
+                // The screen has its own locate-me button and search bar.
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+                mapToolbarEnabled: false,
+                compassEnabled: false,
+              ),
             ),
 
             // Fixed center pin
