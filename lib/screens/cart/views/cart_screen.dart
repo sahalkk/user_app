@@ -128,6 +128,23 @@ class _CartScreenState extends State<CartScreen> {
       } else {
         ready = await DeliveryAddressPicker.completeContact(context, bound);
       }
+      // Whatever got bound above, confirm it's still deliverable right
+      // before ordering — a bind can be stale. A no moves the cubit to
+      // NotDeliverable, which the address panel shows as a notice.
+      if (ready && mounted) {
+        final deliverable = await cubit.revalidateBound();
+        if (!mounted) return;
+        if (deliverable != true) {
+          ready = false;
+          if (deliverable == null) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text(
+                    "Couldn't check delivery availability. Please try again.")));
+          } else {
+            _setPanel(_FooterPanel.address, needsAddress: true);
+          }
+        }
+      }
     } finally {
       if (mounted) setState(() => _isPreparing = false);
     }

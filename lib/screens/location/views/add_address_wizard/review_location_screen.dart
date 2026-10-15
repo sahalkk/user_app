@@ -86,7 +86,17 @@ class _ReviewLocationScreenState extends State<ReviewLocationScreen> {
         body: BlocBuilder<LocationCubit, LocationState>(
           builder: (context, state) {
             if (state is NotDeliverable) {
-              return const SingleChildScrollView(child: NotDeliverableView());
+              // Back to the map to move the pin — staying here would just
+              // re-show this form for the same undeliverable spot. The map
+              // keeps showing NotDeliverable until the pin moves.
+              return SingleChildScrollView(
+                child: NotDeliverableView(
+                  onChooseDifferent: () => Navigator.of(context).popUntil(
+                      (route) =>
+                          route.settings.name == kAddressMapRouteName ||
+                          route.isFirst),
+                ),
+              );
             }
             final isChecking = state is CheckingServiceability;
 

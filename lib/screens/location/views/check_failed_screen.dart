@@ -101,9 +101,11 @@ class CheckFailedScreen extends StatelessWidget {
                             width: double.infinity,
                             height: 52,
                             child: OutlinedButton(
-                              onPressed: () => LocationPickerSheet.show(context),
+                              onPressed: () =>
+                                  LocationPickerSheet.show(context),
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFFE0E0E0)),
+                                side:
+                                    const BorderSide(color: Color(0xFFE0E0E0)),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14)),
                               ),

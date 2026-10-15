@@ -951,7 +951,7 @@ class _ConfirmSheet extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: !canConfirm || isChecking
                       ? null
-                      : () {
+                      : () async {
                           if (ambientConfirm) {
                             // No label/landmark collected in this mode, and
                             // it must never silently grow the user's real
@@ -967,12 +967,22 @@ class _ConfirmSheet extends StatelessWidget {
                             return;
                           }
 
-                          // Serviceability is no longer checked the instant
-                          // the pin is confirmed — the wizard checks it at
-                          // the very end (Step 3's Save). This screen's job
-                          // now is just handing off position + area label to
-                          // the wizard, seeded from existingAddress when
-                          // editing.
+                          // Check the pin before the wizard asks for any
+                          // details, so nobody fills in a whole address for
+                          // a spot we can't deliver to. A no lands on
+                          // NotDeliverable, which this sheet shows inline
+                          // (red "drag the map" note, button disabled).
+                          // Step 3's Save still re-checks, since the pin can
+                          // be nudged on the review map.
+                          final messenger = ScaffoldMessenger.of(context);
+                          final navigator = Navigator.of(context);
+                          final ok = await cubit.precheckPin(state);
+                          if (ok == null) {
+                            messenger.showSnackBar(const SnackBar(
+                                content: Text(
+                                    "Couldn't check delivery availability. Please try again.")));
+                          }
+                          if (ok != true) return;
                           final draft = AddressWizardDraft(
                             position: state.position,
                             areaLabel: state.formattedAddress,
@@ -986,8 +996,7 @@ class _ConfirmSheet extends StatelessWidget {
                             recipientPhone: editing?.recipientPhone ?? '',
                             editing: editing,
                           );
-                          Navigator.push(
-                            context,
+                          navigator.push(
                             MaterialPageRoute(
                               builder: (_) =>
                                   AddressDetailsScreen(draft: draft),

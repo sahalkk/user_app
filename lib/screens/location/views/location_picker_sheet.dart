@@ -140,8 +140,9 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       _searchFailed = false;
     });
     try {
-      final search = await context.read<LocationCubit>().searchPlaces(query,
-          near: _searchBias, sessionToken: _sessionToken);
+      final search = await context
+          .read<LocationCubit>()
+          .searchPlaces(query, near: _searchBias, sessionToken: _sessionToken);
       if (!mounted || seq != _searchSeq) return;
       setState(() {
         _results = search.results;
@@ -167,7 +168,8 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     // The pick ends this billing session; the next search starts a new one.
     _sessionToken = newPlacesSessionToken();
     try {
-      final position = await cubit.resolvePlace(suggestion, sessionToken: token);
+      final position =
+          await cubit.resolvePlace(suggestion, sessionToken: token);
       if (!mounted) return;
       cubit.selectSearchResult(suggestion.label, position);
     } on AddressSearchFailed {
@@ -574,8 +576,7 @@ class _MainPickerView extends StatelessWidget {
           const SizedBox(height: 8),
           for (final (i, r) in results.indexed) ...[
             if (i > 0) const Divider(height: 1, color: Color(0xFFEEEEEE)),
-            PlaceSuggestionTile(
-                suggestion: r, onTap: () => onSelectResult(r)),
+            PlaceSuggestionTile(suggestion: r, onTap: () => onSelectResult(r)),
           ],
           // Google's terms require this wherever its suggestions are shown
           // without a Google map.

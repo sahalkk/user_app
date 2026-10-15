@@ -81,7 +81,8 @@ class NotServiceableScreen extends StatelessWidget {
                             width: double.infinity,
                             height: 52,
                             child: ElevatedButton(
-                              onPressed: () => LocationPickerSheet.show(context),
+                              onPressed: () =>
+                                  LocationPickerSheet.show(context),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF3DAA5C),
                                 shape: RoundedRectangleBorder(
@@ -108,7 +109,8 @@ class NotServiceableScreen extends StatelessWidget {
                                       .read<LocationCubit>()
                                       .joinNotifyList(),
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFFE0E0E0)),
+                                side:
+                                    const BorderSide(color: Color(0xFFE0E0E0)),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14)),
                               ),
