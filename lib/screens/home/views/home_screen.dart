@@ -12,6 +12,7 @@ import '../../../shared/widgets/product_grid.dart';
 import '../../../shared/widgets/product_row.dart';
 import '../../../shared/widgets/section_header.dart';
 import 'package:beeyo_customer/shared/widgets/search_bar_style.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -115,10 +116,15 @@ class HomeScreen extends StatelessWidget {
                 builder: (context, state) {
                   if (state is HomeLoading || state is HomeInitial) {
                     return const Padding(
-                      padding: EdgeInsets.only(top: 80),
-                      child: Center(
-                          child: CircularProgressIndicator(
-                              color: Color(0xFF3DAA5C))),
+                      padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SkeletonBox(width: 140, height: 16),
+                          SizedBox(height: 14),
+                          ProductGridSkeleton(),
+                        ],
+                      ),
                     );
                   }
 
@@ -409,6 +415,7 @@ class _SubcategoryTile extends StatelessWidget {
                     : CachedNetworkImage(
                         imageUrl: imageUrl!,
                         fit: BoxFit.cover,
+                        placeholder: skeletonImagePlaceholder,
                         errorWidget: (context, url, error) => const Icon(
                             Icons.shopping_basket_rounded,
                             color: Color(0xFF3DAA5C),

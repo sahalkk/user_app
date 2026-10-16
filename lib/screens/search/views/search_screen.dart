@@ -17,6 +17,7 @@ import '../../home/blocs/home_bloc.dart';
 import '../../product_details/views/product_details_screen.dart';
 import '../blocs/search_bloc.dart';
 import 'widgets/search_result_tile.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 const _green = Color(0xFF3DAA5C);
 const _muted = Color(0xFF6B6B6B);
@@ -230,8 +231,14 @@ class _SearchScreenState extends State<SearchScreen> {
                   builder: (context, state) {
                     if (state is HomeError) return _buildHomeError(state);
                     if (state is! HomeLoaded) {
-                      return const Center(
-                          child: CircularProgressIndicator(color: _green));
+                      return const SingleChildScrollView(
+                        physics: NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: ListTileSkeleton(
+                            count: 8,
+                            leadingSize: 64,
+                            padding: EdgeInsets.symmetric(vertical: 10)),
+                      );
                     }
                     return _searchController.text.trim().isEmpty
                         ? _buildDiscovery(state)

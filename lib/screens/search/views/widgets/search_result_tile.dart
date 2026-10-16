@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../../shared/models/product_model.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 class SearchResultTile extends StatelessWidget {
   final ProductModel product;
@@ -51,6 +52,7 @@ class SearchResultTile extends StatelessWidget {
                     : CachedNetworkImage(
                         imageUrl: product.imageUrl,
                         fit: BoxFit.cover,
+                        placeholder: skeletonImagePlaceholder,
                         errorWidget: (context, url, error) =>
                             const _ImagePlaceholder(),
                       ),

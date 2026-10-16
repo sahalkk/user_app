@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_bloc.dart';
 
 import 'set_name_screen.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -228,7 +229,7 @@ class _LoginScreenState extends State<LoginScreen> {
         SizedBox(
           width: double.infinity,
           height: 56,
-          child: ElevatedButton(
+          child: ShimmerSweep(active: authState is OtpSending, borderRadius: BorderRadius.circular(28), child: ElevatedButton(
             onPressed: isBusy
                 ? null
                 : () {
@@ -252,18 +253,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   borderRadius: BorderRadius.circular(28)),
               elevation: 0,
             ),
-            child: authState is OtpSending
-                ? const SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 3))
-                : const Text("Continue",
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
-          ),
+            child: Text(
+                authState is OtpSending ? "Sending code…" : "Continue",
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white)),
+          )),
         ),
         const Spacer(),
         Center(
@@ -453,7 +449,7 @@ class _LoginScreenState extends State<LoginScreen> {
         SizedBox(
           width: double.infinity,
           height: 56,
-          child: ElevatedButton(
+          child: ShimmerSweep(active: authState is AuthLoading, borderRadius: BorderRadius.circular(28), child: ElevatedButton(
             onPressed: isBusy
                 ? null
                 : () {
@@ -477,18 +473,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   borderRadius: BorderRadius.circular(28)),
               elevation: 0,
             ),
-            child: authState is AuthLoading
-                ? const SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 3))
-                : const Text("Verify & Login",
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
-          ),
+            child: Text(
+                authState is AuthLoading ? "Verifying…" : "Verify & Login",
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white)),
+          )),
         ),
       ],
     );

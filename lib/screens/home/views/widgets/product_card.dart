@@ -9,6 +9,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../blocs/cart_bloc/cart_bloc.dart';
 import '../../../../shared/models/product_model.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 // ─────────────────────────────────────────────
 //  Premium Dark-Mode Product Card for beeyo
@@ -86,6 +87,7 @@ class _ProductCardState extends State<ProductCard> {
                               fit: BoxFit.cover,
                               width: double.infinity,
                               height: double.infinity,
+                              loadingBuilder: skeletonImageLoadingBuilder,
                               errorBuilder: (context, error, stackTrace) =>
                                   const Icon(
                                       Icons.image_not_supported_outlined,

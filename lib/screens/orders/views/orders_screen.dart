@@ -15,6 +15,7 @@ import '../../../shared/utils/order_items_resolver.dart';
 import '../../../shared/widgets/order_status_chip.dart';
 import '../../../shared/widgets/floating_cart_banner.dart';
 import '../../home/blocs/home_bloc.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 const _green = Color(0xFF3DAA5C);
 const _grey = Color(0xFF6B6B6B);
@@ -806,7 +807,9 @@ class _ProductThumb extends StatelessWidget {
         child: url.isEmpty
             ? placeholder
             : Image.network(url,
-                fit: BoxFit.cover, errorBuilder: (_, __, ___) => placeholder),
+                fit: BoxFit.cover,
+                loadingBuilder: skeletonImageLoadingBuilder,
+                errorBuilder: (_, __, ___) => placeholder),
       ),
     );
   }
@@ -1063,13 +1066,11 @@ class _OrdersSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget bar(double width, double height, {double radius = 8}) => Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-              color: const Color(0xFFECEDEF),
-              borderRadius: BorderRadius.circular(radius)),
-        );
+    Widget bar(double width, double height, {double radius = 8}) =>
+        SkeletonBox(
+            width: width,
+            height: height,
+            borderRadius: BorderRadius.circular(radius));
 
     Widget card({required double height}) => Container(
           height: height,

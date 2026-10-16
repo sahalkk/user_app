@@ -15,6 +15,7 @@ import '../../../shared/widgets/search_bar_style.dart';
 import '../cubit/location_cubit.dart';
 import 'add_address_wizard/address_details_screen.dart';
 import 'add_address_wizard/address_wizard_draft.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 /// Full-screen "drop a pin" picker. The pin stays fixed at the screen
 /// center — the map pans underneath it — which is what riders' navigation
@@ -509,14 +510,7 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                                   ),
                                 ),
                               ),
-                              if (_isSearching)
-                                const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Color(0xFF3DAA5C)),
-                                )
-                              else if (_searchController.text.isNotEmpty)
+                              if (_searchController.text.isNotEmpty)
                                 GestureDetector(
                                   onTap: () {
                                     _searchController.clear();
@@ -531,7 +525,27 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                       ),
                     ],
                   ),
-                  if (_searchResults.isNotEmpty)
+                  if (_isSearching && _searchResults.isEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(
+                          top: 6, left: _searchBarHeight + 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(_searchBarRadius),
+                        border: Border.all(color: const Color(0xFFE3E3E3)),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.12),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: const ListTileSkeleton(
+                          leadingSize: 34,
+                          padding: EdgeInsets.symmetric(vertical: 8)),
+                    )
+                  else if (_searchResults.isNotEmpty)
                     Container(
                       margin: const EdgeInsets.only(
                           top: 6, left: _searchBarHeight + 8),
@@ -949,7 +963,7 @@ class _ConfirmSheet extends StatelessWidget {
               return SizedBox(
                 width: double.infinity,
                 height: 52,
-                child: ElevatedButton(
+                child: ShimmerSweep(active: isChecking, borderRadius: BorderRadius.circular(14), child: ElevatedButton(
                   onPressed: !canConfirm || isChecking
                       ? null
                       : () async {
@@ -1011,21 +1025,18 @@ class _ConfirmSheet extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14)),
                     elevation: 0,
                   ),
-                  child: isChecking
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : Text(
-                          ambientConfirm ? "Confirm Location" : "Continue",
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15),
-                        ),
-                ),
+                  child: Text(
+                    isChecking
+                        ? "Checking…"
+                        : ambientConfirm
+                            ? "Confirm Location"
+                            : "Continue",
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15),
+                  ),
+                )),
               );
             },
           ),

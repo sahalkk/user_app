@@ -15,6 +15,7 @@ import '../../../shared/models/cart_item_model.dart';
 import '../../../shared/models/checkout_address_model.dart';
 import '../widgets/checkout_footer_parts.dart';
 import '../widgets/delivery_address_picker.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 const _kUndoDuration = Duration(seconds: 4);
 const _kPanelDuration = Duration(milliseconds: 250);
@@ -436,7 +437,7 @@ class _CartScreenState extends State<CartScreen> {
                                 flex: 3,
                                 child: SizedBox(
                                   height: 56,
-                                  child: ElevatedButton(
+                                  child: ShimmerSweep(active: busy, borderRadius: BorderRadius.circular(16), child: ElevatedButton(
                                     onPressed: busy ? null : _placeOrder,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor:
@@ -450,25 +451,18 @@ class _CartScreenState extends State<CartScreen> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 12),
                                     ),
-                                    child: busy
-                                        ? const SizedBox(
-                                            width: 24,
-                                            height: 24,
-                                            child: CircularProgressIndicator(
-                                              color: Colors.white,
-                                              strokeWidth: 2.5,
-                                            ),
-                                          )
-                                        : FittedBox(
-                                            child: Text(
-                                              "Place order · ${formatRupees(toPay)}",
-                                              style: const TextStyle(
-                                                  fontSize: 16,
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold),
-                                            ),
-                                          ),
-                                  ),
+                                    child: FittedBox(
+                                      child: Text(
+                                        busy
+                                            ? "Placing order…"
+                                            : "Place order · ${formatRupees(toPay)}",
+                                        style: const TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  )),
                                 ),
                               ),
                             ],

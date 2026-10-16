@@ -17,6 +17,7 @@ import '../../../shared/widgets/global_header.dart';
 import '../../../shared/widgets/product_grid.dart';
 import '../../home/blocs/home_bloc.dart';
 import 'package:beeyo_customer/shared/widgets/search_bar_style.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 const _green = Color(0xFF3DAA5C);
 const _grey = Color(0xFF6B6B6B);
@@ -80,8 +81,19 @@ class _OrderAgainScreenState extends State<OrderAgainScreen> {
           child: BlocBuilder<HomeBloc, HomeState>(
             builder: (context, homeState) {
               if (homeState is HomeLoading) {
-                return const Center(
-                    child: CircularProgressIndicator(color: _green));
+                return const SingleChildScrollView(
+                  physics: NeverScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _OrdersSkeleton(),
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+                        child: ProductGridSkeleton(itemCount: 6),
+                      ),
+                    ],
+                  ),
+                );
               }
               if (homeState is! HomeLoaded) return const SizedBox();
               return _buildContent(context, homeState);
@@ -520,6 +532,7 @@ class _ProductThumb extends StatelessWidget {
             : Image.network(
                 product.imageUrl,
                 fit: BoxFit.cover,
+                loadingBuilder: skeletonImageLoadingBuilder,
                 errorBuilder: (_, __, ___) => placeholder,
               ),
       ),
@@ -745,12 +758,8 @@ class _OrdersSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget bar(double width, double height) => Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-              color: _surface, borderRadius: BorderRadius.circular(8)),
-        );
+    Widget bar(double width, double height) =>
+        SkeletonBox(width: width, height: height);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 0, 10),

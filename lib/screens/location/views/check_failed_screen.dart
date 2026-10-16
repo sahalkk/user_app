@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../shared/widgets/global_header.dart';
 import '../cubit/location_cubit.dart';
 import 'location_picker_sheet.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 /// Full-page block shown in place of the shopping tabs whenever the last
 /// serviceability check couldn't get an answer at all (network/timeout/
@@ -68,7 +69,7 @@ class CheckFailedScreen extends StatelessWidget {
                           SizedBox(
                             width: double.infinity,
                             height: 52,
-                            child: ElevatedButton(
+                            child: ShimmerSweep(active: isRetrying, borderRadius: BorderRadius.circular(14), child: ElevatedButton(
                               onPressed: isRetrying
                                   ? null
                                   : () => context
@@ -80,21 +81,14 @@ class CheckFailedScreen extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(14)),
                                 elevation: 0,
                               ),
-                              child: isRetrying
-                                  ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Text(
-                                      "Try again",
-                                      style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 15),
-                                    ),
-                            ),
+                              child: Text(
+                                isRetrying ? "Checking…" : "Try again",
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15),
+                              ),
+                            )),
                           ),
                           const SizedBox(height: 12),
                           SizedBox(
