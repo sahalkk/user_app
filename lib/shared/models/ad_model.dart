@@ -121,12 +121,15 @@ class AdSettings extends Equatable {
   List<Object?> get props => [cartAdFrequency, homeAutoRotateSecs];
 }
 
-/// `#RRGGBB` or `#AARRGGBB` → Color; null for anything else.
+/// `#RRGGBB` or CSS-style `#RRGGBBAA` (what the dashboard's colour picker
+/// and the backend use) → Color; null for anything else.
 Color? parseHexColor(String? hex) {
   if (hex == null) return null;
   final match = RegExp(r'^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$').firstMatch(hex);
   if (match == null) return null;
   final digits = match.group(1)!;
-  final argb = digits.length == 6 ? 'FF$digits' : digits;
+  final argb = digits.length == 6
+      ? 'FF$digits'
+      : '${digits.substring(6)}${digits.substring(0, 6)}';
   return Color(int.parse(argb, radix: 16));
 }
