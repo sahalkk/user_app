@@ -11,6 +11,7 @@ import '../../../data/repositories/location_repository.dart'
 import '../../../shared/models/place_suggestion_model.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../../../shared/widgets/place_suggestion_tile.dart';
+import '../../../shared/widgets/search_bar_style.dart';
 import '../../address_book/views/address_book_screen.dart';
 import '../cubit/location_cubit.dart';
 import 'map_pin_picker_screen.dart';
@@ -539,9 +540,11 @@ class _MainPickerView extends StatelessWidget {
 
         // Search field
         Container(
+          height: kSearchBarHeight,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(kSearchBarRadius),
             border: Border.all(color: const Color(0xFFE0E0E0)),
           ),
           child: TextField(
@@ -556,7 +559,8 @@ class _MainPickerView extends StatelessWidget {
                   color: Color(0xFF9E9E9E)),
               prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF6B6B6B)),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 14),
+              contentPadding: EdgeInsets.zero,
+              isDense: true,
             ),
           ),
         ),

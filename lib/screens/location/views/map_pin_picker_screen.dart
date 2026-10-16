@@ -11,6 +11,7 @@ import '../../../data/repositories/location_repository.dart'
 import '../../../shared/models/place_suggestion_model.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../../../shared/widgets/place_suggestion_tile.dart';
+import '../../../shared/widgets/search_bar_style.dart';
 import '../cubit/location_cubit.dart';
 import 'add_address_wizard/address_details_screen.dart';
 import 'add_address_wizard/address_wizard_draft.dart';
@@ -621,8 +622,8 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
 
 // Top bar: rectangular search box with small rounded corners, and a
 // matching square back button.
-const double _searchBarHeight = 46;
-const double _searchBarRadius = 8;
+const double _searchBarHeight = kSearchBarHeight;
+const double _searchBarRadius = kSearchBarRadius;
 
 class _RoundIconButton extends StatelessWidget {
   final IconData icon;

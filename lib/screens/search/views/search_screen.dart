@@ -11,6 +11,7 @@ import '../../../shared/models/product_model.dart';
 import '../../../shared/utils/product_search.dart';
 import '../../../shared/widgets/product_grid.dart';
 import '../../../shared/widgets/product_row.dart';
+import '../../../shared/widgets/search_bar_style.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../home/blocs/home_bloc.dart';
 import '../../product_details/views/product_details_screen.dart';
@@ -260,10 +261,10 @@ class _SearchScreenState extends State<SearchScreen> {
           Expanded(
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              height: 48,
+              height: kSearchBarHeight,
               decoration: BoxDecoration(
                 color: focused ? Colors.white : const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(kSearchBarRadius),
                 border: Border.all(
                   color: focused ? _green : _border,
                   width: focused ? 1.5 : 1,

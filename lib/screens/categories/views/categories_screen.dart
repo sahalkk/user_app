@@ -8,6 +8,7 @@ import '../blocs/categories_bloc.dart';
 // 🔥 1. Import the floating cart banner
 import '../../../shared/widgets/floating_cart_banner.dart';
 import '../views/category_products_screen.dart';
+import 'package:beeyo_customer/shared/widgets/search_bar_style.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -40,7 +41,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             SliverPersistentHeader(
               pinned: true,
               delegate: StickyHeaderDelegate(
-                height: 65,
+                height: kStickySearchBarExtent,
                 child: const StickySearchBar(),
               ),
             ),

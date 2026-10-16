@@ -11,6 +11,7 @@ import '../../../shared/widgets/floating_cart_banner.dart';
 import '../../../shared/widgets/product_grid.dart';
 import '../../../shared/widgets/product_row.dart';
 import '../../../shared/widgets/section_header.dart';
+import 'package:beeyo_customer/shared/widgets/search_bar_style.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -33,7 +34,7 @@ class HomeScreen extends StatelessWidget {
             SliverPersistentHeader(
               pinned: true,
               delegate: StickyHeaderDelegate(
-                height: 108,
+                height: kStickySearchBarExtent + 44,
                 child: Container(
                   color: const Color(0xFFFFFFFF),
                   child: Column(

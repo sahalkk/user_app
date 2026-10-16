@@ -5,6 +5,7 @@ import '../../screens/profile/views/profile_screen.dart';
 import '../../screens/search/views/search_screen.dart';
 import '../../screens/location/cubit/location_cubit.dart';
 import '../../screens/location/views/location_picker_sheet.dart';
+import 'search_bar_style.dart';
 
 // =================================================================
 // 1. THE BEEYO BRAND HEADER (Scrolls Away)
@@ -161,17 +162,19 @@ class StickySearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+      alignment: Alignment.center,
       child: GestureDetector(
         onTap: () {
           Navigator.push(context,
               MaterialPageRoute(builder: (context) => const SearchScreen()));
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          height: kSearchBarHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             color: const Color(0xFFF0F0F0),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(kSearchBarRadius),
             border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
           ),
           child: const Row(
