@@ -538,6 +538,7 @@ class _MainPickerView extends StatelessWidget {
           child: TextField(
             controller: searchController,
             onChanged: onSearchChanged,
+            textAlignVertical: TextAlignVertical.center,
             style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
             decoration: const InputDecoration(
               hintText: "Search for area, street, or landmark",
