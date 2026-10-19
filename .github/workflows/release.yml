@@ -1,6 +1,3 @@
-# Flutter app. Every Play upload uses the PRODUCTION base URL.
-#   dev    -> Play "internal" track, release name like v0.2.0-internal
-#   master -> Play closed testing ("alpha") track, release name like v0.2.0-closed
 
 name: Release to Google Play
 
@@ -31,9 +28,10 @@ jobs:
           channel: stable
           cache: true
 
-      # pubspec.yaml lists .env as an asset, so it must exist (it can be empty)
-      - name: Create empty .env
-        run: touch .env
+      # pubspec.yaml lists .env as an asset and main.dart loads it.
+      # flutter_dotenv throws on a 0-byte file, so write a comment line.
+      - name: Create .env
+        run: echo "# created by CI" > .env
 
       - name: Get Flutter packages
         run: flutter pub get
@@ -44,8 +42,10 @@ jobs:
           VERSION_NAME=$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//; s/+.*//' | tr -d ' \r')
           BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed -n 's/.*+//p' | tr -d ' \r')
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
-          echo "flutter.versionName=$VERSION_NAME" >> android/local.properties
-          echo "flutter.versionCode=${BUILD_NUMBER:-1}" >> android/local.properties
+          # Start on a new line: local.properties may not end with a line break
+          printf '\nflutter.versionName=%s\nflutter.versionCode=%s\n' "$VERSION_NAME" "${BUILD_NUMBER:-1}" >> android/local.properties
+          echo "local.properties now contains:"
+          cat android/local.properties
           echo "App version: $VERSION_NAME"
 
       - name: Set up Gradle
