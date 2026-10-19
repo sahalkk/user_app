@@ -1,9 +1,16 @@
+# Flutter app. Every Play upload uses the PRODUCTION base URL.
+#   dev    -> Play "internal" track
+#   master -> Play closed testing ("alpha") track
 
 name: Release to Google Play
 
 on:
   push:
     branches: [dev, master]
+
+env:
+  # >>> Put your real production URL here <<<
+  BASE_URL: https://144.24.146.130
 
 jobs:
   release:
@@ -23,6 +30,10 @@ jobs:
         with:
           channel: stable
           cache: true
+
+      # pubspec.yaml lists .env as an asset, so it must exist (it can be empty)
+      - name: Create empty .env
+        run: touch .env
 
       - name: Get Flutter packages
         run: flutter pub get
@@ -59,4 +70,7 @@ jobs:
           ANDROID_PUBLISHER_CREDENTIALS: ${{ secrets.ANDROID_PUBLISHER_CREDENTIALS }}
         run: |
           chmod +x gradlew
-          ./gradlew publishReleaseBundle --track $TRACK
+          # Same as: flutter build --dart-define=BASE_URL=...  (Gradle needs it base64-encoded)
+          DART_DEFINES=$(echo -n "BASE_URL=$BASE_URL" | base64 -w0)
+          echo "Building for track $TRACK with BASE_URL=$BASE_URL"
+          ./gradlew publishReleaseBundle --track $TRACK -Pdart-defines=$DART_DEFINES
