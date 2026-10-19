@@ -1,13 +1,19 @@
 import java.util.Properties
 import java.io.FileInputStream
+import com.github.triplet.gradle.androidpublisher.ResolutionStrategy
 
-
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties()
+if (keystorePropsFile.exists()) {
+    keystoreProps.load(FileInputStream(keystorePropsFile))
+}
 
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.github.triplet.play") version "3.12.1"
 }
 
 val keystoreProperties = Properties()
@@ -73,6 +79,16 @@ android {
     }
 
 
+}
+
+play {
+    // On your PC it uses the key file; on GitHub it uses a secret instead
+    val playKey = file("play-key.json")
+    if (playKey.exists()) serviceAccountCredentials.set(playKey)
+
+    defaultToAppBundles.set(true)          // upload AAB, not APK
+    track.set("internal")                 // default track
+    resolutionStrategy.set(ResolutionStrategy.AUTO) // auto-increase versionCode
 }
 
 flutter {

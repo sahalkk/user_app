@@ -18,6 +18,13 @@ migrate_working_dir/
 *.iws
 .idea/
 
+# Signing and Play secrets - never commit
+keystore.properties
+*.jks
+*.keystore
+play-key.json
+
+
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
