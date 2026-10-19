@@ -8,9 +8,9 @@ import '../../../../blocs/ads_cubit/ads_cubit.dart';
 import '../../../../shared/models/ad_model.dart';
 import '../../../../shared/widgets/sponsored_ad_card.dart';
 
-/// HOME_BANNER slot: a skeleton while loading, a 2:1 sponsored card (or an
-/// auto-rotating carousel of them) once loaded, and nothing at all — not
-/// even padding — when there are no ads.
+/// HOME_BANNER slot: a 2:1 sponsored card (or an auto-rotating carousel of
+/// them) once ads have loaded, and nothing at all — not even padding — while
+/// loading or when there are no ads.
 class HomeAdBanner extends StatefulWidget {
   const HomeAdBanner({super.key});
 
@@ -35,13 +35,6 @@ class _HomeAdBannerState extends State<HomeAdBanner> {
           a.hiddenIds != b.hiddenIds ||
           a.settings != b.settings,
       builder: (context, state) {
-        final slot = state.slot(AdPlacement.homeBanner);
-        if (!slot.isResolved) {
-          return const Padding(
-            padding: _padding,
-            child: SponsoredAdSkeleton(placement: AdPlacement.homeBanner),
-          );
-        }
         final ads = state.visibleAds(AdPlacement.homeBanner);
         if (ads.isEmpty) return const SizedBox.shrink();
         return Padding(
