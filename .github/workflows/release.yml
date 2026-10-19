@@ -7,7 +7,7 @@ on:
 
 env:
   # >>> Put your real production URL here <<<
-  BASE_URL: https://api.your-production-domain.com
+  BASE_URL: https://144.24.146.130/
 
 jobs:
   release:
