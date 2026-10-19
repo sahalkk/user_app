@@ -9,6 +9,7 @@ import '../../../blocs/cart_bloc/cart_bloc.dart';
 import '../../../blocs/wishlist_bloc/wishlist_bloc.dart';
 import '../../../blocs/wishlist_bloc/wishlist_state.dart';
 import '../../../blocs/wishlist_bloc/wishlist_event.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final ProductModel product;
@@ -189,6 +190,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           fit: BoxFit.cover,
                           width: double.infinity,
                           height: double.infinity,
+                          loadingBuilder: skeletonImageLoadingBuilder,
                           errorBuilder: (context, error, stackTrace) =>
                               Container(
                                   color: const Color(0xFFF0F0F0),

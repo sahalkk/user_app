@@ -68,6 +68,16 @@ class OrderRepository {
       await authRepository.handleUnauthorized();
       throw const SessionExpiredException();
     }
+    // 404/422 carry a message meant for the user (address not found, not
+    // deliverable) — show it rather than a bare status code.
+    if (response.statusCode == 404 || response.statusCode == 422) {
+      try {
+        final message = (jsonDecode(response.body) as Map)['message'];
+        if (message is String && message.isNotEmpty) throw Exception(message);
+      } on FormatException {
+        // Not JSON — fall through to the generic message.
+      }
+    }
     throw Exception('Failed to place order (${response.statusCode})');
   }
 

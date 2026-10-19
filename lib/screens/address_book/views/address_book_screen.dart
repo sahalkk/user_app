@@ -5,6 +5,7 @@ import '../../../shared/models/saved_address_model.dart';
 import '../../location/cubit/location_cubit.dart';
 import '../../location/views/map_pin_picker_screen.dart';
 import '../../location/views/not_deliverable_view.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 enum _AddressAction { deliverHere, edit, delete }
 
@@ -165,15 +166,29 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
       ),
       body: BlocBuilder<LocationCubit, LocationState>(
         builder: (context, locState) {
+          final busy = locState is CheckingServiceability || _isBusy;
           return Stack(
             children: [
-              FutureBuilder<List<SavedAddressModel>>(
+              ShimmerSweep(
+                active: busy,
+                color: const Color(0x2E3DAA5C),
+                child: FutureBuilder<List<SavedAddressModel>>(
                 future: _addressesFuture,
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
-                    return const Center(
-                        child: CircularProgressIndicator(
-                            color: Color(0xFF3DAA5C)));
+                    return const SingleChildScrollView(
+                      physics: NeverScrollableScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(16, 12, 16, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SkeletonBox(width: 120, height: 13),
+                          SizedBox(height: 12),
+                          ListTileSkeleton(
+                              count: 4, circleLeading: true, card: true),
+                        ],
+                      ),
+                    );
                   }
                   final addresses = snapshot.data!;
                   if (addresses.isEmpty) {
@@ -218,14 +233,12 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                     ],
                   );
                 },
-              ),
-              if (locState is CheckingServiceability || _isBusy)
-                Container(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  child: const Center(
-                      child:
-                          CircularProgressIndicator(color: Color(0xFF3DAA5C))),
                 ),
+              ),
+              // Blocks taps while busy; the sweep above is the indicator.
+              if (busy)
+                const Positioned.fill(
+                    child: ColoredBox(color: Color(0x0D000000))),
             ],
           );
         },

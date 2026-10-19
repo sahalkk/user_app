@@ -1,20 +1,26 @@
+import 'package:beeyo_customer/blocs/ads_cubit/ads_cubit.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_bloc.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_state.dart';
 import 'package:beeyo_customer/screens/auth/views/login_screen.dart';
 import 'package:beeyo_customer/screens/location/cubit/location_cubit.dart';
 import 'package:beeyo_customer/screens/location/views/map_pin_picker_screen.dart';
 import 'package:beeyo_customer/screens/main_wrapper.dart';
+import 'package:beeyo_customer/screens/orders/views/order_success_screen.dart';
 import 'package:beeyo_customer/screens/product_details/views/product_details_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../blocs/cart_bloc/cart_bloc.dart';
 import '../../../blocs/order_bloc/order_bloc.dart';
 import '../../../blocs/order_bloc/order_event.dart';
 import '../../../blocs/order_bloc/order_state.dart';
+import '../../../shared/models/ad_model.dart';
 import '../../../shared/models/cart_item_model.dart';
 import '../../../shared/models/checkout_address_model.dart';
 import '../widgets/checkout_footer_parts.dart';
 import '../widgets/delivery_address_picker.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
+import 'package:beeyo_customer/shared/widgets/sponsored_ad_card.dart';
 
 const _kUndoDuration = Duration(seconds: 4);
 const _kPanelDuration = Duration(milliseconds: 250);
@@ -54,6 +60,21 @@ class _CartScreenState extends State<CartScreen> {
     super.initState();
     final state = context.read<LocationCubit>().state;
     if (state is Bound) _lastDarkStoreId = state.darkStoreId;
+    context.read<AdsCubit>().load(AdPlacement.cartInline);
+    _prefetchOrderSuccessAd();
+  }
+
+  /// Checkout starts here, so fetch the order success ad (and warm its
+  /// image) now — it's then ready the instant the order goes through.
+  Future<void> _prefetchOrderSuccessAd() async {
+    final ads = context.read<AdsCubit>();
+    await ads.load(AdPlacement.orderSuccess);
+    if (!mounted) return;
+    final visible = ads.state.visibleAds(AdPlacement.orderSuccess);
+    if (visible.isEmpty) return;
+    final ad = visible.first;
+    precacheImage(CachedNetworkImageProvider(ad.imageUrl), context,
+        onError: (_, __) => ads.hide(ad));
   }
 
   void _setPanel(_FooterPanel? panel, {bool needsAddress = false}) {
@@ -111,6 +132,8 @@ class _CartScreenState extends State<CartScreen> {
   /// user confirms the pin and fills in details, then the order goes out.
   /// With nothing bound at all, the picker opens instead.
   Future<void> _placeOrder() async {
+    // No-op if the prefetch already has it; retries if that failed.
+    context.read<AdsCubit>().load(AdPlacement.orderSuccess);
     if (!await _ensureLoggedIn() || !mounted) return;
     final cubit = context.read<LocationCubit>();
     setState(() => _isPreparing = true);
@@ -127,6 +150,23 @@ class _CartScreenState extends State<CartScreen> {
         ready = true;
       } else {
         ready = await DeliveryAddressPicker.completeContact(context, bound);
+      }
+      // Whatever got bound above, confirm it's still deliverable right
+      // before ordering — a bind can be stale. A no moves the cubit to
+      // NotDeliverable, which the address panel shows as a notice.
+      if (ready && mounted) {
+        final deliverable = await cubit.revalidateBound();
+        if (!mounted) return;
+        if (deliverable != true) {
+          ready = false;
+          if (deliverable == null) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text(
+                    "Couldn't check delivery availability. Please try again.")));
+          } else {
+            _setPanel(_FooterPanel.address, needsAddress: true);
+          }
+        }
       }
     } finally {
       if (mounted) setState(() => _isPreparing = false);
@@ -159,6 +199,20 @@ class _CartScreenState extends State<CartScreen> {
     if (state is! OrderPlaced) return;
 
     context.read<CartBloc>().add(ClearCart());
+
+    // With an order success ad ready, the success screen takes over the
+    // whole stack and moves on to the Orders tab itself — nothing should go
+    // back to the now-empty cart. Without one, the original dialog flow.
+    final ads = context.read<AdsCubit>().state;
+    if (ads.visibleAds(AdPlacement.orderSuccess).isNotEmpty) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+            builder: (context) => OrderSuccessScreen(order: state.order)),
+        (_) => false,
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -307,6 +361,8 @@ class _CartScreenState extends State<CartScreen> {
           final visibleItems = state.items
               .where((item) => !_pendingDeleteIds.contains(item.product.id))
               .toList();
+          final rows =
+              _buildRows(visibleItems, context.watch<AdsCubit>().state);
 
           return Column(
             children: [
@@ -316,15 +372,22 @@ class _CartScreenState extends State<CartScreen> {
                   children: [
                     ListView.separated(
                       padding: const EdgeInsets.all(16),
-                      itemCount: visibleItems.length,
+                      itemCount: rows.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 16),
                       itemBuilder: (context, index) {
-                        final cartItem = visibleItems[index];
-                        return _CartItemCard(
-                          key: ValueKey(cartItem.product.id),
-                          cartItem: cartItem,
-                          onSwipeDelete: () => _handleSwipeDelete(cartItem),
-                        );
+                        switch (rows[index]) {
+                          case _ProductRow(:final item):
+                            return _CartItemCard(
+                              key: ValueKey(item.product.id),
+                              cartItem: item,
+                              onSwipeDelete: () => _handleSwipeDelete(item),
+                            );
+                          case _AdRow(:final ad, :final slot):
+                            return KeyedSubtree(
+                              key: ValueKey('cart-ad-$slot'),
+                              child: SponsoredAdCard(ad: ad, slotId: '$slot'),
+                            );
+                        }
                       },
                     ),
                     Positioned.fill(
@@ -419,7 +482,7 @@ class _CartScreenState extends State<CartScreen> {
                                 flex: 3,
                                 child: SizedBox(
                                   height: 56,
-                                  child: ElevatedButton(
+                                  child: ShimmerSweep(active: busy, borderRadius: BorderRadius.circular(16), child: ElevatedButton(
                                     onPressed: busy ? null : _placeOrder,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor:
@@ -433,25 +496,18 @@ class _CartScreenState extends State<CartScreen> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 12),
                                     ),
-                                    child: busy
-                                        ? const SizedBox(
-                                            width: 24,
-                                            height: 24,
-                                            child: CircularProgressIndicator(
-                                              color: Colors.white,
-                                              strokeWidth: 2.5,
-                                            ),
-                                          )
-                                        : FittedBox(
-                                            child: Text(
-                                              "Place order · ${formatRupees(toPay)}",
-                                              style: const TextStyle(
-                                                  fontSize: 16,
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold),
-                                            ),
-                                          ),
-                                  ),
+                                    child: FittedBox(
+                                      child: Text(
+                                        busy
+                                            ? "Placing order…"
+                                            : "Place order · ${formatRupees(toPay)}",
+                                        style: const TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  )),
                                 ),
                               ),
                             ],
@@ -467,6 +523,30 @@ class _CartScreenState extends State<CartScreen> {
         },
       ),
     );
+  }
+
+  /// The list as displayed: cart items with a sponsored row after every
+  /// `cartAdFrequency` items and always one after the last, cycling through
+  /// the live CART_INLINE ads in priority order. Ads are view-only rows —
+  /// totals, counts, undo and checkout all keep using the cart items alone.
+  /// Until ads arrive (or when there are none) it's just the cart items.
+  static List<_CartRow> _buildRows(List<CartItemModel> items, AdsState ads) {
+    final products = [for (final item in items) _ProductRow(item)];
+    final available = ads.visibleAds(AdPlacement.cartInline);
+    if (items.isEmpty || available.isEmpty) return products;
+
+    final every = ads.settings.cartAdFrequency;
+    final rows = <_CartRow>[];
+    var slot = 0;
+    for (var i = 0; i < products.length; i++) {
+      rows.add(products[i]);
+      final isLast = i == products.length - 1;
+      if ((i + 1) % every == 0 || isLast) {
+        rows.add(_AdRow(ad: available[slot % available.length], slot: slot));
+        slot++;
+      }
+    }
+    return rows;
   }
 
   /// [panel]'s content while it's the open one; collapses smoothly to
@@ -485,6 +565,24 @@ class _CartScreenState extends State<CartScreen> {
           : const SizedBox(width: double.infinity),
     );
   }
+}
+
+// ─────────────────────────────────────────────
+//  Rows of the cart list: products and sponsored slots
+// ─────────────────────────────────────────────
+sealed class _CartRow {
+  const _CartRow();
+}
+
+class _ProductRow extends _CartRow {
+  final CartItemModel item;
+  const _ProductRow(this.item);
+}
+
+class _AdRow extends _CartRow {
+  final AdModel ad;
+  final int slot;
+  const _AdRow({required this.ad, required this.slot});
 }
 
 // ─────────────────────────────────────────────

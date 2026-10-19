@@ -8,13 +8,11 @@ import 'categories/views/categories_screen.dart';
 import 'orders/views/orders_screen.dart';
 // Note: Changed the import from Profile to OrderAgain
 import 'order_again/views/order_again_screen.dart';
-import 'cart/views/cart_screen.dart';
 import '../shared/widgets/app_bottom_nav.dart';
 
 // Blocs
 import '../../blocs/auth_bloc/auth_bloc.dart';
 import '../../blocs/auth_bloc/auth_state.dart';
-import '../../blocs/cart_bloc/cart_bloc.dart';
 import '../../blocs/order_bloc/order_bloc.dart';
 import '../../blocs/order_bloc/order_event.dart';
 import '../shared/utils/bloc_ready.dart';
@@ -84,7 +82,7 @@ class _MainWrapperState extends State<MainWrapper> {
       const HomeScreen(),
       const OrderAgainScreen(), // Now at index 1
       const CategoriesScreen(),
-      const OrdersScreen(),
+      OrdersScreen(isActive: _currentIndex == 3),
     ];
 
     // Read once, reused below for both the gate overlay and hiding the
@@ -94,140 +92,65 @@ class _MainWrapperState extends State<MainWrapper> {
     final locationState = context.watch<LocationCubit>().state;
     final isBound = locationState is Bound;
 
-    return BlocListener<LocationCubit, LocationState>(
-      // The initial product fetch fires once at splash (see
-      // SplashScreen.initState), completely independent of whether the
-      // backend was actually reachable yet — if it failed then, nothing
-      // else ever retries it, leaving Home stuck on a stale error even
-      // after the backend recovers and a serviceable location is bound.
-      // Landing on Bound is a reliable "we're online now" signal, so use it
-      // to recover automatically instead of relying on the user finding
-      // Home's own manual Retry button.
-      listenWhen: (previous, current) => previous is! Bound && current is Bound,
-      listener: (context, state) {
-        final homeBloc = context.read<HomeBloc>();
-        if (homeBloc.state is HomeError) {
-          homeBloc.add(LoadHomeData());
-        }
+    // MainWrapper is the root route (splash and checkout both clear the
+    // stack beneath it), so an unhandled system back here exits the app.
+    // From any other tab, back returns to Home first — only Home exits.
+    // While gated there are no tabs to return to, so back exits as normal.
+    return PopScope(
+      canPop: _currentIndex == 0 || !isBound,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        setState(() => _currentIndex = 0);
       },
-      child: Scaffold(
-        body: Stack(
-        children: [
-          IndexedStack(
-            index: _currentIndex,
-            children: pages,
+      child: BlocListener<LocationCubit, LocationState>(
+        // The initial product fetch fires once at splash (see
+        // SplashScreen.initState), completely independent of whether the
+        // backend was actually reachable yet — if it failed then, nothing
+        // else ever retries it, leaving Home stuck on a stale error even
+        // after the backend recovers and a serviceable location is bound.
+        // Landing on Bound is a reliable "we're online now" signal, so use it
+        // to recover automatically instead of relying on the user finding
+        // Home's own manual Retry button.
+        listenWhen: (previous, current) =>
+            previous is! Bound && current is Bound,
+        listener: (context, state) {
+          final homeBloc = context.read<HomeBloc>();
+          if (homeBloc.state is HomeError) {
+            homeBloc.add(LoadHomeData());
+          }
+        },
+        child: Scaffold(
+          body: Stack(
+            children: [
+              IndexedStack(
+                index: _currentIndex,
+                children: pages,
+              ),
+
+              if (!isBound)
+                Positioned.fill(
+                  child: locationState is NotDeliverable
+                      ? const NotServiceableScreen()
+                      : locationState is CheckFailed
+                          ? const CheckFailedScreen()
+                          : const LocationGateScreen(),
+                ),
+
+              // The "View Cart" banner lives in each tab's own Scaffold
+              // (FloatingCartBanner) so the tab reserves space for it —
+              // an overlay here would just cover the bottom of the list.
+            ],
           ),
-
-          if (!isBound)
-            Positioned.fill(
-              child: locationState is NotDeliverable
-                  ? const NotServiceableScreen()
-                  : locationState is CheckFailed
-                      ? const CheckFailedScreen()
-                      : const LocationGateScreen(),
-            ),
-
-          // Global Floating Cart Banner (Remains unchanged!)
-          Positioned(
-            bottom: 16,
-            left: 16,
-            right: 16,
-            child: !isBound
-                ? const SizedBox.shrink()
-                : BlocBuilder<CartBloc, CartState>(
-                    builder: (context, state) {
-                      if (state is CartLoaded && state.items.isNotEmpty) {
-                        final totalItems = state.items
-                            .fold(0, (sum, item) => sum + item.quantity);
-                        final totalPrice = state.items.fold(
-                            0.0,
-                            (sum, item) =>
-                                sum +
-                                (item.product.priceValue * item.quantity));
-
-                        return GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => const CartScreen()));
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 18, vertical: 13),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF3DAA5C),
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                  color:
-                                      const Color(0xFF3DAA5C).withValues(alpha: 0.25),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
-                                )
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      "$totalItems ITEM${totalItems > 1 ? 'S' : ''}",
-                                      style: const TextStyle(
-                                          fontFamily: 'Poppins',
-                                          color: Color(0xCCFFFFFF),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 0.5),
-                                    ),
-                                    Text(
-                                      "₹${totalPrice.toStringAsFixed(0)}",
-                                      style: const TextStyle(
-                                          fontFamily: 'Poppins',
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w900),
-                                    ),
-                                  ],
-                                ),
-                                const Row(
-                                  children: [
-                                    Text(
-                                      "View Cart",
-                                      style: TextStyle(
-                                          fontFamily: 'Poppins',
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700),
-                                    ),
-                                    SizedBox(width: 6),
-                                    Icon(Icons.arrow_forward_ios_rounded,
-                                        color: Colors.white, size: 13),
-                                  ],
-                                )
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-          ),
-        ],
-      ),
-      // No tabs to switch between while we don't even know if this location
-      // is deliverable — the gate screens above are meant to be a clean,
-      // full-screen flow, not framed by chrome that doesn't do anything yet.
-      bottomNavigationBar: !isBound
-          ? null
-          : AppBottomNav(
-              currentIndex: _currentIndex,
-              onTap: _onTabTapped,
-            ),
+          // No tabs to switch between while we don't even know if this location
+          // is deliverable — the gate screens above are meant to be a clean,
+          // full-screen flow, not framed by chrome that doesn't do anything yet.
+          bottomNavigationBar: !isBound
+              ? null
+              : AppBottomNav(
+                  currentIndex: _currentIndex,
+                  onTap: _onTabTapped,
+                ),
+        ),
       ),
     );
   }

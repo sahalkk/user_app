@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../blocs/auth_bloc/auth_bloc.dart';
 import '../../../blocs/auth_bloc/auth_event.dart';
 import '../../../data/repositories/auth_repository.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 /// Shown once, right after a brand-new account's first login (no name on
 /// the backend yet) — also reusable later as an "edit name" screen from
@@ -126,7 +127,7 @@ class _SetNameScreenState extends State<SetNameScreen> {
               SizedBox(
                 width: double.infinity,
                 height: 56,
-                child: ElevatedButton(
+                child: ShimmerSweep(active: _isSaving, borderRadius: BorderRadius.circular(16), child: ElevatedButton(
                   onPressed: _isSaving ? null : _save,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF3DAA5C),
@@ -134,21 +135,14 @@ class _SetNameScreenState extends State<SetNameScreen> {
                         borderRadius: BorderRadius.circular(16)),
                     elevation: 0,
                   ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5),
-                        )
-                      : const Text(
-                          "Continue",
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
-                        ),
-                ),
+                  child: Text(
+                    _isSaving ? "Saving…" : "Continue",
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
+                  ),
+                )),
               ),
               if (widget.initialName == null) ...[
                 const SizedBox(height: 12),

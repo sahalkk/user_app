@@ -1,14 +1,17 @@
+import 'package:beeyo_customer/blocs/ads_cubit/ads_cubit.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_bloc.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_event.dart';
 import 'package:beeyo_customer/blocs/auth_bloc/auth_state.dart';
 import 'package:beeyo_customer/blocs/order_bloc/order_bloc.dart';
 import 'package:beeyo_customer/blocs/wishlist_bloc/wishlist_bloc.dart';
+import 'package:beeyo_customer/data/repositories/ad_repository.dart';
 import 'package:beeyo_customer/data/repositories/auth_repository.dart';
 import 'package:beeyo_customer/data/repositories/location_repository.dart';
 import 'package:beeyo_customer/data/repositories/order_repository.dart';
 import 'package:beeyo_customer/data/repositories/recent_searches_repository.dart';
 import 'package:beeyo_customer/screens/auth/views/login_screen.dart';
 import 'package:beeyo_customer/screens/location/cubit/location_cubit.dart';
+import 'package:beeyo_customer/shared/models/ad_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -49,6 +52,9 @@ class MyAppView extends StatelessWidget {
         RepositoryProvider<RecentSearchesRepository>(
           create: (context) => RecentSearchesRepository(),
         ),
+        RepositoryProvider<AdRepository>(
+          create: (context) => AdRepository(),
+        ),
       ],
       // USE MULTI-BLOC PROVIDER HERE
       child: MultiBlocProvider(
@@ -79,6 +85,13 @@ class MyAppView extends StatelessWidget {
           BlocProvider(
             create: (context) =>
                 LocationCubit(context.read<LocationRepository>())..bootstrap(),
+          ),
+          // Home banner fetched up front so it's usually ready before Home
+          // finishes loading products.
+          BlocProvider(
+            lazy: false,
+            create: (context) => AdsCubit(context.read<AdRepository>())
+              ..load(AdPlacement.homeBanner),
           ),
         ],
         child: BlocListener<AuthBloc, AuthState>(

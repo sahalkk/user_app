@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -10,9 +11,11 @@ import '../../../data/repositories/location_repository.dart'
 import '../../../shared/models/place_suggestion_model.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../../../shared/widgets/place_suggestion_tile.dart';
+import '../../../shared/widgets/search_bar_style.dart';
 import '../cubit/location_cubit.dart';
 import 'add_address_wizard/address_details_screen.dart';
 import 'add_address_wizard/address_wizard_draft.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 /// Full-screen "drop a pin" picker. The pin stays fixed at the screen
 /// center — the map pans underneath it — which is what riders' navigation
@@ -137,6 +140,14 @@ class MapPinPickerScreen extends StatefulWidget {
 // Roof level — close enough to see individual buildings on satellite.
 const double _pinZoom = 18;
 
+// Camera transitions for programmatic moves (search pick, locate-me) — see
+// _MapPinPickerScreenState._moveCamera.
+const double _glideMaxMeters = 1500;
+const double _flyMaxMeters = 50000;
+const Duration _glideDuration = Duration(milliseconds: 700);
+const Duration _flyLegDuration = Duration(milliseconds: 700);
+const Duration _flyPause = Duration(milliseconds: 250);
+
 gmaps.LatLng _toG(LatLng p) => gmaps.LatLng(p.latitude, p.longitude);
 
 class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
@@ -150,6 +161,14 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
   // Starts at the initial position: the map reports an idle once it first
   // loads, and that spot's address was already seeded in initState.
   late LatLng? _programmaticTarget = widget.initialPosition;
+  // Whether the stalled-animation retry in _onCameraIdle was already spent
+  // on the current _programmaticTarget, so it can't loop.
+  bool _retriedProgrammaticMove = false;
+  // Bumped per _moveCamera call (and by a touch) so a superseded
+  // two-leg fly doesn't fire its second leg.
+  int _moveSeq = 0;
+  // True during the zoom-out leg of a fly, whose idle isn't the target.
+  bool _isFlyingOut = false;
   bool _isDragging = false;
   // Hybrid = satellite photo + road/place labels, so customers can drop the
   // pin on their own roof; the layers button flips to the plain map.
@@ -196,10 +215,59 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
     super.dispose();
   }
 
-  void _moveCamera(LatLng position) {
+  /// Moves the pin to [position], picking the transition by distance: a
+  /// street-level glide when close, a zoom-out-and-back-in when far enough
+  /// that a street-level glide would just smear unloaded tiles, and an
+  /// instant jump when it's so far that the zoom-out shows nothing useful.
+  Future<void> _moveCamera(LatLng position) async {
+    final controller = _mapController;
+    if (controller == null) return;
+    final seq = ++_moveSeq;
     _programmaticTarget = position;
-    _mapController?.animateCamera(
-        gmaps.CameraUpdate.newLatLngZoom(_toG(position), _pinZoom));
+    _retriedProgrammaticMove = false;
+    final from = _cameraCenter;
+    final distance = distanceMeters(from, position);
+    final landing = gmaps.CameraUpdate.newLatLngZoom(_toG(position), _pinZoom);
+
+    if (distance <= _glideMaxMeters) {
+      await controller.animateCamera(landing, duration: _glideDuration);
+      return;
+    }
+    if (distance > _flyMaxMeters) {
+      await controller.moveCamera(landing);
+      return;
+    }
+
+    // Leg 1: pull back until both points are in view. Its idle lands short
+    // of the target by design, so _onCameraIdle must ignore it.
+    _isFlyingOut = true;
+    await controller.animateCamera(
+      gmaps.CameraUpdate.newLatLngBounds(
+        gmaps.LatLngBounds(
+          southwest: gmaps.LatLng(math.min(from.latitude, position.latitude),
+              math.min(from.longitude, position.longitude)),
+          northeast: gmaps.LatLng(math.max(from.latitude, position.latitude),
+              math.max(from.longitude, position.longitude)),
+        ),
+        80,
+      ),
+      duration: _flyLegDuration,
+    );
+    // The platform call returns as the animation starts, not when it ends.
+    await Future<void>.delayed(_flyLegDuration + _flyPause);
+    // A finger on the map or a newer move took over in the meantime.
+    if (!mounted || seq != _moveSeq) return;
+    _isFlyingOut = false;
+    // Leg 2: drop into the target.
+    await controller.animateCamera(landing, duration: _flyLegDuration);
+  }
+
+  // Any finger on the map hands control back to the user, so a stale
+  // programmatic target (or a half-finished fly) can't mask their drag.
+  void _onMapPointerDown(PointerDownEvent _) {
+    _programmaticTarget = null;
+    _isFlyingOut = false;
+    _moveSeq++;
   }
 
   void _onCameraMoveStarted() {
@@ -209,12 +277,23 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
   }
 
   void _onCameraIdle() {
+    if (_isFlyingOut) return;
     final target = _programmaticTarget;
+    // Our own move landing where we sent it already knows its address.
+    if (target != null && distanceMeters(target, _cameraCenter) < 2) {
+      _programmaticTarget = null;
+      return;
+    }
+    // Our own move stopped short with no finger on the map — the animation
+    // was interrupted (e.g. the map resizing under it). Jump straight there
+    // once rather than leaving the pin on the old spot.
+    if (target != null && !_retriedProgrammaticMove) {
+      _retriedProgrammaticMove = true;
+      _mapController?.moveCamera(
+          gmaps.CameraUpdate.newLatLngZoom(_toG(target), _pinZoom));
+      return;
+    }
     _programmaticTarget = null;
-    // Our own move landing where we sent it already knows its address. If
-    // the centre is elsewhere, the user dragged (an animation to the
-    // current spot may never report idle, leaving a stale target).
-    if (target != null && distanceMeters(target, _cameraCenter) < 2) return;
     setState(() => _isDragging = false);
     context.read<LocationCubit>().updatePinPosition(_cameraCenter);
   }
@@ -299,22 +378,29 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
         }
       },
       child: Scaffold(
+        // Keep the map full-size while the search keyboard is up: resizing
+        // it as the keyboard closes on a result pick interrupts the camera
+        // animation to that result.
+        resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
-            gmaps.GoogleMap(
-              initialCameraPosition: gmaps.CameraPosition(
-                  target: _toG(widget.initialPosition), zoom: _pinZoom),
-              mapType: _mapType,
-              onMapCreated: (controller) => _mapController = controller,
-              onCameraMoveStarted: _onCameraMoveStarted,
-              onCameraMove: (position) => _cameraCenter =
-                  LatLng(position.target.latitude, position.target.longitude),
-              onCameraIdle: _onCameraIdle,
-              // The screen has its own locate-me button and search bar.
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              mapToolbarEnabled: false,
-              compassEnabled: false,
+            Listener(
+              onPointerDown: _onMapPointerDown,
+              child: gmaps.GoogleMap(
+                initialCameraPosition: gmaps.CameraPosition(
+                    target: _toG(widget.initialPosition), zoom: _pinZoom),
+                mapType: _mapType,
+                onMapCreated: (controller) => _mapController = controller,
+                onCameraMoveStarted: _onCameraMoveStarted,
+                onCameraMove: (position) => _cameraCenter =
+                    LatLng(position.target.latitude, position.target.longitude),
+                onCameraIdle: _onCameraIdle,
+                // The screen has its own locate-me button and search bar.
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+                mapToolbarEnabled: false,
+                compassEnabled: false,
+              ),
             ),
 
             // Fixed center pin
@@ -424,14 +510,7 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                                   ),
                                 ),
                               ),
-                              if (_isSearching)
-                                const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Color(0xFF3DAA5C)),
-                                )
-                              else if (_searchController.text.isNotEmpty)
+                              if (_searchController.text.isNotEmpty)
                                 GestureDetector(
                                   onTap: () {
                                     _searchController.clear();
@@ -446,7 +525,27 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
                       ),
                     ],
                   ),
-                  if (_searchResults.isNotEmpty)
+                  if (_isSearching && _searchResults.isEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(
+                          top: 6, left: _searchBarHeight + 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(_searchBarRadius),
+                        border: Border.all(color: const Color(0xFFE3E3E3)),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.12),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: const ListTileSkeleton(
+                          leadingSize: 34,
+                          padding: EdgeInsets.symmetric(vertical: 8)),
+                    )
+                  else if (_searchResults.isNotEmpty)
                     Container(
                       margin: const EdgeInsets.only(
                           top: 6, left: _searchBarHeight + 8),
@@ -537,8 +636,8 @@ class _MapPinPickerScreenState extends State<MapPinPickerScreen> {
 
 // Top bar: rectangular search box with small rounded corners, and a
 // matching square back button.
-const double _searchBarHeight = 46;
-const double _searchBarRadius = 8;
+const double _searchBarHeight = kSearchBarHeight;
+const double _searchBarRadius = kSearchBarRadius;
 
 class _RoundIconButton extends StatelessWidget {
   final IconData icon;
@@ -864,10 +963,10 @@ class _ConfirmSheet extends StatelessWidget {
               return SizedBox(
                 width: double.infinity,
                 height: 52,
-                child: ElevatedButton(
+                child: ShimmerSweep(active: isChecking, borderRadius: BorderRadius.circular(14), child: ElevatedButton(
                   onPressed: !canConfirm || isChecking
                       ? null
-                      : () {
+                      : () async {
                           if (ambientConfirm) {
                             // No label/landmark collected in this mode, and
                             // it must never silently grow the user's real
@@ -883,12 +982,22 @@ class _ConfirmSheet extends StatelessWidget {
                             return;
                           }
 
-                          // Serviceability is no longer checked the instant
-                          // the pin is confirmed — the wizard checks it at
-                          // the very end (Step 3's Save). This screen's job
-                          // now is just handing off position + area label to
-                          // the wizard, seeded from existingAddress when
-                          // editing.
+                          // Check the pin before the wizard asks for any
+                          // details, so nobody fills in a whole address for
+                          // a spot we can't deliver to. A no lands on
+                          // NotDeliverable, which this sheet shows inline
+                          // (red "drag the map" note, button disabled).
+                          // Step 3's Save still re-checks, since the pin can
+                          // be nudged on the review map.
+                          final messenger = ScaffoldMessenger.of(context);
+                          final navigator = Navigator.of(context);
+                          final ok = await cubit.precheckPin(state);
+                          if (ok == null) {
+                            messenger.showSnackBar(const SnackBar(
+                                content: Text(
+                                    "Couldn't check delivery availability. Please try again.")));
+                          }
+                          if (ok != true) return;
                           final draft = AddressWizardDraft(
                             position: state.position,
                             areaLabel: state.formattedAddress,
@@ -902,8 +1011,7 @@ class _ConfirmSheet extends StatelessWidget {
                             recipientPhone: editing?.recipientPhone ?? '',
                             editing: editing,
                           );
-                          Navigator.push(
-                            context,
+                          navigator.push(
                             MaterialPageRoute(
                               builder: (_) =>
                                   AddressDetailsScreen(draft: draft),
@@ -917,21 +1025,18 @@ class _ConfirmSheet extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14)),
                     elevation: 0,
                   ),
-                  child: isChecking
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : Text(
-                          ambientConfirm ? "Confirm Location" : "Continue",
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15),
-                        ),
-                ),
+                  child: Text(
+                    isChecking
+                        ? "Checking…"
+                        : ambientConfirm
+                            ? "Confirm Location"
+                            : "Continue",
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15),
+                  ),
+                )),
               );
             },
           ),

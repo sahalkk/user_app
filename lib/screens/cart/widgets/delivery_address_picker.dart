@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../../location/cubit/location_cubit.dart';
 import '../../location/views/map_pin_picker_screen.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 /// Saved-address list + "Add new address" for choosing where an order goes.
 /// Picking a row binds it on [LocationCubit] (the single source of truth for
@@ -129,11 +130,8 @@ class _DeliveryAddressPickerState extends State<DeliveryAddressPicker> {
       future: _addressesFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: LinearProgressIndicator(
-                color: Color(0xFF3DAA5C), backgroundColor: Color(0xFFF0F0F0)),
-          );
+          return const ListTileSkeleton(
+              count: 2, leadingSize: 22, circleLeading: true);
         }
         final addresses = snapshot.data!;
 
@@ -243,8 +241,14 @@ class _AddressRow extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        // Busy = this address is being switched to and checked.
+        child: ShimmerSweep(
+          active: isBusy,
+          borderRadius: BorderRadius.circular(12),
+          color: const Color(0x4D3DAA5C),
+          child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFF1F8F3) : Colors.white,
@@ -294,22 +298,16 @@ class _AddressRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            if (isBusy)
-              const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Color(0xFF3DAA5C)),
-              )
-            else
-              Icon(
-                isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
-                color: isSelected
-                    ? const Color(0xFF3DAA5C)
-                    : const Color(0xFFE0E0E0),
-                size: 22,
-              ),
+            Icon(
+              isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
+              color: isSelected
+                  ? const Color(0xFF3DAA5C)
+                  : const Color(0xFFE0E0E0),
+              size: 22,
+            ),
           ],
+        ),
+          ),
         ),
       ),
     );

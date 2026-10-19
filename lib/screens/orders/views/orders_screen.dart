@@ -13,7 +13,9 @@ import '../../../shared/models/order_status.dart';
 import '../../../shared/models/product_model.dart';
 import '../../../shared/utils/order_items_resolver.dart';
 import '../../../shared/widgets/order_status_chip.dart';
+import '../../../shared/widgets/floating_cart_banner.dart';
 import '../../home/blocs/home_bloc.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 const _green = Color(0xFF3DAA5C);
 const _grey = Color(0xFF6B6B6B);
@@ -22,7 +24,12 @@ const _surface = Color(0xFFF5F5F5);
 const _background = Color(0xFFF7F8FA);
 
 class OrdersScreen extends StatefulWidget {
-  const OrdersScreen({super.key});
+  /// Whether this is the tab currently on screen. MainWrapper's IndexedStack
+  /// keeps this screen alive behind the other tabs, so it can't tell that
+  /// on its own — polling only runs while this is true.
+  final bool isActive;
+
+  const OrdersScreen({super.key, this.isActive = true});
 
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
@@ -31,12 +38,14 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> with WidgetsBindingObserver {
   // No push infra (no WebSocket/notification channel) behind order status
   // yet, so this is a short poll instead — good enough for a status tag
-  // that only changes a few times over an order's life. Paused whenever the
-  // app isn't in the foreground so it doesn't spend battery/data unseen.
+  // that only changes a few times over an order's life. Runs only while
+  // this tab is visible, the app is in the foreground and someone is logged
+  // in, so it doesn't spend battery/data unseen.
   // Each poll also rebuilds the list, which is what moves a delivered order
   // from Active to Past once its linger window has passed.
   static const _pollInterval = Duration(seconds: 12);
   Timer? _pollTimer;
+  bool _inForeground = true;
 
   // OrderBloc is shared with checkout, so its state passes through
   // OrderPlacing/OrderPlaced — keep the last loaded list here so the page
@@ -50,13 +59,32 @@ class _OrdersScreenState extends State<OrdersScreen> with WidgetsBindingObserver
     WidgetsBinding.instance.addObserver(this);
     final state = context.read<OrderBloc>().state;
     if (state is OrderLoaded) _orders = state.orders;
-    context.read<OrderBloc>().add(LoadOrders());
-    _startPolling();
+    // Guests have no orders to load — fetching would only surface a
+    // "please log in" error behind the tab's login gate.
+    if (_isLoggedIn) context.read<OrderBloc>().add(LoadOrders());
+    _syncPolling();
   }
 
-  void _startPolling() {
-    _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(_pollInterval, (_) {
+  @override
+  void didUpdateWidget(OrdersScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) _syncPolling();
+  }
+
+  bool get _isLoggedIn =>
+      context.read<AuthBloc>().state is AuthAuthenticated;
+
+  bool get _shouldPoll => widget.isActive && _inForeground && _isLoggedIn;
+
+  /// Starts or stops the poll to match [_shouldPoll]. Re-entering polling
+  /// leaves the cadence alone if a timer is already running.
+  void _syncPolling() {
+    if (!_shouldPoll) {
+      _pollTimer?.cancel();
+      _pollTimer = null;
+      return;
+    }
+    _pollTimer ??= Timer.periodic(_pollInterval, (_) {
       if (!mounted) return;
       context.read<OrderBloc>().add(const LoadOrders(silent: true));
     });
@@ -64,14 +92,13 @@ class _OrdersScreenState extends State<OrdersScreen> with WidgetsBindingObserver
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // Catch up on anything that changed while backgrounded, then resume
-      // the regular poll cadence.
+    _inForeground = state == AppLifecycleState.resumed;
+    if (_inForeground && _shouldPoll) {
+      // Catch up on anything that changed while backgrounded before the
+      // regular poll cadence resumes.
       context.read<OrderBloc>().add(const LoadOrders(silent: true));
-      _startPolling();
-    } else {
-      _pollTimer?.cancel();
     }
+    _syncPolling();
   }
 
   @override
@@ -116,11 +143,13 @@ class _OrdersScreenState extends State<OrdersScreen> with WidgetsBindingObserver
             } else {
               setState(() => _orders = null);
             }
+            _syncPolling();
           },
         ),
       ],
       child: Scaffold(
         backgroundColor: _background,
+        bottomNavigationBar: const FloatingCartBanner(),
         body: SafeArea(child: _buildBody(context)),
       ),
     );
@@ -778,7 +807,9 @@ class _ProductThumb extends StatelessWidget {
         child: url.isEmpty
             ? placeholder
             : Image.network(url,
-                fit: BoxFit.cover, errorBuilder: (_, __, ___) => placeholder),
+                fit: BoxFit.cover,
+                loadingBuilder: skeletonImageLoadingBuilder,
+                errorBuilder: (_, __, ___) => placeholder),
       ),
     );
   }
@@ -1035,13 +1066,11 @@ class _OrdersSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget bar(double width, double height, {double radius = 8}) => Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-              color: const Color(0xFFECEDEF),
-              borderRadius: BorderRadius.circular(radius)),
-        );
+    Widget bar(double width, double height, {double radius = 8}) =>
+        SkeletonBox(
+            width: width,
+            height: height,
+            borderRadius: BorderRadius.circular(radius));
 
     Widget card({required double height}) => Container(
           height: height,

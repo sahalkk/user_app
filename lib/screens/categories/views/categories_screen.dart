@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 import '../../../shared/models/category_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shimmer/shimmer.dart';
 import '../blocs/categories_bloc.dart';
 // 🔥 1. Import the floating cart banner
 import '../../../shared/widgets/floating_cart_banner.dart';
 import '../views/category_products_screen.dart';
+import 'package:beeyo_customer/shared/widgets/search_bar_style.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -40,7 +41,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             SliverPersistentHeader(
               pinned: true,
               delegate: StickyHeaderDelegate(
-                height: 65,
+                height: kStickySearchBarExtent,
                 child: const StickySearchBar(),
               ),
             ),
@@ -163,11 +164,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                         child: CachedNetworkImage(
                           imageUrl: category.imageUrl,
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => Shimmer.fromColors(
-                            baseColor: const Color(0xFFE0E0E0),
-                            highlightColor: const Color(0xFFBDBDBD),
-                            child: Container(color: Colors.white),
-                          ),
+                          placeholder: skeletonImagePlaceholder,
                           errorWidget: (context, url, error) => const Center(
                             child: Icon(Icons.shopping_basket_rounded,
                                 color: Color(0xFF3DAA5C), size: 24),
@@ -214,28 +211,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         itemBuilder: (context, index) {
           return Column(
             children: [
-              Expanded(
-                child: Shimmer.fromColors(
-                  baseColor: const Color(0xFFF0F0F0),
-                  highlightColor: const Color(0xFFE0E0E0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
+              const Expanded(
+                child: SkeletonBox(
+                    borderRadius: BorderRadius.all(Radius.circular(14))),
               ),
               const SizedBox(height: 8),
-              Shimmer.fromColors(
-                baseColor: const Color(0xFFF0F0F0),
-                highlightColor: const Color(0xFFE0E0E0),
-                child: Container(
-                  height: 10,
-                  width: 40,
-                  color: Colors.white,
-                ),
-              ),
+              const SkeletonBox(width: 40, height: 10),
             ],
           );
         },

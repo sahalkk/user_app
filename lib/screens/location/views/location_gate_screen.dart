@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../shared/widgets/global_header.dart';
 import '../cubit/location_cubit.dart';
 import 'location_picker_sheet.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 /// Covers the shopping tabs for every [LocationState] that isn't [Bound],
 /// [NotDeliverable], or [CheckFailed] (which get their own dedicated
@@ -85,19 +86,7 @@ class LocationGateScreen extends StatelessWidget {
   }
 
   List<Widget> _busyContent(LocationState state) {
-    return [
-      const CircularProgressIndicator(color: Color(0xFF3DAA5C)),
-      const SizedBox(height: 20),
-      Text(
-        _busyLabelFor(state),
-        style: const TextStyle(
-          fontFamily: 'Poppins',
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF6B6B6B),
-        ),
-      ),
-    ];
+    return [ShimmerStatus(label: _busyLabelFor(state))];
   }
 
   String _busyLabelFor(LocationState state) {

@@ -57,5 +57,10 @@
 		<string>Beeyo uses your microphone for voice search.</string>
 		<key>NSSpeechRecognitionUsageDescription</key>
 		<string>Beeyo uses speech recognition to turn your voice into a search query.</string>
+		<!-- Sponsored ads open the advertiser's site externally (url_launcher). -->
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>https</string>
+		</array>
 	</dict>
 </plist>

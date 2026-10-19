@@ -7,7 +7,12 @@ import '../cubit/location_cubit.dart';
 /// delivery zone. Always offers a way out — pick a different location —
 /// plus a low-friction notify-list signup, never a dead end.
 class NotDeliverableView extends StatelessWidget {
-  const NotDeliverableView({super.key});
+  /// Replaces "Choose a different location"'s default (dropping to
+  /// [ManualEntry]) — e.g. the add-address wizard sends the user back to
+  /// its map instead.
+  final VoidCallback? onChooseDifferent;
+
+  const NotDeliverableView({super.key, this.onChooseDifferent});
 
   @override
   Widget build(BuildContext context) {
@@ -57,8 +62,9 @@ class NotDeliverableView extends StatelessWidget {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: () =>
-                      context.read<LocationCubit>().pickDifferentLocation(),
+                  onPressed: onChooseDifferent ??
+                      () =>
+                          context.read<LocationCubit>().pickDifferentLocation(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF3DAA5C),
                     shape: RoundedRectangleBorder(

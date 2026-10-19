@@ -402,7 +402,8 @@ class LocationCubit extends Cubit<LocationState> {
       // square one on every relaunch (see bootstrap()) without silently
       // growing their real address book.
       var bound = existingAddress;
-      if (persistAsSavedAddress && await _repository.authRepository.isLoggedIn()) {
+      if (persistAsSavedAddress &&
+          await _repository.authRepository.isLoggedIn()) {
         // Bind the stored copy — it carries the backendId from the sync, so
         // placing an order doesn't POST this address a second time.
         bound = await _repository.saveAddress(existingAddress);
@@ -419,6 +420,59 @@ class LocationCubit extends Cubit<LocationState> {
         position: position,
         formattedAddress: formattedAddress,
       ));
+    }
+  }
+
+  // ── Checks that don't bind ──────────────────────────────────────
+
+  /// Checks the pin the user is reviewing in the add/edit-address map
+  /// before the wizard collects any details, so an unserviceable spot is
+  /// caught up front rather than at the very last Save. Doesn't bind or
+  /// save anything: lands back on [pin] when serviceable (true), on
+  /// [NotDeliverable] when not (false). A failed check also lands back on
+  /// [pin] and returns null, so the caller can say so and let them retry.
+  Future<bool?> precheckPin(Confirming pin) async {
+    emit(CheckingServiceability(
+      position: pin.position,
+      formattedAddress: pin.formattedAddress,
+    ));
+    try {
+      final result = await _repository.checkServiceability(pin.position);
+      if (result.isServiceable) {
+        emit(pin);
+        return true;
+      }
+      emit(NotDeliverable(
+        position: pin.position,
+        formattedAddress: pin.formattedAddress,
+      ));
+      return false;
+    } on ServiceabilityCheckFailed {
+      emit(pin);
+      return null;
+    }
+  }
+
+  /// Re-checks the bound address right before an order goes out — a bind
+  /// can be stale (bootstrap binds optimistically, zones change while the
+  /// app sits open). Moves to [NotDeliverable] when it no longer is, and
+  /// returns null when the check itself couldn't complete.
+  Future<bool?> revalidateBound() async {
+    final current = state;
+    if (current is! Bound) return false;
+    try {
+      final result =
+          await _repository.checkServiceability(current.address.position);
+      if (result.isServiceable) return true;
+      if (state == current) {
+        emit(NotDeliverable(
+          position: current.address.position,
+          formattedAddress: current.address.formattedAddress,
+        ));
+      }
+      return false;
+    } on ServiceabilityCheckFailed {
+      return null;
     }
   }
 

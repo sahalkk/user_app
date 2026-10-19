@@ -11,9 +11,11 @@ import '../../../data/repositories/location_repository.dart'
 import '../../../shared/models/place_suggestion_model.dart';
 import '../../../shared/models/saved_address_model.dart';
 import '../../../shared/widgets/place_suggestion_tile.dart';
+import '../../../shared/widgets/search_bar_style.dart';
 import '../../address_book/views/address_book_screen.dart';
 import '../cubit/location_cubit.dart';
 import 'map_pin_picker_screen.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 /// The ambient "where are you / is my area serviceable" picker: GPS, search,
 /// or a saved address. GPS picks bind straight away; search results get a
@@ -140,8 +142,9 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       _searchFailed = false;
     });
     try {
-      final search = await context.read<LocationCubit>().searchPlaces(query,
-          near: _searchBias, sessionToken: _sessionToken);
+      final search = await context
+          .read<LocationCubit>()
+          .searchPlaces(query, near: _searchBias, sessionToken: _sessionToken);
       if (!mounted || seq != _searchSeq) return;
       setState(() {
         _results = search.results;
@@ -167,7 +170,8 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     // The pick ends this billing session; the next search starts a new one.
     _sessionToken = newPlacesSessionToken();
     try {
-      final position = await cubit.resolvePlace(suggestion, sessionToken: token);
+      final position =
+          await cubit.resolvePlace(suggestion, sessionToken: token);
       if (!mounted) return;
       cubit.selectSearchResult(suggestion.label, position);
     } on AddressSearchFailed {
@@ -238,11 +242,12 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       maxChildSize: 0.95,
       expand: false,
       builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
+        // Material (not a coloured Container) so the ListTiles inside paint
+        // their ink splashes on this surface instead of underneath it.
+        return Material(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
           child: BlocConsumer<LocationCubit, LocationState>(
             listener: (context, state) {
               // The user's pick (saved address, current location) reached
@@ -328,20 +333,7 @@ class _CenteredLoader extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 240,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(color: Color(0xFF3DAA5C)),
-            const SizedBox(height: 16),
-            Text(label,
-                style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    color: Color(0xFF6B6B6B),
-                    fontSize: 13)),
-          ],
-        ),
-      ),
+      child: Center(child: ShimmerStatus(label: label)),
     );
   }
 }
@@ -536,14 +528,17 @@ class _MainPickerView extends StatelessWidget {
 
         // Search field
         Container(
+          height: kSearchBarHeight,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(kSearchBarRadius),
             border: Border.all(color: const Color(0xFFE0E0E0)),
           ),
           child: TextField(
             controller: searchController,
             onChanged: onSearchChanged,
+            textAlignVertical: TextAlignVertical.center,
             style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
             decoration: const InputDecoration(
               hintText: "Search for area, street, or landmark",
@@ -553,28 +548,20 @@ class _MainPickerView extends StatelessWidget {
                   color: Color(0xFF9E9E9E)),
               prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF6B6B6B)),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 14),
+              contentPadding: EdgeInsets.zero,
+              isDense: true,
             ),
           ),
         ),
 
-        if (isSearching)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(
-                child: SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Color(0xFF3DAA5C)))),
-          ),
-
-        if (results.isNotEmpty) ...[
+        if (isSearching && results.isEmpty) ...[
+          const SizedBox(height: 8),
+          const ListTileSkeleton(padding: EdgeInsets.symmetric(vertical: 12)),
+        ] else if (results.isNotEmpty) ...[
           const SizedBox(height: 8),
           for (final (i, r) in results.indexed) ...[
             if (i > 0) const Divider(height: 1, color: Color(0xFFEEEEEE)),
-            PlaceSuggestionTile(
-                suggestion: r, onTap: () => onSelectResult(r)),
+            PlaceSuggestionTile(suggestion: r, onTap: () => onSelectResult(r)),
           ],
           // Google's terms require this wherever its suggestions are shown
           // without a Google map.
@@ -600,25 +587,33 @@ class _MainPickerView extends StatelessWidget {
         ] else ...[
           const SizedBox(height: 8),
           // Use current location
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: isResolving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Color(0xFF3DAA5C)))
-                : const Icon(Icons.my_location_rounded,
-                    color: Color(0xFF3DAA5C)),
-            title: const Text("Use my current location",
-                style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF3DAA5C))),
-            onTap: isResolving
-                ? null
-                : () => context.read<LocationCubit>().useCurrentLocation(),
+          ShimmerSweep(
+            active: isResolving,
+            borderRadius: BorderRadius.circular(12),
+            color: const Color(0x4D3DAA5C),
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.my_location_rounded,
+                  color: Color(0xFF3DAA5C)),
+              title: isResolving
+                  ? const ShimmerText("Locating you…",
+                      textAlign: TextAlign.start,
+                      baseColor: Color(0xFF3DAA5C),
+                      highlightColor: Color(0xFFB9E4C6),
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700))
+                  : const Text("Use my current location",
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF3DAA5C))),
+              onTap: isResolving
+                  ? null
+                  : () => context.read<LocationCubit>().useCurrentLocation(),
+            ),
           ),
           const Divider(height: 24, color: Color(0xFFE0E0E0)),
 
@@ -647,12 +642,8 @@ class _MainPickerView extends StatelessWidget {
               future: addressesFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: LinearProgressIndicator(
-                        color: Color(0xFF3DAA5C),
-                        backgroundColor: Color(0xFFF0F0F0)),
-                  );
+                  return const ListTileSkeleton(
+                      count: 2, circleLeading: true, card: true);
                 }
                 final addresses = snapshot.data ?? [];
                 if (addresses.isEmpty) {
@@ -891,8 +882,8 @@ class _AsyncDistanceBadge extends StatelessWidget {
   }
 }
 
-/// [label] null renders the loading placeholder — same pill, with a small
-/// spinner in place of the distance, so nothing shifts when it resolves.
+/// [label] null renders the loading placeholder — a shimmering skeleton
+/// the same size as the pill, so nothing shifts when it resolves.
 class _DistanceBadge extends StatelessWidget {
   final String? label;
   const _DistanceBadge({this.label});
@@ -900,6 +891,9 @@ class _DistanceBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = this.label;
+    if (label == null) {
+      return const SkeletonBox(width: 76, height: 20);
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -911,23 +905,12 @@ class _DistanceBadge extends StatelessWidget {
         children: [
           const Icon(Icons.near_me_rounded, size: 11, color: Color(0xFF6B6B6B)),
           const SizedBox(width: 4),
-          if (label == null) ...[
-            const SizedBox(
-              width: 9,
-              height: 9,
-              child: CircularProgressIndicator(
-                  strokeWidth: 1.5, color: Color(0xFF9E9E9E)),
-            ),
-            const SizedBox(width: 4),
-          ],
-          Text(label ?? "km away",
-              style: TextStyle(
+          Text(label,
+              style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  color: label == null
-                      ? const Color(0xFFBDBDBD)
-                      : const Color(0xFF6B6B6B))),
+                  color: Color(0xFF6B6B6B))),
         ],
       ),
     );

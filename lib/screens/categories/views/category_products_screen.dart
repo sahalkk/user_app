@@ -8,6 +8,7 @@ import '../../../shared/widgets/product_grid.dart';
 
 // 🔥 1. Import the new floating cart banner!
 import '../../../shared/widgets/floating_cart_banner.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 class CategoryProductsScreen extends StatefulWidget {
   final String categoryId;
@@ -82,9 +83,12 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
               child: BlocBuilder<HomeBloc, HomeState>(
                 builder: (context, state) {
                   if (state is HomeLoading) {
-                    return const Center(
-                        child: CircularProgressIndicator(
-                            color: Color(0xFF3DAA5C)));
+                    return const SingleChildScrollView(
+                      physics: NeverScrollableScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(12, 16, 12, 100),
+                      child: ProductGridSkeleton(
+                          crossAxisCount: 2, itemCount: 6),
+                    );
                   }
 
                   if (state is HomeLoaded) {
@@ -192,6 +196,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                           : CachedNetworkImage(
                               imageUrl: imageUrl,
                               fit: BoxFit.cover,
+                              placeholder: skeletonImagePlaceholder,
                               errorWidget: (context, url, error) => const Icon(
                                   Icons.shopping_basket_rounded,
                                   color: Color(0xFF3DAA5C),

@@ -11,11 +11,13 @@ import '../../../shared/models/product_model.dart';
 import '../../../shared/utils/product_search.dart';
 import '../../../shared/widgets/product_grid.dart';
 import '../../../shared/widgets/product_row.dart';
+import '../../../shared/widgets/search_bar_style.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../home/blocs/home_bloc.dart';
 import '../../product_details/views/product_details_screen.dart';
 import '../blocs/search_bloc.dart';
 import 'widgets/search_result_tile.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 const _green = Color(0xFF3DAA5C);
 const _muted = Color(0xFF6B6B6B);
@@ -229,8 +231,14 @@ class _SearchScreenState extends State<SearchScreen> {
                   builder: (context, state) {
                     if (state is HomeError) return _buildHomeError(state);
                     if (state is! HomeLoaded) {
-                      return const Center(
-                          child: CircularProgressIndicator(color: _green));
+                      return const SingleChildScrollView(
+                        physics: NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: ListTileSkeleton(
+                            count: 8,
+                            leadingSize: 64,
+                            padding: EdgeInsets.symmetric(vertical: 10)),
+                      );
                     }
                     return _searchController.text.trim().isEmpty
                         ? _buildDiscovery(state)
@@ -260,10 +268,10 @@ class _SearchScreenState extends State<SearchScreen> {
           Expanded(
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              height: 48,
+              height: kSearchBarHeight,
               decoration: BoxDecoration(
                 color: focused ? Colors.white : const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(kSearchBarRadius),
                 border: Border.all(
                   color: focused ? _green : _border,
                   width: focused ? 1.5 : 1,

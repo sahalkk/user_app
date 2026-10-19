@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 // ADDED WishlistBloc imports
 import '../../../blocs/wishlist_bloc/wishlist_bloc.dart';
 import '../../../blocs/wishlist_bloc/wishlist_state.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 class WishlistScreen extends StatelessWidget {
   const WishlistScreen({super.key});
@@ -33,8 +34,18 @@ class WishlistScreen extends StatelessWidget {
       body: BlocBuilder<WishlistBloc, WishlistState>(
         builder: (context, state) {
           if (state is WishlistLoading) {
-            return const Center(
-                child: CircularProgressIndicator(color: Colors.green));
+            return const SingleChildScrollView(
+              physics: NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(width: 70, height: 16),
+                  SizedBox(height: 16),
+                  ProductGridSkeleton(),
+                ],
+              ),
+            );
           }
 
           if (state is WishlistLoaded) {

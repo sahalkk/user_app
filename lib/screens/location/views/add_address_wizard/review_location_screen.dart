@@ -11,6 +11,7 @@ import '../../../../shared/models/saved_address_model.dart';
 import '../../cubit/location_cubit.dart';
 import '../not_deliverable_view.dart';
 import 'address_wizard_draft.dart';
+import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 
 const _green = Color(0xFF3DAA5C);
 const _grey = Color(0xFF6B6B6B);
@@ -86,7 +87,17 @@ class _ReviewLocationScreenState extends State<ReviewLocationScreen> {
         body: BlocBuilder<LocationCubit, LocationState>(
           builder: (context, state) {
             if (state is NotDeliverable) {
-              return const SingleChildScrollView(child: NotDeliverableView());
+              // Back to the map to move the pin — staying here would just
+              // re-show this form for the same undeliverable spot. The map
+              // keeps showing NotDeliverable until the pin moves.
+              return SingleChildScrollView(
+                child: NotDeliverableView(
+                  onChooseDifferent: () => Navigator.of(context).popUntil(
+                      (route) =>
+                          route.settings.name == kAddressMapRouteName ||
+                          route.isFirst),
+                ),
+              );
             }
             final isChecking = state is CheckingServiceability;
 
@@ -146,7 +157,7 @@ class _ReviewLocationScreenState extends State<ReviewLocationScreen> {
                 SizedBox(
                   width: double.infinity,
                   height: 52,
-                  child: ElevatedButton(
+                  child: ShimmerSweep(active: isChecking, borderRadius: BorderRadius.circular(14), child: ElevatedButton(
                     onPressed: isChecking ? null : () => _save(context),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF3DAA5C),
@@ -155,19 +166,12 @@ class _ReviewLocationScreenState extends State<ReviewLocationScreen> {
                           borderRadius: BorderRadius.circular(14)),
                       elevation: 0,
                     ),
-                    child: isChecking
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text("Save Address",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15)),
-                  ),
+                    child: Text(isChecking ? "Checking…" : "Save Address",
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15)),
+                  )),
                 ),
               ],
             );
