@@ -1,6 +1,6 @@
 # Flutter app. Every Play upload uses the PRODUCTION base URL.
-#   dev    -> Play "internal" track
-#   master -> Play closed testing ("alpha") track
+#   dev    -> Play "internal" track, release name like v0.2.0-internal
+#   master -> Play closed testing ("alpha") track, release name like v0.2.0-closed
 
 name: Release to Google Play
 
@@ -10,7 +10,7 @@ on:
 
 env:
   # >>> Put your real production URL here <<<
-  BASE_URL: https://144.24.146.130
+  BASE_URL: https://api.your-production-domain.com
 
 jobs:
   release:
@@ -38,6 +38,16 @@ jobs:
       - name: Get Flutter packages
         run: flutter pub get
 
+      # Without this, Gradle doesn't know your app version and uses "1.0"
+      - name: Read app version from pubspec.yaml
+        run: |
+          VERSION_NAME=$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//; s/+.*//' | tr -d ' \r')
+          BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed -n 's/.*+//p' | tr -d ' \r')
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+          echo "flutter.versionName=$VERSION_NAME" >> android/local.properties
+          echo "flutter.versionCode=${BUILD_NUMBER:-1}" >> android/local.properties
+          echo "App version: $VERSION_NAME"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -56,12 +66,14 @@ jobs:
           EOF
           cp key.properties keystore.properties
 
-      - name: Choose Play track from branch
+      - name: Choose Play track and release name from branch
         run: |
           if [ "${{ github.ref_name }}" = "master" ]; then
             echo "TRACK=alpha" >> $GITHUB_ENV   # closed testing; change to production after public launch
+            echo "RELEASE_NAME=v${VERSION_NAME}-closed" >> $GITHUB_ENV
           else
             echo "TRACK=internal" >> $GITHUB_ENV
+            echo "RELEASE_NAME=v${VERSION_NAME}-internal" >> $GITHUB_ENV
           fi
 
       - name: Build, sign and upload AAB
@@ -72,5 +84,5 @@ jobs:
           chmod +x gradlew
           # Same as: flutter build --dart-define=BASE_URL=...  (Gradle needs it base64-encoded)
           DART_DEFINES=$(echo -n "BASE_URL=$BASE_URL" | base64 -w0)
-          echo "Building for track $TRACK with BASE_URL=$BASE_URL"
-          ./gradlew publishReleaseBundle --track $TRACK -Pdart-defines=$DART_DEFINES
+          echo "Uploading $RELEASE_NAME to track $TRACK with BASE_URL=$BASE_URL"
+          ./gradlew publishReleaseBundle --track $TRACK --release-name "$RELEASE_NAME" -Pdart-defines=$DART_DEFINES
