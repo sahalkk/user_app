@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../blocs/cart_bloc/cart_bloc.dart';
 import '../../shared/models/product_model.dart';
 import '../../shared/models/cart_item_model.dart';
+import '../utils/stock_guard.dart';
 
 /// A reusable widget that shows either an "Add to Cart" button or a quantity counter
 /// depending on whether the product is already in the cart.
@@ -43,6 +44,15 @@ class ProductQuantitySelector extends StatelessWidget {
     );
   }
 
+  int _inCart(BuildContext context) {
+    final state = context.read<CartBloc>().state;
+    if (state is! CartLoaded) return 0;
+    for (final item in state.items) {
+      if (item.product.id == product.id) return item.quantity;
+    }
+    return 0;
+  }
+
   /// Small counter for product card (compact view)
   Widget _buildCompactCounter(BuildContext context, CartItemModel cartItem) {
     return Row(
@@ -77,7 +87,7 @@ class ProductQuantitySelector extends StatelessWidget {
         ),
         GestureDetector(
           onTap: () {
-            context.read<CartBloc>().add(AddToCart(product));
+            addOneToCart(context, product, _inCart(context));
           },
           child: Container(
             padding: const EdgeInsets.all(6),
@@ -129,7 +139,7 @@ class ProductQuantitySelector extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.add, size: 20),
                 onPressed: () {
-                  context.read<CartBloc>().add(AddToCart(product));
+                  addOneToCart(context, product, _inCart(context));
                 },
                 color: Colors.green,
               ),
@@ -146,7 +156,7 @@ class ProductQuantitySelector extends StatelessWidget {
   Widget _buildCompactAddButton(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        context.read<CartBloc>().add(AddToCart(product));
+        addOneToCart(context, product, _inCart(context));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("${product.title} added to cart!"),
@@ -177,7 +187,7 @@ class ProductQuantitySelector extends StatelessWidget {
         height: 50,
         child: ElevatedButton(
           onPressed: () {
-            context.read<CartBloc>().add(AddToCart(product));
+            addOneToCart(context, product, _inCart(context));
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text("${product.title} added to cart!"),

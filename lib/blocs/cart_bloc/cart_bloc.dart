@@ -17,7 +17,20 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     on<RemoveFromCart>(_onRemoveFromCart);
     on<UpdateCartItemQuantity>(_onUpdateQuantity);
     on<ClearCart>(_onClearCart);
+    on<ApplyStockLimits>(_onApplyStockLimits);
+  }
 
+  void _onApplyStockLimits(ApplyStockLimits event, Emitter<CartState> emit) {
+    var changed = false;
+    _items.removeWhere((item) {
+      final limit = event.limits[item.product.id];
+      if (limit == null || item.quantity <= limit) return false;
+      changed = true;
+      if (limit <= 0) return true;
+      item.quantity = limit;
+      return false;
+    });
+    if (changed) _emitLoaded(emit);
   }
 
   void _onLoadCart(LoadCart event, Emitter<CartState> emit) {

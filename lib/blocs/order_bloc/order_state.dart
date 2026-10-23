@@ -46,8 +46,12 @@ class OrderPlaced extends OrderState {
 class OrderPlaceError extends OrderState {
   final String message;
 
-  const OrderPlaceError(this.message);
+  /// Set when the order was refused for stock: units actually left per
+  /// short product.
+  final Map<String, int>? shortages;
+
+  const OrderPlaceError(this.message, {this.shortages});
 
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [message, shortages];
 }

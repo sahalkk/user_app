@@ -10,6 +10,9 @@ import '../../../blocs/wishlist_bloc/wishlist_bloc.dart';
 import '../../../blocs/wishlist_bloc/wishlist_state.dart';
 import '../../../blocs/wishlist_bloc/wishlist_event.dart';
 import 'package:beeyo_customer/shared/widgets/skeleton.dart';
+import 'package:beeyo_customer/shared/widgets/stock_badges.dart';
+import 'package:beeyo_customer/shared/utils/stock_guard.dart';
+import 'package:beeyo_customer/blocs/stock_cubit/stock_cubit.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final ProductModel product;
@@ -34,6 +37,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   void initState() {
     super.initState();
     _imageController = PageController();
+    // The catalog's numbers can be up to a poll old; get this one fresh.
+    context.read<StockCubit>().refreshProducts([product.id]);
   }
 
   @override
@@ -141,6 +146,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               fontWeight: FontWeight.w900,
                               color: Colors.black87),
                         ),
+                        LowStockBadge(productId: product.id, fontSize: 10),
                         const SizedBox(height: 2),
                         const Text(
                           "Inclusive of all taxes",
@@ -154,7 +160,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  _buildDynamicAddButton(context, currentItemQuantity),
+                  if (context.select<StockCubit, bool>(
+                      (c) => c.state.isSoldOut(product.id)))
+                    const ArrivingSoonPill(height: 46, fontSize: 13)
+                  else
+                    _buildDynamicAddButton(context, currentItemQuantity),
                 ],
               ),
             ),
@@ -494,7 +504,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     if (quantity == 0) {
       return GestureDetector(
         onTap: () {
-          context.read<CartBloc>().add(AddToCart(product));
+          addOneToCart(context, product, 0);
         },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -556,7 +566,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               ),
             ),
             GestureDetector(
-              onTap: () => context.read<CartBloc>().add(AddToCart(product)),
+              onTap: () => addOneToCart(context, product, quantity),
               child: const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 8),
                   child: Icon(Icons.add, color: Colors.white, size: 20)),

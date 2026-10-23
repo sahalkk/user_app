@@ -61,6 +61,8 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
         items: event.items,
       );
       emit(OrderPlaced(order));
+    } on InsufficientStockException catch (e) {
+      emit(OrderPlaceError(e.message, shortages: e.available));
     } catch (e) {
       emit(OrderPlaceError(e.toString().replaceFirst('Exception: ', '')));
     }

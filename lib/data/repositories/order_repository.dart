@@ -7,6 +7,36 @@ import '../../shared/models/cart_item_model.dart';
 import '../../shared/models/order_model.dart';
 import 'auth_repository.dart';
 
+/// The order was refused because the store can't cover some lines.
+/// [available] maps each short product to the units actually left.
+class InsufficientStockException implements Exception {
+  final String message;
+  final Map<String, int> available;
+
+  const InsufficientStockException(this.message, this.available);
+
+  static InsufficientStockException? tryParse(String body) {
+    try {
+      final json = jsonDecode(body) as Map;
+      final data = json['data'];
+      if (data is! Map || data['code'] != 'INSUFFICIENT_STOCK') return null;
+      return InsufficientStockException(
+        json['message'] as String? ?? 'Some items are no longer available',
+        {
+          for (final item in data['items'] as List)
+            (item as Map)['productId'] as String:
+                (item['available'] as num).toInt(),
+        },
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  String toString() => message;
+}
+
 /// Talks to the backend's real `/api/v1/orders` endpoints (confirmed live
 /// against the Swagger spec at `/api/v1/docs-json`). Two things the spec
 /// left untyped: the `Order` response shape (empty schema — field names
@@ -67,6 +97,13 @@ class OrderRepository {
     if (response.statusCode == 401) {
       await authRepository.handleUnauthorized();
       throw const SessionExpiredException();
+    }
+    // Someone else got the last units (or stock was cut) between adding to
+    // the cart and placing the order. Nothing was taken; the body lists
+    // what's left of each short item so the cart can be fixed in one go.
+    if (response.statusCode == 409) {
+      final shortage = InsufficientStockException.tryParse(response.body);
+      if (shortage != null) throw shortage;
     }
     // 404/422 carry a message meant for the user (address not found, not
     // deliverable) — show it rather than a bare status code.

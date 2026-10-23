@@ -40,3 +40,13 @@ class UpdateCartItemQuantity extends CartEvent {
 }
 
 class ClearCart extends CartEvent {}
+
+/// Brings the cart within what the store has: an item whose limit is 0 is
+/// removed, one above its limit is cut down to it. Products without an
+/// entry in [limits] are left as they are.
+class ApplyStockLimits extends CartEvent {
+  final Map<String, int> limits;
+  const ApplyStockLimits(this.limits);
+  @override
+  List<Object> get props => [limits];
+}

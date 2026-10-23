@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../blocs/auth_bloc/auth_bloc.dart';
 import '../../../blocs/auth_bloc/auth_state.dart';
 import '../../../blocs/cart_bloc/cart_bloc.dart';
+import '../../../blocs/stock_cubit/stock_cubit.dart';
 import '../../../blocs/order_bloc/order_bloc.dart';
 import '../../../blocs/order_bloc/order_event.dart';
 import '../../../blocs/order_bloc/order_state.dart';
@@ -243,9 +244,13 @@ class _OrderAgainScreenState extends State<OrderAgainScreen> {
 }
 
 /// Adds every still-available item of a past order to the cart at its
-/// original quantity, and tells the user what happened.
+/// original quantity (cut down to what the store has now), and tells the
+/// user what happened. Sold-out items are skipped like delisted ones.
 void _reorder(BuildContext context, List<ResolvedOrderItem> items) {
-  final available = items.where((i) => i.available).toList();
+  final stock = context.read<StockCubit>().state;
+  final available = items
+      .where((i) => i.available && !stock.isSoldOut(i.product.id))
+      .toList();
   final skipped = items.length - available.length;
   final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
 
@@ -253,10 +258,16 @@ void _reorder(BuildContext context, List<ResolvedOrderItem> items) {
   if (available.isEmpty) {
     message = "These items are no longer available";
   } else {
-    context.read<CartBloc>().add(AddItemsToCart(available
-        .map((i) =>
-            CartItemModel(id: '', product: i.product, quantity: i.quantity))
-        .toList()));
+    final cart = context.read<CartBloc>()
+      ..add(AddItemsToCart(available
+          .map((i) =>
+              CartItemModel(id: '', product: i.product, quantity: i.quantity))
+          .toList()));
+    // Merged with what's already in the cart, a line can now exceed stock.
+    cart.add(ApplyStockLimits({
+      for (final i in available)
+        if (stock.stockOf(i.product.id) case final left?) i.product.id: left,
+    }));
     final count = available.length;
     message = "Added $count item${count == 1 ? '' : 's'} to your cart"
         "${skipped > 0 ? ' · $skipped unavailable' : ''}";

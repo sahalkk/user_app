@@ -21,6 +21,9 @@ import '../widgets/checkout_footer_parts.dart';
 import '../widgets/delivery_address_picker.dart';
 import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 import 'package:beeyo_customer/shared/widgets/sponsored_ad_card.dart';
+import 'package:beeyo_customer/shared/widgets/stock_badges.dart';
+import 'package:beeyo_customer/shared/utils/stock_guard.dart';
+import 'package:beeyo_customer/blocs/stock_cubit/stock_cubit.dart';
 
 const _kUndoDuration = Duration(seconds: 4);
 const _kPanelDuration = Duration(milliseconds: 250);
@@ -62,6 +65,29 @@ class _CartScreenState extends State<CartScreen> {
     if (state is Bound) _lastDarkStoreId = state.darkStoreId;
     context.read<AdsCubit>().load(AdPlacement.cartInline);
     _prefetchOrderSuccessAd();
+    // The cart may have sat for a while (or the app was in the background):
+    // get the latest numbers for exactly what's in it.
+    _refreshCartStock();
+  }
+
+  Future<void> _refreshCartStock() {
+    final cart = context.read<CartBloc>().state;
+    if (cart is! CartLoaded) return Future.value();
+    return context
+        .read<StockCubit>()
+        .refreshProducts(cart.items.map((i) => i.product.id));
+  }
+
+  /// Per product in the cart, the units actually available when that's less
+  /// than what's in the cart (0 = sold out). Empty when everything fits.
+  static Map<String, int> _stockLimits(
+      List<CartItemModel> items, StockState stock) {
+    final limits = <String, int>{};
+    for (final item in items) {
+      final left = stock.stockOf(item.product.id);
+      if (left != null && item.quantity > left) limits[item.product.id] = left;
+    }
+    return limits;
   }
 
   /// Checkout starts here, so fetch the order success ad (and warm its
@@ -173,6 +199,23 @@ class _CartScreenState extends State<CartScreen> {
     }
     if (!ready || !mounted) return;
 
+    // Last look at stock before committing. The server re-checks under a
+    // lock regardless; this just catches the common case without a round
+    // trip that fails. Any shortfall shows on the items and blocks checkout.
+    setState(() => _isPreparing = true);
+    await _refreshCartStock();
+    if (!mounted) return;
+    setState(() => _isPreparing = false);
+    final cartNow = context.read<CartBloc>().state;
+    if (cartNow is CartLoaded &&
+        _stockLimits(cartNow.items, context.read<StockCubit>().state)
+            .isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              "Some items just ran low. Update your cart to continue.")));
+      return;
+    }
+
     // Re-read: the add/complete steps above may have bound a new address.
     final location = cubit.state;
     final cart = context.read<CartBloc>().state;
@@ -192,12 +235,26 @@ class _CartScreenState extends State<CartScreen> {
 
   void _onOrderStateChanged(BuildContext context, OrderState state) {
     if (state is OrderPlaceError) {
+      // Refused for stock: record what's really left so the affected items
+      // light up and checkout waits for the cart to be updated.
+      final shortages = state.shortages;
+      if (shortages != null) {
+        context.read<StockCubit>().applyShortages(shortages);
+      }
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(state.message)));
       return;
     }
     if (state is! OrderPlaced) return;
 
+    // This order just took stock, so pick that up now rather than on the
+    // next poll; the last unit should read "Arriving soon" straight away.
+    final cart = context.read<CartBloc>().state;
+    if (cart is CartLoaded) {
+      context
+          .read<StockCubit>()
+          .refreshProducts(cart.items.map((i) => i.product.id));
+    }
     context.read<CartBloc>().add(ClearCart());
 
     // With an order success ad ready, the success screen takes over the
@@ -363,6 +420,8 @@ class _CartScreenState extends State<CartScreen> {
               .toList();
           final rows =
               _buildRows(visibleItems, context.watch<AdsCubit>().state);
+          final stock = context.watch<StockCubit>().state;
+          final limits = _stockLimits(visibleItems, stock);
 
           return Column(
             children: [
@@ -380,6 +439,7 @@ class _CartScreenState extends State<CartScreen> {
                             return _CartItemCard(
                               key: ValueKey(item.product.id),
                               cartItem: item,
+                              stockLeft: stock.stockOf(item.product.id),
                               onSwipeDelete: () => _handleSwipeDelete(item),
                             );
                           case _AdRow(:final ad, :final slot):
@@ -422,6 +482,7 @@ class _CartScreenState extends State<CartScreen> {
                   child: BlocBuilder<OrderBloc, OrderState>(
                     builder: (context, orderState) {
                       final busy = _isPreparing || orderState is OrderPlacing;
+                      final blocked = limits.isNotEmpty;
                       final panelMaxHeight =
                           MediaQuery.sizeOf(context).height * 0.45;
                       final toPay = state.totalAmount + kDeliveryFee;
@@ -429,6 +490,13 @@ class _CartScreenState extends State<CartScreen> {
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (blocked)
+                            _StockIssueBanner(
+                              count: limits.length,
+                              onUpdate: () => context
+                                  .read<CartBloc>()
+                                  .add(ApplyStockLimits(limits)),
+                            ),
                           DeliverToStrip(
                             expanded: _openPanel == _FooterPanel.address,
                             needsAddress: _needsAddress,
@@ -483,12 +551,16 @@ class _CartScreenState extends State<CartScreen> {
                                 child: SizedBox(
                                   height: 56,
                                   child: ShimmerSweep(active: busy, borderRadius: BorderRadius.circular(16), child: ElevatedButton(
-                                    onPressed: busy ? null : _placeOrder,
+                                    onPressed:
+                                        busy || blocked ? null : _placeOrder,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor:
                                           Theme.of(context).primaryColor,
-                                      disabledBackgroundColor:
-                                          Theme.of(context).primaryColor,
+                                      // Busy keeps its colour under the
+                                      // shimmer; blocked greys out.
+                                      disabledBackgroundColor: blocked && !busy
+                                          ? const Color(0xFFBDBDBD)
+                                          : Theme.of(context).primaryColor,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(16),
                                       ),
@@ -500,7 +572,9 @@ class _CartScreenState extends State<CartScreen> {
                                       child: Text(
                                         busy
                                             ? "Placing order…"
-                                            : "Place order · ${formatRupees(toPay)}",
+                                            : blocked
+                                                ? "Update cart to continue"
+                                                : "Place order · ${formatRupees(toPay)}",
                                         style: const TextStyle(
                                             fontSize: 16,
                                             color: Colors.white,
@@ -590,17 +664,24 @@ class _AdRow extends _CartRow {
 // ─────────────────────────────────────────────
 class _CartItemCard extends StatelessWidget {
   final CartItemModel cartItem;
+
+  /// Units the store has, or null while unknown.
+  final int? stockLeft;
   final VoidCallback onSwipeDelete;
 
   const _CartItemCard({
     super.key,
     required this.cartItem,
+    required this.stockLeft,
     required this.onSwipeDelete,
   });
 
   @override
   Widget build(BuildContext context) {
     final itemTotal = cartItem.product.priceValue * cartItem.quantity;
+    final soldOut = stockLeft == 0;
+    final overStock =
+        stockLeft != null && stockLeft! > 0 && cartItem.quantity > stockLeft!;
 
     // Fresh fade + scale entrance every time this widget is (re)inserted
     // into the tree — plays on first load, and again if the user hits UNDO.
@@ -634,12 +715,17 @@ class _CartItemCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: const Color(0xFFFFFFFF),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE0E0E0)),
+              border: Border.all(
+                  color: soldOut || overStock
+                      ? kLowStockColor.withValues(alpha: 0.5)
+                      : const Color(0xFFE0E0E0)),
             ),
             child: Row(
               children: [
                 // --- Image ---
-                Container(
+                Opacity(
+                  opacity: soldOut ? 0.4 : 1,
+                  child: Container(
                   width: 70,
                   height: 70,
                   decoration: BoxDecoration(
@@ -650,7 +736,7 @@ class _CartItemCard extends StatelessWidget {
                       fit: BoxFit.cover,
                     ),
                   ),
-                ),
+                )),
                 const SizedBox(width: 16),
 
                 // --- Details Column ---
@@ -678,6 +764,19 @@ class _CartItemCard extends StatelessWidget {
                             color: Color(0xFF6B6B6B),
                             fontSize: 11),
                       ),
+                      if (soldOut || overStock) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          soldOut
+                              ? "Sold out · remove to continue"
+                              : "Only $stockLeft left · reduce to continue",
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              color: kLowStockColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11),
+                        ),
+                      ],
 
                       const SizedBox(height: 12),
 
@@ -751,12 +850,8 @@ class _CartItemCard extends StatelessWidget {
                                       color: Colors.white),
                                 ),
                                 InkWell(
-                                  onTap: () {
-                                    context.read<CartBloc>().add(
-                                        UpdateCartItemQuantity(
-                                            cartItem.product.id,
-                                            cartItem.quantity + 1));
-                                  },
+                                  onTap: () => addOneToCart(context,
+                                      cartItem.product, cartItem.quantity),
                                   child: const Padding(
                                     padding: EdgeInsets.symmetric(
                                         horizontal: 12, vertical: 8),
@@ -789,6 +884,53 @@ class _CartItemCard extends StatelessWidget {
       alignment: alignment,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: const Icon(Icons.delete_rounded, color: Color(0xFFE53935)),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  "Some items are unavailable" + one-tap fix, above the footer
+// ─────────────────────────────────────────────
+class _StockIssueBanner extends StatelessWidget {
+  final int count;
+  final VoidCallback onUpdate;
+
+  const _StockIssueBanner({required this.count, required this.onUpdate});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 4, bottom: 8),
+      padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.inventory_2_outlined,
+              color: kLowStockColor, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              count == 1
+                  ? "1 item isn't available in that quantity"
+                  : "$count items aren't available in those quantities",
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF5D4037)),
+            ),
+          ),
+          TextButton(
+            onPressed: onUpdate,
+            style: TextButton.styleFrom(foregroundColor: kLowStockColor),
+            child: const Text("Update cart",
+                style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
     );
   }
 }

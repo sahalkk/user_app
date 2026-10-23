@@ -15,18 +15,20 @@ import 'package:beeyo_customer/shared/widgets/search_bar_style.dart';
 import 'package:beeyo_customer/shared/widgets/skeleton.dart';
 import '../../../blocs/ads_cubit/ads_cubit.dart';
 import '../../../shared/models/ad_model.dart';
+import '../../../blocs/stock_cubit/stock_cubit.dart';
 import 'widgets/home_ad_banner.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  /// Pull-to-refresh: reloads products and refetches the home ads.
+  /// Pull-to-refresh: reloads products, stock and the home ads.
   Future<void> _refresh(BuildContext context) async {
     final homeBloc = context.read<HomeBloc>();
     final adsCubit = context.read<AdsCubit>();
     homeBloc.add(LoadHomeData());
     await Future.wait([
       adsCubit.load(AdPlacement.homeBanner, force: true),
+      context.read<StockCubit>().refresh(),
       homeBloc.stream.firstWhere((s) => s is HomeLoaded || s is HomeError),
     ]);
   }

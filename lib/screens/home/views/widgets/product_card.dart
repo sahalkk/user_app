@@ -10,6 +10,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../blocs/cart_bloc/cart_bloc.dart';
 import '../../../../shared/models/product_model.dart';
 import 'package:beeyo_customer/shared/widgets/skeleton.dart';
+import 'package:beeyo_customer/shared/widgets/stock_badges.dart';
+import 'package:beeyo_customer/shared/utils/stock_guard.dart';
+import 'package:beeyo_customer/blocs/stock_cubit/stock_cubit.dart';
 
 // ─────────────────────────────────────────────
 //  Premium Dark-Mode Product Card for beeyo
@@ -44,7 +47,27 @@ class _ProductCardState extends State<ProductCard> {
   @override
   Widget build(BuildContext context) {
     final images = _images;
+    // Rebuilds only when this product flips between sold out and not.
+    final soldOut =
+        context.select<StockCubit, bool>((c) => c.state.isSoldOut(product.id));
 
+    // Sold out: image and text go translucent and the whole card stops
+    // responding (no details, no ADD, no wishlist) until the store
+    // restocks. The "Arriving soon" pill takes the ADD button's spot at
+    // full opacity so it reads clearly.
+    return IgnorePointer(
+      ignoring: soldOut,
+      child: _buildCard(context, images, soldOut),
+    );
+  }
+
+  Widget _dimmed(bool soldOut, Widget child) => AnimatedOpacity(
+        opacity: soldOut ? 0.4 : 1,
+        duration: const Duration(milliseconds: 200),
+        child: child,
+      );
+
+  Widget _buildCard(BuildContext context, List<String> images, bool soldOut) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -61,7 +84,7 @@ class _ProductCardState extends State<ProductCard> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                AspectRatio(
+                _dimmed(soldOut, AspectRatio(
                   aspectRatio: 1.0,
                   child: Container(
                     width: double.infinity,
@@ -132,20 +155,30 @@ class _ProductCardState extends State<ProductCard> {
                       ),
                     ),
                   ),
+                )),
+
+                // "Only N left" (top-left), while stock is low
+                Positioned(
+                  top: 7,
+                  left: 7,
+                  child: LowStockBadge(productId: product.id),
                 ),
 
-                // Floating ADD button (straddles the image's bottom edge)
+                // Floating ADD button (straddles the image's bottom edge),
+                // or "Arriving soon" once sold out
                 Positioned(
                   right: 8,
                   bottom: -8,
-                  child: _buildAddButton(context),
+                  child: soldOut
+                      ? const ArrivingSoonPill()
+                      : _buildAddButton(context),
                 ),
 
                 // Wishlist heart icon (top-right)
                 Positioned(
                   top: 7,
                   right: 7,
-                  child: BlocBuilder<WishlistBloc, WishlistState>(
+                  child: _dimmed(soldOut, BlocBuilder<WishlistBloc, WishlistState>(
                     builder: (context, state) {
                       bool isWishlisted = false;
                       if (state is WishlistLoaded) {
@@ -200,7 +233,7 @@ class _ProductCardState extends State<ProductCard> {
                         ),
                       );
                     },
-                  ),
+                  )),
                 ),
               ],
             ),
@@ -208,7 +241,7 @@ class _ProductCardState extends State<ProductCard> {
             const SizedBox(height: 15),
 
             // ── PRODUCT INFO (sizes itself to its content) ─────────────
-            Padding(
+            _dimmed(soldOut, Padding(
               padding: const EdgeInsets.fromLTRB(9.0, 0, 9.0, 10.0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -278,7 +311,7 @@ class _ProductCardState extends State<ProductCard> {
                   ),
                 ],
               ),
-            ),
+            )),
           ],
         ),
       ),
@@ -344,7 +377,7 @@ class _ProductCardState extends State<ProductCard> {
           // ── Plain ADD button (floating outline pill) ──
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => context.read<CartBloc>().add(AddToCart(product)),
+            onTap: () => addOneToCart(context, product, 0),
             child: Container(
               height: 32,
               padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -412,8 +445,7 @@ class _ProductCardState extends State<ProductCard> {
                   // Plus
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () =>
-                        context.read<CartBloc>().add(AddToCart(product)),
+                    onTap: () => addOneToCart(context, product, quantity),
                     child: const Padding(
                       padding: EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
